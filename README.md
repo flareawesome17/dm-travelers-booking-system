@@ -1,73 +1,151 @@
-# Welcome to your Lovable project
+# D&M Travelers Inn – Hotel Management & Booking System
 
-## Project info
+Full-stack hotel booking and admin platform per the project PRD: public booking site (mobile-first, SEO, Framer Motion), admin panel, Supabase, REST API on Vercel serverless, email verification, Stripe/PayPal/GCash, RBAC, and reports.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Stack
 
-## How can I edit this code?
+- **Frontend:** React (Vite), TypeScript, TailwindCSS, Framer Motion, React Router
+- **Backend:** Separate API (e.g. Vercel serverless or other); see `app/api/` for route contracts
+- **Database:** Supabase (PostgreSQL)
+- **Auth:** JWT (admin), email verification (guests)
+- **Payments:** Stripe (PayPal/GCash stubbed for integration)
+- **Email:** SMTP (Nodemailer)
 
-There are several ways of editing your application.
+## Setup
 
-**Use Lovable**
+### 1. Install
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+```bash
+npm install
+```
 
-Changes made via Lovable will be committed automatically to this repo.
+### 2. Environment
 
-**Use your preferred IDE**
+Copy `.env.example` to `.env` and set:
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- `NEXT_PUBLIC_SUPABASE_URL` – Supabase project URL  
+- `SUPABASE_SERVICE_ROLE_KEY` – Supabase service role key  
+- `JWT_SECRET` – random string for signing admin JWTs  
+- `VITE_API_URL` – base URL of the API server (`http://localhost:5471`; see “Two ports” below)  
+- SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`  
+- Payments: `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (optional for deposit flow)
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### 3. Database
 
-Follow these steps:
+Run the migration in Supabase (SQL Editor or CLI):
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+```bash
+# From project root, run the SQL in:
+# supabase/migrations/001_initial_schema.sql
+```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### 4. Seed first admin (optional)
 
-# Step 3: Install the necessary dependencies.
-npm i
+```bash
+node scripts/seed-admin.mjs
+```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+The script will prompt for **email** and **password** if they’re not set in `.env` / `.env.local` as `ADMIN_EMAIL` and `ADMIN_PASSWORD`. Enter the credentials you want for the first admin user.
+
+### 5. Run the app (two ports only)
+
+This project uses **exactly two ports**:
+
+| Port  | Role    | Command       | URL                      |
+|-------|---------|---------------|--------------------------|
+| **4242** | Frontend | `npm run dev` | http://localhost:4242   |
+| **5471** | Server (API) | `npm run api`  | http://localhost:5471   |
+
+All API calls from the frontend go to the server on **5471**. Set `VITE_API_URL=http://localhost:5471` in `.env.local`.
+
+**Terminal 1 – Server (API):**
+
+```bash
+npm run api
+```
+
+**Terminal 2 – Frontend:**
+
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Then open **http://localhost:4242** (site and admin at `/admin`). If port 4242 is in use, Vite will error (no automatic fallback to another port).
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+**Production preview (after building):**
 
-**Use GitHub Codespaces**
+```bash
+npm run build
+npm start
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Serves the built app from `dist/` on port 4242. Run `npm run build` first or you’ll get “page not found”.
 
-## What technologies are used for this project?
+---
 
-This project is built with:
+## How to access the admin
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+1. **Start the dev server** (if not already running):
+   ```bash
+   npm run dev
+   ```
 
-## How can I deploy this project?
+2. **Open the admin in your browser:**
+   - **URL:** [http://localhost:4242/admin](http://localhost:4242/admin)  
+   - Or use the **Admin** link in the site navbar.  
+   - Visiting `/admin` automatically redirects to `/admin/login`.
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+3. **Log in** with an admin account.  
+   If you don’t have one yet, create the first admin user:
+   ```bash
+   node scripts/seed-admin.mjs
+   ```
+   Enter your email and password when prompted, then use those same credentials on the admin login page.  
+   Make sure the **API server is running** (`npm run api`, port 5471) and `VITE_API_URL=http://localhost:5471` in `.env.local`, or login will fail with 404.
 
-## Can I connect a custom domain to my Lovable project?
+4. **After login** you’ll see the dashboard. From the sidebar you can open:
+   - **Dashboard** – overview and recent bookings  
+   - **Bookings** – list and manage reservations  
+   - **Rooms** – room list and management  
+   - **Housekeeping** – room status (Dirty, In Cleaning, Clean, Maintenance)  
+   - **Restaurant** – menu items  
+   - **Reports** – revenue and occupancy (with CSV export)  
+   - **Users** – admin users (Super Admin only)  
+   - **Settings** – hotel settings  
 
-Yes, you can!
+**Note:** The database (Supabase) must be set up and the migration `supabase/migrations/001_initial_schema.sql` applied before admin login will work. Fill in `.env.local` with your Supabase URL and service role key.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Deployment (Vercel)
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+1. Connect the repo to Vercel.
+2. Add all variables from `.env.example` in **Project → Settings → Environment Variables** (for Production/Preview).
+3. Deploy. API routes are serverless under `/api/*`.
+
+**Note:** For CSV/PDF report export with auth, call the reports API with `Authorization: Bearer <token>` (e.g. from a frontend button that fetches and triggers download).
+
+## API overview
+
+- `POST /api/admin/login` – admin login (returns JWT)
+- `GET/POST /api/bookings` – list (admin) / create (public)
+- `GET/PATCH /api/bookings/[id]` – get/update booking
+- `POST /api/bookings/verify` – submit email verification code
+- `POST /api/bookings/payment/deposit` – confirm 30% deposit
+- `GET/POST/PATCH /api/rooms`, `PATCH /api/rooms/[id]`
+- `GET /api/room_types`
+- `GET /api/housekeeping/rooms`, `PATCH /api/housekeeping/room/[id]/status`
+- `GET/POST /api/reviews`, `PATCH /api/reviews/[id]/approve`
+- `GET/POST /api/menu`, `PATCH /api/menu/[id]`
+- `GET /api/reports/occupancy`, `GET /api/reports/revenue` (optional `?format=csv`)
+- `GET/POST /api/admin/users`, `GET/PATCH /api/settings`
+
+## Data retention (per PRD)
+
+- **Payments:** 7 years (archival)
+- **Bookings:** 5 years (audit)
+- **Reviews:** indefinite when public
+
+## KPIs
+
+- LCP ≤ 2.5s, TTI ≤ 3s (public site)
+- `POST /api/bookings` latency ≤ 1.5s
+- Uptime target ≥ 99.9%

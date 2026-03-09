@@ -1,0 +1,28 @@
+---
+description: Prioritize project documentation for all coding, architecture, UI/UX, API, schema, and deployment decisions
+alwaysApply: true
+---
+
+# Project Rule: Documentation-First
+
+While working on this project, **always refer to and prioritize** the following documentation Markdown files. Do not make assumptions or go out of context.
+
+## Canonical documentation (read when relevant)
+
+- **PRD & overview**: `dm_hotel_booking_and_management_system_prd.md`, `dm_hotel_booking_and_management_system_all_documentation.md`
+- **User flows**: `dm_hotel_booking_and_management_system_user_flow.md`
+- **Tech stack**: `dm_hotel_booking_and_management_system_tech_stack.md`
+- **Styling**: `dm_hotel_booking_and_management_system_styling.md`
+- **Structure**: `dm_hotel_booking_and_management_system_structure.md`
+- **Schema**: `dm_hotel_booking_and_management_system_schema.md`
+
+## Requirements
+
+1. **Coding** – Follow patterns, conventions, and examples defined in the docs.
+2. **Architecture** – Align with the documented architecture and module boundaries.
+3. **UI/UX** – Match layouts, components, and flows described in the documentation.
+4. **API development** – Implement endpoints, contracts, and behavior as specified.
+5. **Database schema** – Use the documented schema; do not introduce undocumented tables or columns.
+6. **Deployment** – Follow the documented deployment and environment setup.
+
+**Never** introduce features, behaviors, or implementations that contradict or extend beyond the documentation without explicit user approval. When something is unclear, ask or propose a minimal change that stays within the docs.
