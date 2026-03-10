@@ -8,43 +8,86 @@ import { toast } from "@/components/ui/sonner";
 type RoomFormProps = {
   apiUrl: string;
   token: string;
+  room?: {
+    id: string;
+    room_number?: string;
+    room_type?: string;
+    floor?: number;
+    capacity?: number;
+    amenities?: string[];
+    rate_plans?: unknown;
+  };
   onSuccess: (room: unknown) => void;
   onClose: () => void;
 };
 
-export function RoomForm({ apiUrl, token, onSuccess, onClose }: RoomFormProps) {
-  const [roomNumber, setRoomNumber] = useState("");
-  const [roomType, setRoomType] = useState("");
-  const [floor, setFloor] = useState("");
-  const [capacity, setCapacity] = useState("2");
-  const [basePrice, setBasePrice] = useState("");
-  const [amenities, setAmenities] = useState("");
+export function RoomForm({ apiUrl, token, room, onSuccess, onClose }: RoomFormProps) {
+  const [roomNumber, setRoomNumber] = useState(room?.room_number ?? "");
+  const [roomType, setRoomType] = useState(room?.room_type ?? "");
+  const [floor, setFloor] = useState(room?.floor != null ? String(room.floor) : "");
+  const [capacity, setCapacity] = useState(
+    room?.capacity != null ? String(room.capacity) : "2",
+  );
+  const [amenities, setAmenities] = useState(
+    Array.isArray(room?.amenities) ? room!.amenities!.join(", ") : "",
+  );
   const [files, setFiles] = useState<FileList | null>(null);
+  const existingImages = Array.isArray((room as any)?.image_urls)
+    ? ((room as any).image_urls as string[])
+    : [];
+  const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
 
   // Rate plan state
-  const [enable24h, setEnable24h] = useState(true);
-  const [rate24Price, setRate24Price] = useState("");
-  const [rate24EarlyFee, setRate24EarlyFee] = useState("");
-  const [rate24LateFee, setRate24LateFee] = useState("");
+  const existingPlans = Array.isArray(room?.rate_plans) ? (room!.rate_plans as any[]) : [];
+  const findPlan = (kind: string) =>
+    existingPlans.find((p) => p && typeof p === "object" && p.kind === kind);
 
-  const [enable12h, setEnable12h] = useState(false);
-  const [rate12Price, setRate12Price] = useState("");
-  const [rate12LateFee, setRate12LateFee] = useState("");
+  const plan24 = findPlan("24h");
+  const plan12 = findPlan("12h");
+  const plan5 = findPlan("5h");
+  const plan3 = findPlan("3h");
 
-  const [enable5h, setEnable5h] = useState(false);
-  const [rate5Price, setRate5Price] = useState("");
-  const [rate5LateFee, setRate5LateFee] = useState("");
+  const [enable24h, setEnable24h] = useState(plan24 ? Boolean(plan24.enabled) : true);
+  const [rate24Price, setRate24Price] = useState(
+    plan24 && plan24.base_price != null ? String(plan24.base_price) : "",
+  );
+  const [rate24EarlyFee, setRate24EarlyFee] = useState(
+    plan24 && plan24.early_checkin_fee != null ? String(plan24.early_checkin_fee) : "",
+  );
+  const [rate24LateFee, setRate24LateFee] = useState(
+    plan24 && plan24.late_checkout_fee != null ? String(plan24.late_checkout_fee) : "",
+  );
 
-  const [enable3h, setEnable3h] = useState(false);
-  const [rate3Price, setRate3Price] = useState("");
-  const [rate3LateFee, setRate3LateFee] = useState("");
+  const [enable12h, setEnable12h] = useState(plan12 ? Boolean(plan12.enabled) : false);
+  const [rate12Price, setRate12Price] = useState(
+    plan12 && plan12.base_price != null ? String(plan12.base_price) : "",
+  );
+  const [rate12LateFee, setRate12LateFee] = useState(
+    plan12 && plan12.late_checkout_fee != null ? String(plan12.late_checkout_fee) : "",
+  );
+
+  const [enable5h, setEnable5h] = useState(plan5 ? Boolean(plan5.enabled) : false);
+  const [rate5Price, setRate5Price] = useState(
+    plan5 && plan5.base_price != null ? String(plan5.base_price) : "",
+  );
+  const [rate5LateFee, setRate5LateFee] = useState(
+    plan5 && plan5.late_checkout_fee != null ? String(plan5.late_checkout_fee) : "",
+  );
+
+  const [enable3h, setEnable3h] = useState(plan3 ? Boolean(plan3.enabled) : false);
+  const [rate3Price, setRate3Price] = useState(
+    plan3 && plan3.base_price != null ? String(plan3.base_price) : "",
+  );
+  const [rate3LateFee, setRate3LateFee] = useState(
+    plan3 && plan3.late_checkout_fee != null ? String(plan3.late_checkout_fee) : "",
+  );
 
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!roomNumber || !roomType || !basePrice) {
-      toast.error("Room number, type, and base price are required.");
+    if (!roomNumber || !roomType) {
+      toast.error("Room number and room type are required.");
       return;
     }
 
@@ -52,15 +95,14 @@ export function RoomForm({ apiUrl, token, onSuccess, onClose }: RoomFormProps) {
     const ratePlans: Array<Record<string, unknown>> = [];
 
     if (enable24h) {
-      const price = rate24Price || basePrice;
-      if (!price) {
-        toast.error("Please set a price for the 24-hour rate or the base price.");
+      if (!rate24Price) {
+        toast.error("Please set a price for the 24-hour rate.");
         return;
       }
       ratePlans.push({
         kind: "24h",
         enabled: true,
-        base_price: Number(price),
+        base_price: Number(rate24Price),
         early_checkin_fee: rate24EarlyFee ? Number(rate24EarlyFee) : 0,
         late_checkout_fee: rate24LateFee ? Number(rate24LateFee) : 0,
         checkin_time: "14:00",
@@ -163,25 +205,59 @@ export function RoomForm({ apiUrl, token, onSuccess, onClose }: RoomFormProps) {
         uploadedUrls = Array.isArray(uploadData.urls) ? uploadData.urls : [];
       }
 
-      const res = await fetch(`${apiUrl}/api/rooms`, {
-        method: "POST",
+      const isEdit = Boolean(room?.id);
+      const endpoint = isEdit ? `${apiUrl}/api/rooms/${room!.id}` : `${apiUrl}/api/rooms`;
+      const method = isEdit ? "PATCH" : "POST";
+
+      // Build payload
+      const payload: Record<string, unknown> = {};
+      const trimmedAmenities = amenities
+        .split(",")
+        .map((a) => a.trim())
+        .filter(Boolean);
+      const newImagesAll =
+        uploadedUrls.length > 0 ? [...existingImages, ...uploadedUrls] : existingImages;
+
+      if (!isEdit) {
+        payload.room_number = roomNumber;
+        payload.room_type = roomType;
+        payload.floor = floor ? Number(floor) : undefined;
+        payload.capacity = capacity ? Number(capacity) : undefined;
+        payload.amenities = trimmedAmenities;
+        payload.image_urls = uploadedUrls;
+        payload.rate_plans = ratePlans;
+      } else {
+        if (roomNumber !== room?.room_number) payload.room_number = roomNumber;
+        if (roomType !== room?.room_type) payload.room_type = roomType;
+        if ((floor ? Number(floor) : undefined) !== room?.floor) {
+          payload.floor = floor ? Number(floor) : null;
+        }
+        if ((capacity ? Number(capacity) : undefined) !== room?.capacity) {
+          payload.capacity = capacity ? Number(capacity) : null;
+        }
+        if (
+          JSON.stringify(trimmedAmenities) !==
+          JSON.stringify(Array.isArray(room?.amenities) ? room!.amenities : [])
+        ) {
+          payload.amenities = trimmedAmenities;
+        }
+        if (uploadedUrls.length > 0) {
+          payload.image_urls = newImagesAll;
+        }
+        const initialPlansJson = JSON.stringify(existingPlans || []);
+        const newPlansJson = JSON.stringify(ratePlans);
+        if (initialPlansJson !== newPlansJson) {
+          payload.rate_plans = ratePlans;
+        }
+      }
+
+      const res = await fetch(endpoint, {
+        method,
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          room_number: roomNumber,
-          room_type: roomType,
-          floor: floor ? Number(floor) : undefined,
-          capacity: capacity ? Number(capacity) : undefined,
-          base_price_per_night: Number(basePrice),
-          amenities: amenities
-            .split(",")
-            .map((a) => a.trim())
-            .filter(Boolean),
-          image_urls: uploadedUrls,
-          rate_plans: ratePlans,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const text = await res.text();
@@ -255,18 +331,6 @@ export function RoomForm({ apiUrl, token, onSuccess, onClose }: RoomFormProps) {
             onChange={(e) => setCapacity(e.target.value)}
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="base-price">Base price / night (₱)</Label>
-          <Input
-            id="base-price"
-            type="number"
-            min={0}
-            step="0.01"
-            value={basePrice}
-            onChange={(e) => setBasePrice(e.target.value)}
-            required
-          />
-        </div>
       </div>
 
       <div className="space-y-2">
@@ -302,7 +366,7 @@ export function RoomForm({ apiUrl, token, onSuccess, onClose }: RoomFormProps) {
                 step="0.01"
                 value={rate24Price}
                 onChange={(e) => setRate24Price(e.target.value)}
-                placeholder={basePrice || "3000"}
+                placeholder="3000"
               />
             </div>
             <div className="space-y-1">
@@ -451,11 +515,44 @@ export function RoomForm({ apiUrl, token, onSuccess, onClose }: RoomFormProps) {
           type="file"
           multiple
           accept="image/*"
-          onChange={(e) => setFiles(e.target.files)}
+          onChange={(e) => {
+            const list = e.target.files;
+            setFiles(list);
+            if (list && list.length > 0) {
+              const previews: string[] = [];
+              Array.from(list).forEach((file) => {
+                const url = URL.createObjectURL(file);
+                previews.push(url);
+              });
+              setNewImagePreviews(previews);
+            } else {
+              setNewImagePreviews([]);
+            }
+          }}
         />
         <p className="text-xs text-muted-foreground">
           Upload one or more optimized images for this room.
         </p>
+        {(existingImages.length > 0 || newImagePreviews.length > 0) && (
+          <div className="mt-2 grid grid-cols-4 gap-2">
+            {existingImages.map((src, idx) => (
+              // eslint-disable-next-line jsx-a11y/alt-text
+              <img
+                key={`existing-${idx}`}
+                src={src}
+                className="h-16 w-full rounded-md object-cover border border-slate-200 bg-slate-100"
+              />
+            ))}
+            {newImagePreviews.map((src, idx) => (
+              // eslint-disable-next-line jsx-a11y/alt-text
+              <img
+                key={`new-${idx}`}
+                src={src}
+                className="h-16 w-full rounded-md object-cover border border-dashed border-[#07008A]/40 bg-slate-50"
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       <DialogFooter className="pt-4">
