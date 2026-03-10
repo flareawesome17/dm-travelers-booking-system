@@ -8,7 +8,8 @@ const patchSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
   price: z.number().positive().optional(),
-  category: z.enum(['Breakfast', 'Lunch', 'Dinner', 'Drinks']).optional(),
+  // Category now comes from database-driven list; accept any non-empty string on this layer.
+  category: z.string().min(1).optional(),
   is_available: z.boolean().optional(),
   image_url: z.string().url().optional().nullable(),
 });

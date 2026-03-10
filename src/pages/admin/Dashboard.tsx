@@ -66,9 +66,9 @@ export default function AdminDashboard() {
   const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } };
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-slate-50 via-white to-[#07008A]/[0.03]">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-[#07008A]/[0.03]">
       <AdminSidebar />
-      <main className="flex-1 overflow-auto">
+      <main className="ml-64 min-h-screen overflow-auto">
         <div className="p-6 lg:p-8 max-w-6xl mx-auto">
           {/* Page header */}
           <motion.div

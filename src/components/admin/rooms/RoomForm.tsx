@@ -46,6 +46,7 @@ export function RoomForm({ apiUrl, token, room, onSuccess, onClose }: RoomFormPr
   const plan12 = findPlan("12h");
   const plan5 = findPlan("5h");
   const plan3 = findPlan("3h");
+  const planPerGuest = findPlan("per_guest");
 
   const [enable24h, setEnable24h] = useState(plan24 ? Boolean(plan24.enabled) : true);
   const [rate24Price, setRate24Price] = useState(
@@ -80,6 +81,28 @@ export function RoomForm({ apiUrl, token, room, onSuccess, onClose }: RoomFormPr
   );
   const [rate3LateFee, setRate3LateFee] = useState(
     plan3 && plan3.late_checkout_fee != null ? String(plan3.late_checkout_fee) : "",
+  );
+
+  const [enablePerGuest, setEnablePerGuest] = useState(
+    planPerGuest ? Boolean((planPerGuest as any).enabled ?? (planPerGuest as any).price_24h ?? (planPerGuest as any).price_12h) : false,
+  );
+  const [enablePerGuest24h, setEnablePerGuest24h] = useState(
+    planPerGuest ? (Boolean((planPerGuest as any).price_24h != null) || Boolean((planPerGuest as any).base_price != null)) : false,
+  );
+  const [enablePerGuest12h, setEnablePerGuest12h] = useState(
+    planPerGuest ? Boolean((planPerGuest as any).price_12h != null) : false,
+  );
+  const [ratePerGuest24hPrice, setRatePerGuest24hPrice] = useState(
+    planPerGuest && (planPerGuest as any).price_24h != null
+      ? String((planPerGuest as any).price_24h)
+      : planPerGuest && (planPerGuest as any).base_price != null
+      ? String((planPerGuest as any).base_price)
+      : "",
+  );
+  const [ratePerGuest12hPrice, setRatePerGuest12hPrice] = useState(
+    planPerGuest && (planPerGuest as any).price_12h != null
+      ? String((planPerGuest as any).price_12h)
+      : "",
   );
 
   const [submitting, setSubmitting] = useState(false);
@@ -149,6 +172,21 @@ export function RoomForm({ apiUrl, token, room, onSuccess, onClose }: RoomFormPr
         base_price: Number(rate3Price),
         late_checkout_fee: rate3LateFee ? Number(rate3LateFee) : 0,
         duration_hours: 3,
+      });
+    }
+
+    if (enablePerGuest) {
+      const has24 = enablePerGuest24h && ratePerGuest24hPrice;
+      const has12 = enablePerGuest12h && ratePerGuest12hPrice;
+      if (!has24 && !has12) {
+        toast.error("Enable at least one per guest variant (24h or 12h) and set its price.");
+        return;
+      }
+      ratePlans.push({
+        kind: "per_guest",
+        enabled: true,
+        price_24h: has24 ? Number(ratePerGuest24hPrice) : null,
+        price_12h: has12 ? Number(ratePerGuest12hPrice) : null,
       });
     }
 
@@ -283,6 +321,8 @@ export function RoomForm({ apiUrl, token, room, onSuccess, onClose }: RoomFormPr
       setSubmitting(false);
     }
   };
+
+  const isEdit = Boolean(room?.id);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -506,6 +546,70 @@ export function RoomForm({ apiUrl, token, room, onSuccess, onClose }: RoomFormPr
             </div>
           </div>
         </div>
+
+        <div className="space-y-3 rounded-md border p-4 bg-slate-50/40">
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={enablePerGuest}
+              onChange={(e) => setEnablePerGuest(e.target.checked)}
+            />
+            Per guest rate
+          </label>
+          <p className="text-xs text-slate-500">
+            Charge a fixed amount per guest. Configure separate per-guest prices for 24-hour and 12-hour stays.
+          </p>
+          {enablePerGuest && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
+              <div className="space-y-2 rounded-md border border-dashed p-3 bg-white/40">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    checked={enablePerGuest24h}
+                    onChange={(e) => setEnablePerGuest24h(e.target.checked)}
+                  />
+                  24-hour per guest rate
+                </label>
+                <div className="space-y-1">
+                  <Label htmlFor="rate-per-guest-24-price">Price per guest (₱)</Label>
+                  <Input
+                    id="rate-per-guest-24-price"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={ratePerGuest24hPrice}
+                    onChange={(e) => setRatePerGuest24hPrice(e.target.value)}
+                    placeholder="600"
+                    disabled={!enablePerGuest24h}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2 rounded-md border border-dashed p-3 bg-white/40">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    checked={enablePerGuest12h}
+                    onChange={(e) => setEnablePerGuest12h(e.target.checked)}
+                  />
+                  12-hour per guest rate
+                </label>
+                <div className="space-y-1">
+                  <Label htmlFor="rate-per-guest-12-price">Price per guest (₱)</Label>
+                  <Input
+                    id="rate-per-guest-12-price"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={ratePerGuest12hPrice}
+                    onChange={(e) => setRatePerGuest12hPrice(e.target.value)}
+                    placeholder="400"
+                    disabled={!enablePerGuest12h}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="space-y-2 border-t pt-4">
@@ -560,7 +664,7 @@ export function RoomForm({ apiUrl, token, room, onSuccess, onClose }: RoomFormPr
           Cancel
         </Button>
         <Button type="submit" disabled={submitting}>
-          {submitting ? "Saving..." : "Save room"}
+          {submitting ? "Saving..." : isEdit ? "Update room" : "Save room"}
         </Button>
       </DialogFooter>
     </form>

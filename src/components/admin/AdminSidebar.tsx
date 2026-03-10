@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   CalendarCheck,
@@ -10,6 +10,7 @@ import {
   Settings,
   Home,
   ChevronRight,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,9 +27,19 @@ const navItems = [
 
 export default function AdminSidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem("admin_token");
+    } catch {
+      // ignore
+    }
+    navigate("/admin/login", { replace: true });
+  };
 
   return (
-    <aside className="w-64 shrink-0 flex flex-col bg-[#07008A] text-white shadow-xl">
+    <aside className="fixed inset-y-0 left-0 w-64 flex flex-col bg-[#07008A] text-white shadow-xl z-30">
       {/* Brand header */}
       <div className="p-6 border-b border-white/10">
         <div className="flex items-center gap-3">
@@ -65,8 +76,16 @@ export default function AdminSidebar() {
         })}
       </nav>
 
-      {/* Back to site */}
-      <div className="p-4 border-t border-white/10">
+      {/* Footer actions */}
+      <div className="p-4 border-t border-white/10 space-y-2">
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/90 hover:bg-white/10 hover:text-white transition-all"
+        >
+          <LogOut className="h-5 w-5 shrink-0" />
+          <span>Logout</span>
+        </button>
         <Link
           to="/"
           className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/80 hover:bg-white/10 hover:text-white transition-all"

@@ -19,7 +19,8 @@ const createSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   price: z.number().positive(),
-  category: z.enum(['Breakfast', 'Lunch', 'Dinner', 'Drinks']),
+  // Category is now driven by database categories; accept any non-empty string here.
+  category: z.string().min(1),
   is_available: z.boolean().default(true),
   image_url: z.string().url().optional(),
 });
