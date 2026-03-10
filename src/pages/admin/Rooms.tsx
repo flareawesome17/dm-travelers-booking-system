@@ -5,13 +5,22 @@ import AdminSidebar from "@/components/admin/AdminSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BedDouble } from "lucide-react";
+import { BedDouble, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { RoomForm } from "@/components/admin/rooms/RoomForm";
 
 const API_URL = import.meta.env.VITE_API_URL || "";
 
 export default function AdminRooms() {
   const [rooms, setRooms] = useState<unknown[]>([]);
   const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -37,10 +46,37 @@ export default function AdminRooms() {
             <p className="text-muted-foreground mt-1">Room inventory and pricing</p>
           </motion.div>
           <Card className="border-0 shadow-lg bg-white overflow-hidden">
-            <CardHeader className="border-b bg-slate-50/50 px-6 py-4">
+            <CardHeader className="border-b bg-slate-50/50 px-6 py-4 flex items-center justify-between gap-4">
               <CardTitle className="text-lg font-semibold text-[#07008A] flex items-center gap-2">
                 <BedDouble className="h-5 w-5" /> All Rooms
               </CardTitle>
+              <Dialog open={open} onOpenChange={setOpen}>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4"
+                  onClick={() => setOpen(true)}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add room
+                </Button>
+                <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Add new room</DialogTitle>
+                  </DialogHeader>
+                  <RoomForm
+                    apiUrl={API_URL}
+                    token={localStorage.getItem("admin_token") || ""}
+                    onSuccess={(room) =>
+                      setRooms((prev) => {
+                        const next = Array.isArray(prev) ? [...prev, room] : [room];
+                        return next;
+                      })
+                    }
+                    onClose={() => setOpen(false)}
+                  />
+                </DialogContent>
+              </Dialog>
             </CardHeader>
             <CardContent className="p-0">
               {loading ? (
