@@ -10,7 +10,7 @@ const navLinks = [
   { label: "Restaurant", path: "/restaurant" },
   { label: "Reviews", path: "/reviews" },
   { label: "Contact", path: "/contact" },
-  { label: "Admin", path: "/admin" },
+  // { label: "Admin", path: "/admin" },
 ];
 
 const Navbar = () => {
@@ -50,9 +50,9 @@ const Navbar = () => {
           </nav>
 
           <div className="hidden lg:flex items-center gap-4">
-            <a href="tel:+639123456789" className="flex items-center gap-2 text-sm text-primary-foreground/70">
+            <a href="tel:+639518683018" className="flex items-center gap-2 text-sm text-primary-foreground/70">
               <Phone className="w-4 h-4" />
-              +63 912 345 6789
+              +63 951 868 3018
             </a>
             <Link to="/booking">
               <Button variant="default" size="sm" className="bg-gradient-gold text-secondary font-semibold shadow-gold hover:opacity-90">

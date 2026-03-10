@@ -44,7 +44,7 @@ export default function HomePage() {
             transition={{ duration: 0.6 }}
             className="text-[#FED501] text-sm uppercase tracking-widest mb-4"
           >
-            Welcome to Davao
+            Welcome to Plaridel
           </motion.p>
           <motion.h1
             initial={{ opacity: 0, y: 30 }}
@@ -62,7 +62,7 @@ export default function HomePage() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-lg md:text-xl mb-10 max-w-2xl mx-auto"
           >
-            Experience warm Filipino hospitality at D&M Travelers Inn. Book your stay in the heart of Davao.
+            Experience warm Filipino hospitality at D&M Travelers Inn. Book your stay in Plaridel, Misamis Occidental.
           </motion.p>
 
           <motion.div
@@ -155,7 +155,8 @@ export default function HomePage() {
       <footer className="bg-[#07008A] text-white py-8 mt-16">
         <div className="container mx-auto px-4 text-center">
           <p className="font-bold">D&M Travelers Inn</p>
-          <p className="text-sm opacity-80 mt-2">Plaridel, Misamis Occidental · Near Baobawon Island</p>
+          <p className="text-sm opacity-80 mt-2">Looc Proper, Dipolog - Oroquieta National Rd, Plaridel, 7209 Misamis Occidental</p>
+          <p className="text-sm opacity-80 mt-1"><a href="tel:+639518683018" className="hover:text-[#FED501] transition">+63 951 868 3018</a></p>
         </div>
       </footer>
     </div>

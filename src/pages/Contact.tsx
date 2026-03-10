@@ -28,8 +28,8 @@ const Contact = () => {
                 <h2 className="font-heading text-2xl font-bold text-foreground mb-6">Get In Touch</h2>
                 <div className="space-y-5">
                   {[
-                    { icon: MapPin, title: "Address", text: "123 J.P. Laurel Ave, Bajada, Davao City 8000" },
-                    { icon: Phone, title: "Phone", text: "+63 912 345 6789" },
+                    { icon: MapPin, title: "Address", text: "Looc Proper, Dipolog - Oroquieta National Rd, Plaridel, 7209 Misamis Occidental, Philippines" },
+                    { icon: Phone, title: "Phone", text: "+63 951 868 3018" },
                     { icon: Mail, title: "Email", text: "info@dmtravelersinn.com" },
                     { icon: Clock, title: "Front Desk", text: "Open 24 hours, 7 days a week" },
                   ].map((item) => (

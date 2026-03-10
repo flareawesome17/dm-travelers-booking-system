@@ -11,7 +11,7 @@ const amenities = [
   { icon: ShieldCheck, title: "24/7 Security", desc: "CCTV & security staff" },
   { icon: Clock, title: "Front Desk", desc: "Round-the-clock service" },
   { icon: Sparkles, title: "Housekeeping", desc: "Daily room cleaning" },
-  { icon: MapPin, title: "Prime Location", desc: "Near Davao attractions" },
+  { icon: MapPin, title: "Prime Location", desc: "Near Plaridel attractions" },
 ];
 
 const AmenitiesSection = () => {

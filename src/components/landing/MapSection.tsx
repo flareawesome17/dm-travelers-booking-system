@@ -16,7 +16,7 @@ const MapSection = () => {
           className="text-center mb-10"
         >
           <p className="text-primary text-sm uppercase tracking-[0.15em] font-medium mb-2">Location</p>
-          <h2 className="font-heading text-3xl lg:text-4xl font-bold text-foreground">Find Us in Davao City</h2>
+          <h2 className="font-heading text-3xl lg:text-4xl font-bold text-foreground">Find Us in Plaridel, Misamis Occidental</h2>
         </motion.div>
 
         <motion.div
@@ -27,14 +27,14 @@ const MapSection = () => {
         >
           <div className="lg:col-span-2 rounded-xl overflow-hidden shadow-elevated h-72 lg:h-96">
             <iframe
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3959.5!2d125.61!3d7.07!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2sDavao+City!5e0!3m2!1sen!2sph!4v1"
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3951.0!2d123.7!3d8.6!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2sPlaridel%2C+Misamis+Occidental!5e0!3m2!1sen!2sph!4v1"
               width="100%"
               height="100%"
               style={{ border: 0 }}
               allowFullScreen
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
-              title="D&M Travelers Inn location"
+              title="D&M Travelers Inn location - Plaridel, Misamis Occidental"
             />
           </div>
 
@@ -44,22 +44,18 @@ const MapSection = () => {
               <h3 className="font-heading text-lg font-semibold text-foreground">Our Address</h3>
             </div>
             <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-              123 J.P. Laurel Avenue,<br />
-              Bajada, Davao City,<br />
-              Philippines 8000
+              Looc Proper, Dipolog - Oroquieta National Rd,<br />
+              Plaridel, 7209 Misamis Occidental,<br />
+              Philippines
             </p>
             <div className="space-y-3 text-sm">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Navigation className="w-4 h-4 text-primary" />
-                5 mins from SM Lanang Premier
+                Along Dipolog-Oroquieta National Road
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Navigation className="w-4 h-4 text-primary" />
-                15 mins from Davao Airport
-              </div>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Navigation className="w-4 h-4 text-primary" />
-                Near People's Park
+                Near Baobawon Island
               </div>
             </div>
           </div>

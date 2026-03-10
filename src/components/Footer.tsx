@@ -11,7 +11,7 @@ const Footer = () => {
               D&M Travelers Inn
             </h3>
             <p className="text-secondary-foreground/70 text-sm leading-relaxed">
-              Your home away from home in the heart of Davao City. Experience warm Filipino hospitality with modern comfort.
+              Your home away from home in Plaridel, Misamis Occidental. Experience warm Filipino hospitality with modern comfort.
             </p>
           </div>
 
@@ -39,15 +39,15 @@ const Footer = () => {
             <ul className="space-y-3 text-sm text-secondary-foreground/70">
               <li className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
-                123 J.P. Laurel Ave, Davao City, Philippines 8000
+                Looc Proper, Dipolog - Oroquieta National Rd, Plaridel, 7209 Misamis Occidental, Philippines
               </li>
               <li className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-primary flex-shrink-0" />
-                +63 912 345 6789
+                +63 951 868 3018
               </li>
               <li className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-primary flex-shrink-0" />
-                info@dmtravelersinn.com
+                dmsupport@erniecodev.win
               </li>
               <li className="flex items-start gap-2">
                 <Clock className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />

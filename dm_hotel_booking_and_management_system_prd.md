@@ -366,15 +366,15 @@ Review schema
 
 SEO keywords:
 
-travelers inn davao
+travelers inn plaridel
 
-davao travelers inn booking
+plaridel travelers inn booking
 
-affordable hotel davao
+affordable hotel plaridel
 
-davao accommodation
+plaridel accommodation
 
-budget hotel davao city
+budget hotel plaridel
 
 Booking Reservation System
 

@@ -13,13 +13,13 @@ const testimonials = [
     name: "James Lee",
     location: "Singapore",
     rating: 5,
-    text: "Best value hotel in Davao. Clean rooms, excellent restaurant, and the pool area is a great place to unwind. Highly recommended!",
+    text: "Best value hotel in Plaridel. Clean rooms, excellent restaurant, and the pool area is a great place to unwind. Highly recommended!",
   },
   {
     name: "Ana Reyes",
     location: "Cebu",
     rating: 4,
-    text: "Great location near SM Lanang. The breakfast buffet was impressive and the staff are very accommodating. Will definitely come back!",
+    text: "Great location along the national road. The breakfast buffet was impressive and the staff are very accommodating. Will definitely come back!",
   },
 ];
 

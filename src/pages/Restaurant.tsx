@@ -10,11 +10,11 @@ const menuItems = [
   { name: "Pancake Stack", category: "Breakfast", price: 160, desc: "Fluffy pancakes with maple syrup and butter" },
   { name: "Sinigang na Baboy", category: "Lunch", price: 280, desc: "Pork sour soup with vegetables" },
   { name: "Kare-Kare", category: "Lunch", price: 320, desc: "Oxtail stew with peanut sauce" },
-  { name: "Grilled Tuna Belly", category: "Lunch", price: 350, desc: "Fresh Davao tuna, grilled to perfection" },
+  { name: "Grilled Tuna Belly", category: "Lunch", price: 350, desc: "Fresh local tuna, grilled to perfection" },
   { name: "Lechon Kawali", category: "Dinner", price: 380, desc: "Crispy deep-fried pork belly" },
   { name: "Seafood Platter", category: "Dinner", price: 650, desc: "Assorted fresh seafood, grilled and steamed" },
   { name: "Chicken Inasal", category: "Dinner", price: 280, desc: "Grilled marinated chicken with rice" },
-  { name: "Mango Shake", category: "Drinks", price: 120, desc: "Fresh Davao mango smoothie" },
+  { name: "Mango Shake", category: "Drinks", price: 120, desc: "Fresh local mango smoothie" },
   { name: "Halo-Halo", category: "Drinks", price: 150, desc: "Classic Filipino shaved ice dessert drink" },
   { name: "San Miguel Beer", category: "Drinks", price: 80, desc: "Ice-cold local beer" },
 ];

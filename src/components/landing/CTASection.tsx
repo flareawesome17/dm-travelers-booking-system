@@ -22,7 +22,7 @@ const CTASection = () => {
           transition={{ duration: 0.7 }}
         >
           <h2 className="font-heading text-3xl lg:text-5xl font-bold mb-4" style={{ color: "hsl(40, 33%, 98%)" }}>
-            Ready to Experience Davao?
+            Ready to Experience Plaridel?
           </h2>
           <p className="text-lg mb-8 max-w-xl mx-auto" style={{ color: "hsl(40, 15%, 70%)" }}>
             Book your stay at D&M Travelers Inn today and enjoy affordable luxury in the heart of the city.

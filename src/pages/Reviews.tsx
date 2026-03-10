@@ -7,10 +7,10 @@ import Footer from "@/components/Footer";
 
 const existingReviews = [
   { name: "Maria Santos", location: "Manila", rating: 5, text: "Absolutely wonderful stay! The staff went above and beyond. Will definitely come back!", date: "2025-12-15" },
-  { name: "James Lee", location: "Singapore", rating: 5, text: "Best value hotel in Davao. Clean rooms, excellent restaurant, and the pool is great.", date: "2025-11-28" },
-  { name: "Ana Reyes", location: "Cebu", rating: 4, text: "Great location near SM Lanang. Breakfast buffet was impressive and staff are very accommodating.", date: "2025-11-10" },
+  { name: "James Lee", location: "Singapore", rating: 5, text: "Best value hotel in Plaridel. Clean rooms, excellent restaurant, and the pool is great.", date: "2025-11-28" },
+  { name: "Ana Reyes", location: "Cebu", rating: 4, text: "Great location along the national road. Breakfast buffet was impressive and staff are very accommodating.", date: "2025-11-10" },
   { name: "David Kim", location: "Seoul", rating: 5, text: "The executive suite exceeded my expectations. Beautiful views and impeccable service throughout our stay.", date: "2025-10-22" },
-  { name: "Sofia Garcia", location: "Davao", rating: 4, text: "Perfect for a staycation! Love the pool area and the restaurant food is authentic Filipino flavors.", date: "2025-10-05" },
+  { name: "Sofia Garcia", location: "Plaridel", rating: 4, text: "Perfect for a staycation! Love the pool area and the restaurant food is authentic Filipino flavors.", date: "2025-10-05" },
   { name: "Michael Torres", location: "CDO", rating: 5, text: "Professional staff and well-maintained facilities. The location is very convenient for business travelers.", date: "2025-09-18" },
 ];
 
