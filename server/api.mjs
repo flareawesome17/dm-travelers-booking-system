@@ -1293,6 +1293,27 @@ async function handleCreateRestaurantOrder(req, res) {
   send(res, req, 201, orderRow);
 }
 
+async function handleGetRestaurantOrders(req, res) {
+  const admin = await getAdminFromRequest(req);
+  if (!admin) {
+    send(res, req, 401, { error: 'Unauthorized' });
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from('restaurant_orders')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (error) {
+    send(res, req, 500, { error: error.message || 'Failed to fetch restaurant orders' });
+    return;
+  }
+
+  send(res, req, 200, data || []);
+}
+
 async function handleGetRevenue(req, res) {
   const admin = await getAdminFromRequest(req);
   if (!admin) {
@@ -1714,6 +1735,11 @@ const server = createServer(async (req, res) => {
 
   if (url === '/api/restaurant/orders' && req.method === 'POST') {
     await handleCreateRestaurantOrder(req, res);
+    return;
+  }
+
+  if (url === '/api/restaurant/orders' && req.method === 'GET') {
+    await handleGetRestaurantOrders(req, res);
     return;
   }
 

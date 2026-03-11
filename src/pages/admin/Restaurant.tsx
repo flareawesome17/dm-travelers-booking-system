@@ -45,12 +45,36 @@ type RestaurantCategory = {
   sort_order?: number | null;
 };
 
+type BookingOption = {
+  id: string;
+  reference_number?: string;
+  check_in_date?: string;
+  check_out_date?: string;
+  status?: string;
+  guests?: { full_name?: string | null };
+  rooms?: { room_number?: string | null };
+};
+
+type RestaurantOrder = {
+  id: string;
+  booking_id?: string | null;
+  room_id?: string | null;
+  order_source?: string | null;
+  status?: string | null;
+  subtotal?: number | null;
+  service_charge?: number | null;
+  total_amount?: number | null;
+  created_at?: string | null;
+};
+
 export default function AdminRestaurant() {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<RestaurantCategory[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [bookings, setBookings] = useState<BookingOption[]>([]);
+  const [orders, setOrders] = useState<RestaurantOrder[]>([]);
   const [open, setOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [name, setName] = useState("");
@@ -64,9 +88,11 @@ export default function AdminRestaurant() {
   const [orderOpen, setOrderOpen] = useState(false);
   const [orderSaving, setOrderSaving] = useState(false);
   const [orderSource, setOrderSource] = useState<"Restaurant" | "Room Service" | "Walk-In">("Restaurant");
-  const [orderBookingRef, setOrderBookingRef] = useState("");
+  const [orderBookingRef, setOrderBookingRef] = useState<string>("");
+  const [orderBookingSearch, setOrderBookingSearch] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
-  const [orderQuantities, setOrderQuantities] = useState<Record<string, string>>({});
+  const [orderItemSearch, setOrderItemSearch] = useState("");
+  const [orderLines, setOrderLines] = useState<{ menu_item_id: string; quantity: string }[]>([]);
   const navigate = useNavigate();
 
   const loadItems = () => {
@@ -99,8 +125,23 @@ export default function AdminRestaurant() {
   };
 
   useEffect(() => {
+    const token = localStorage.getItem("admin_token");
+    if (!token) {
+      navigate("/admin/login", { replace: true });
+      return;
+    }
     loadItems();
     loadCategories();
+    // fetch bookings for Room Service dropdown (only once)
+    fetch(`${API_URL}/api/bookings`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((data) => setBookings(Array.isArray(data) ? (data as BookingOption[]) : []))
+      .catch(() => setBookings([]));
+    // fetch recent restaurant orders
+    fetch(`${API_URL}/api/restaurant/orders`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((data) => setOrders(Array.isArray(data) ? (data as RestaurantOrder[]) : []))
+      .catch(() => setOrders([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
@@ -123,8 +164,10 @@ export default function AdminRestaurant() {
   const openOrderForm = () => {
     setOrderSource("Restaurant");
     setOrderBookingRef("");
+    setOrderBookingSearch("");
     setOrderNotes("");
-    setOrderQuantities({});
+    setOrderItemSearch("");
+    setOrderLines([]);
     setOrderOpen(true);
   };
 
@@ -277,11 +320,11 @@ export default function AdminRestaurant() {
                           navigate("/admin/login", { replace: true });
                           return;
                         }
-                        const itemsPayload = items
-                          .map((m) => {
-                            const qty = Number(orderQuantities[m.id] || 0);
+                        const itemsPayload = orderLines
+                          .map((line) => {
+                            const qty = Number(line.quantity);
                             if (!Number.isFinite(qty) || qty <= 0) return null;
-                            return { menu_item_id: m.id, quantity: qty };
+                            return { menu_item_id: line.menu_item_id, quantity: qty };
                           })
                           .filter(Boolean) as { menu_item_id: string; quantity: number }[];
                         if (!itemsPayload.length) {
@@ -319,7 +362,7 @@ export default function AdminRestaurant() {
                               : "Restaurant order created.",
                           );
                           setOrderOpen(false);
-                          setOrderQuantities({});
+                          setOrderLines([]);
                           setOrderBookingRef("");
                           setOrderNotes("");
                         } catch {
@@ -344,14 +387,47 @@ export default function AdminRestaurant() {
                           </select>
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="order-booking-ref">Booking reference (for room charge)</Label>
+                          <Label htmlFor="order-booking-ref">Booking (for room charge)</Label>
                           <Input
-                            id="order-booking-ref"
-                            value={orderBookingRef}
-                            onChange={(e) => setOrderBookingRef(e.target.value)}
-                            placeholder="DM-XXXX..."
+                            id="order-booking-search"
+                            value={orderBookingSearch}
+                            onChange={(e) => setOrderBookingSearch(e.target.value)}
+                            placeholder="Search by name, room, ref..."
+                            className="mb-1"
                             disabled={orderSource !== "Room Service"}
                           />
+                          <select
+                            id="order-booking-ref"
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            value={orderBookingRef}
+                            onChange={(e) => setOrderBookingRef(e.target.value)}
+                            disabled={orderSource !== "Room Service"}
+                          >
+                            <option value="">Select booking</option>
+                            {bookings
+                              .filter((b) => {
+                                if (!orderBookingSearch.trim()) return true;
+                                const term = orderBookingSearch.toLowerCase();
+                                const haystack = [
+                                  b.reference_number,
+                                  b.guests?.full_name,
+                                  b.rooms?.room_number,
+                                  b.status,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" ")
+                                  .toLowerCase();
+                                return haystack.includes(term);
+                              })
+                              .map((b) => (
+                                <option key={b.id} value={b.reference_number ?? ""}>
+                                  {b.rooms?.room_number
+                                    ? `Room ${b.rooms.room_number}`
+                                    : "No room"}{" "}
+                                  · {b.guests?.full_name ?? "Guest"} · {b.reference_number}
+                                </option>
+                              ))}
+                          </select>
                         </div>
                       </div>
                       <div className="space-y-2">
@@ -365,42 +441,110 @@ export default function AdminRestaurant() {
                       </div>
                       <div className="space-y-2">
                         <Label>Items</Label>
-                        <div className="max-h-64 overflow-y-auto border rounded-md">
-                          <table className="w-full text-xs">
-                            <thead>
-                              <tr className="border-b bg-slate-50">
-                                <th className="text-left py-2 px-3">Name</th>
-                                <th className="text-left py-2 px-3">Category</th>
-                                <th className="text-right py-2 px-3">Price</th>
-                                <th className="text-right py-2 px-3">Qty</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {items.map((m) => (
-                                <tr key={m.id} className="border-b last:border-0">
-                                  <td className="py-2 px-3">{m.name}</td>
-                                  <td className="py-2 px-3 text-slate-500">{m.category ?? "—"}</td>
-                                  <td className="py-2 px-3 text-right">
-                                    ₱{Number(m.price ?? 0).toFixed(0)}
-                                  </td>
-                                  <td className="py-2 px-3 text-right">
-                                    <Input
-                                      type="number"
-                                      min={0}
-                                      className="h-7 w-16 text-xs inline-block"
-                                      value={orderQuantities[m.id] ?? ""}
-                                      onChange={(e) =>
-                                        setOrderQuantities((prev) => ({
-                                          ...prev,
-                                          [m.id]: e.target.value,
-                                        }))
-                                      }
-                                    />
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Input
+                              placeholder="Search menu item..."
+                              value={orderItemSearch}
+                              onChange={(e) => setOrderItemSearch(e.target.value)}
+                              className="h-8 text-xs"
+                            />
+                            <select
+                              className="h-8 rounded-full border border-slate-200 bg-white px-3 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#07008A]/60"
+                              onChange={(e) => {
+                                const id = e.target.value;
+                                if (!id) return;
+                                setOrderLines((prev) =>
+                                  prev.find((l) => l.menu_item_id === id)
+                                    ? prev
+                                    : [...prev, { menu_item_id: id, quantity: "1" }],
+                                );
+                                e.target.value = "";
+                              }}
+                            >
+                              <option value="">Add item…</option>
+                              {items
+                                .filter((m) => {
+                                  if (orderLines.some((l) => l.menu_item_id === m.id)) return false;
+                                  if (!orderItemSearch.trim()) return true;
+                                  const term = orderItemSearch.toLowerCase();
+                                  const haystack = [m.name, m.category]
+                                    .filter(Boolean)
+                                    .join(" ")
+                                    .toLowerCase();
+                                  return haystack.includes(term);
+                                })
+                                .map((m) => (
+                                  <option key={m.id} value={m.id}>
+                                    {m.name} — ₱{Number(m.price ?? 0).toFixed(0)}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+                          {orderLines.length === 0 ? (
+                            <p className="text-xs text-slate-500">No items selected yet.</p>
+                          ) : (
+                            <div className="max-h-64 overflow-y-auto border rounded-md">
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="border-b bg-slate-50">
+                                    <th className="text-left py-2 px-3">Name</th>
+                                    <th className="text-left py-2 px-3">Category</th>
+                                    <th className="text-right py-2 px-3">Price</th>
+                                    <th className="text-right py-2 px-3">Qty</th>
+                                    <th className="text-right py-2 px-3">Actions</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {orderLines.map((line) => {
+                                    const m = items.find((it) => it.id === line.menu_item_id);
+                                    if (!m) return null;
+                                    return (
+                                      <tr key={line.menu_item_id} className="border-b last:border-0">
+                                        <td className="py-2 px-3">{m.name}</td>
+                                        <td className="py-2 px-3 text-slate-500">{m.category ?? "—"}</td>
+                                        <td className="py-2 px-3 text-right">
+                                          ₱{Number(m.price ?? 0).toFixed(0)}
+                                        </td>
+                                        <td className="py-2 px-3 text-right">
+                                          <Input
+                                            type="number"
+                                            min={1}
+                                            className="h-7 w-16 text-xs inline-block"
+                                            value={line.quantity}
+                                            onChange={(e) =>
+                                              setOrderLines((prev) =>
+                                                prev.map((l) =>
+                                                  l.menu_item_id === line.menu_item_id
+                                                    ? { ...l, quantity: e.target.value }
+                                                    : l,
+                                                ),
+                                              )
+                                            }
+                                          />
+                                        </td>
+                                        <td className="py-2 px-3 text-right">
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 text-slate-500 hover:text-red-600 hover:bg-red-50"
+                                            onClick={() =>
+                                              setOrderLines((prev) =>
+                                                prev.filter((l) => l.menu_item_id !== line.menu_item_id),
+                                              )
+                                            }
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </Button>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex justify-end gap-2 pt-2">
@@ -678,6 +822,90 @@ export default function AdminRestaurant() {
                           </td>
                         </tr>
                       ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="mt-6 border-0 shadow-lg bg-white overflow-hidden">
+            <CardHeader className="border-b bg-slate-50/50 px-6 py-4">
+              <CardTitle className="text-lg font-semibold text-[#07008A] flex items-center gap-2">
+                Recent Orders
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {orders.length === 0 ? (
+                <div className="p-6 text-sm text-slate-500">No restaurant orders yet.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-slate-50/80">
+                        <th className="text-left py-3 px-6 text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
+                          Source
+                        </th>
+                        <th className="text-left py-3 px-4 text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
+                          Booking / Room
+                        </th>
+                        <th className="text-left py-3 px-4 text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="text-left py-3 px-4 text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
+                          Created
+                        </th>
+                        <th className="text-right py-3 px-6 text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
+                          Total
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orders.map((o) => {
+                        const booking = o.booking_id
+                          ? bookings.find((b) => b.id === o.booking_id)
+                          : undefined;
+                        return (
+                          <tr
+                            key={o.id}
+                            className="border-b last:border-0 hover:bg-slate-50/50 transition-colors"
+                          >
+                            <td className="py-3 px-6 text-xs text-slate-700">
+                              {o.order_source ?? "Restaurant"}
+                            </td>
+                            <td className="py-3 px-4 text-xs text-slate-600">
+                              {booking ? (
+                                <span>
+                                  {booking.rooms?.room_number
+                                    ? `Room ${booking.rooms.room_number}`
+                                    : "No room"}
+                                  {" · "}
+                                  {booking.guests?.full_name ?? "Guest"}
+                                  {" · "}
+                                  {booking.reference_number}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400">Not linked</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-xs text-slate-600">
+                              {o.status ?? (booking ? "Charged to Room" : "Paid")}
+                            </td>
+                            <td className="py-3 px-4 text-xs text-slate-500">
+                              {o.created_at
+                                ? new Date(o.created_at).toLocaleString(undefined, {
+                                    month: "short",
+                                    day: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })
+                                : "—"}
+                            </td>
+                            <td className="py-3 px-6 text-right font-semibold text-[#07008A]">
+                              ₱{Number(o.total_amount ?? 0).toFixed(0)}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
