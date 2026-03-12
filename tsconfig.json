@@ -25,5 +25,5 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "src/_pages_legacy", "src/App.tsx", "src/App.css", "src/main.tsx", "src/vite-env.d.ts", "src/components/Navbar.tsx", "src/components/Footer.tsx", "server"]
+  "exclude": ["node_modules", "src/_pages_legacy", "src/components/Navbar.tsx", "src/components/Footer.tsx", "server"]
 }
