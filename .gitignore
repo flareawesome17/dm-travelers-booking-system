@@ -16,6 +16,9 @@ dist-ssr
 .env.*.local
 *.local
 
+# Cursor AI
+.cursor/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

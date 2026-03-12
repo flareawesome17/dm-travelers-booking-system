@@ -3,13 +3,13 @@
 import { motion } from "framer-motion";
 import { useInView } from "framer-motion";
 import { useRef } from "react";
-import { Wifi, Car, UtensilsCrossed, Waves, ShieldCheck, Clock, Sparkles, MapPin } from "lucide-react";
+import { Wifi, Car, UtensilsCrossed, Waves, ShieldCheck, Clock, Sparkles, MapPin, Scissors } from "lucide-react";
 
 const amenities = [
   { icon: Wifi, title: "Free Wi-Fi", desc: "High-speed internet throughout" },
   { icon: Car, title: "Free Parking", desc: "Secure on-site parking" },
   { icon: UtensilsCrossed, title: "Restaurant", desc: "Filipino & international cuisine" },
-  { icon: Waves, title: "Swimming Pool", desc: "Refreshing outdoor pool" },
+  { icon: Scissors, title: "Salon", desc: "Professional salon services available" },
   { icon: ShieldCheck, title: "24/7 Security", desc: "CCTV & security staff" },
   { icon: Clock, title: "Front Desk", desc: "Round-the-clock service" },
   { icon: Sparkles, title: "Housekeeping", desc: "Daily room cleaning" },
