@@ -1,8 +1,11 @@
+"use client";
+
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { CalendarDays, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import heroImage from "@/assets/hero-hotel.jpg";
+
+const heroImage = "/images/hero-hotel.jpg";
 
 const HeroSection = () => {
   return (
@@ -78,7 +81,7 @@ const HeroSection = () => {
                 </select>
               </div>
             </div>
-            <Link to="/rooms">
+            <Link href="/rooms">
               <Button className="w-full mt-4 bg-gradient-gold text-secondary font-semibold h-11 shadow-gold hover:opacity-90 transition-opacity">
                 Check Availability
               </Button>

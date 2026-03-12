@@ -1,6 +1,8 @@
+"use client";
+
 import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 
@@ -27,7 +29,7 @@ const CTASection = () => {
           <p className="text-lg mb-8 max-w-xl mx-auto" style={{ color: "hsl(40, 15%, 70%)" }}>
             Book your stay at D&M Travelers Inn today and enjoy affordable luxury in the heart of the city.
           </p>
-          <Link to="/booking">
+          <Link href="/booking">
             <Button size="lg" className="bg-gradient-gold text-secondary font-semibold text-base px-8 h-12 shadow-gold hover:opacity-90">
               Reserve Your Room <ArrowRight className="w-5 h-5 ml-2" />
             </Button>

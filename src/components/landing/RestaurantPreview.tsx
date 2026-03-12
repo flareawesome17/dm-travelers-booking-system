@@ -1,9 +1,12 @@
+"use client";
+
 import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import restaurantImg from "@/assets/restaurant.jpg";
+
+const restaurantImg = "/images/restaurant.jpg";
 
 const RestaurantPreview = () => {
   const ref = useRef(null);
@@ -35,7 +38,7 @@ const RestaurantPreview = () => {
                 </div>
               ))}
             </div>
-            <Link to="/restaurant">
+            <Link href="/restaurant">
               <Button className="bg-gradient-gold text-secondary font-semibold shadow-gold hover:opacity-90">
                 View Full Menu <ArrowRight className="w-4 h-4 ml-1" />
               </Button>

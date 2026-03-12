@@ -100,7 +100,7 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
 
   useEffect(() => {
     setLoadingRooms(true);
-    fetch(`${apiUrl}/api/rooms`, { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`/api/rooms`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((data) => setRooms(Array.isArray(data) ? data : []))
       .catch(() => setRooms([]))
@@ -112,7 +112,7 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
       setRoomAvailability([]);
       return;
     }
-    fetch(`${apiUrl}/api/rooms/${roomId}/availability`, {
+    fetch(`/api/rooms/${roomId}/availability`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
@@ -235,7 +235,7 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
 
     setSubmitting(true);
     try {
-      const res = await fetch(`${apiUrl}/api/bookings`, {
+      const res = await fetch(`/api/bookings`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -1,11 +1,14 @@
+"use client";
+
 import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { Users, Maximize, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import roomStandard from "@/assets/room-standard.jpg";
-import roomDeluxe from "@/assets/room-deluxe.jpg";
-import roomSuite from "@/assets/room-suite.jpg";
+
+const roomStandard = "/images/room-standard.jpg";
+const roomDeluxe = "/images/room-deluxe.jpg";
+const roomSuite = "/images/room-suite.jpg";
 
 const rooms = [
   {
@@ -78,7 +81,7 @@ const FeaturedRoomsSection = () => {
                   <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> {room.guests} Guests</span>
                   <span className="flex items-center gap-1"><Maximize className="w-3.5 h-3.5" /> {room.size}</span>
                 </div>
-                <Link to="/booking">
+                <Link href="/booking">
                   <Button variant="outline" className="w-full group/btn border-primary text-primary hover:bg-primary hover:text-primary-foreground">
                     Book Now <ArrowRight className="w-4 h-4 ml-1 group-hover/btn:translate-x-1 transition-transform" />
                   </Button>
@@ -89,7 +92,7 @@ const FeaturedRoomsSection = () => {
         </div>
 
         <div className="text-center mt-10">
-          <Link to="/rooms">
+          <Link href="/rooms">
             <Button variant="ghost" className="text-primary hover:text-primary/80 font-medium">
               View All Rooms <ArrowRight className="w-4 h-4 ml-1" />
             </Button>

@@ -217,7 +217,7 @@ export function RoomForm({ apiUrl, token, room, onSuccess, onClose }: RoomFormPr
           ),
         );
 
-        const uploadRes = await fetch(`${apiUrl}/api/rooms/upload-image`, {
+        const uploadRes = await fetch(`/api/rooms/upload-image`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -244,7 +244,7 @@ export function RoomForm({ apiUrl, token, room, onSuccess, onClose }: RoomFormPr
       }
 
       const isEdit = Boolean(room?.id);
-      const endpoint = isEdit ? `${apiUrl}/api/rooms/${room!.id}` : `${apiUrl}/api/rooms`;
+      const endpoint = isEdit ? `/api/rooms/${room!.id}` : `/api/rooms`;
       const method = isEdit ? "PATCH" : "POST";
 
       // Build payload

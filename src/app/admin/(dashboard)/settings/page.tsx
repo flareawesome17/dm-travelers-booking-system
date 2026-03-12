@@ -1,0 +1,47 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
+import { Settings as SettingsIcon } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+
+export default function AdminSettingsPage() {
+  const [settings, setSettings] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    const token = localStorage.getItem("admin_token");
+    if (!token) { router.replace("/admin/login"); return; }
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => setSettings(typeof data === "object" ? data : {}))
+      .catch(() => setSettings({}))
+      .finally(() => setLoading(false));
+  }, [router]);
+
+  const entries = Object.entries(settings);
+
+  return (
+    <>
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+        <h1 className="text-2xl lg:text-3xl font-bold text-[#07008A] tracking-tight">Hotel Settings</h1>
+        <p className="text-muted-foreground mt-1">Configure hotel details and preferences</p>
+      </motion.div>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+        <Card className="border-0 shadow-lg bg-white overflow-hidden max-w-2xl">
+          <CardHeader className="border-b bg-slate-50/50 px-6 py-4">
+            <CardTitle className="text-lg font-semibold text-[#07008A] flex items-center gap-2"><SettingsIcon className="h-5 w-5" /> Settings</CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            {loading ? <div className="space-y-4">{[1, 2, 3, 4].map((i) => <div key={i} className="flex justify-between gap-4"><Skeleton className="h-6 w-32" /><Skeleton className="h-6 flex-1 max-w-xs" /></div>)}</div>
+            : entries.length === 0 ? <p className="text-muted-foreground text-sm">No settings configured yet.</p>
+            : <ul className="space-y-0 divide-y">{entries.map(([key, value]) => <li key={key} className="flex items-center justify-between py-4 first:pt-0 gap-4"><span className="font-medium text-slate-700 capitalize">{key.replace(/_/g, " ")}</span><span className="text-sm text-slate-600 text-right break-all max-w-[60%]">{value}</span></li>)}</ul>}
+          </CardContent>
+        </Card>
+      </motion.div>
+    </>
+  );
+}
