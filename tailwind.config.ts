@@ -18,8 +18,6 @@ export default {
         body: ['DM Sans', 'system-ui', 'sans-serif'],
       },
       colors: {
-        primary: { DEFAULT: "#07008A", dark: "#05006a" },
-        accent: "#FED501",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
