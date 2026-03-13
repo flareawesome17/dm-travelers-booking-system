@@ -14,9 +14,9 @@ export async function POST(req: NextRequest) {
     const ext = file.name.split(".").pop() || "jpg";
     const filename = `menu/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
     const supabase = getSupabaseAdmin();
-    const { error: uploadError } = await supabase.storage.from("images").upload(filename, buffer, { contentType: file.type || "image/jpeg", upsert: false });
+    const { error: uploadError } = await supabase.storage.from("room-images").upload(filename, buffer, { contentType: file.type || "image/jpeg", upsert: false });
     if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 400 });
-    const { data: urlData } = supabase.storage.from("images").getPublicUrl(filename);
+    const { data: urlData } = supabase.storage.from("room-images").getPublicUrl(filename);
     return NextResponse.json({ url: urlData.publicUrl });
   } catch { return NextResponse.json({ error: "Internal server error" }, { status: 500 }); }
 }

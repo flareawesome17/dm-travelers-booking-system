@@ -242,21 +242,19 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          full_name: fullName.trim(),
-          email: email.trim(),
-          phone_number: phone.trim() || null,
+          guest: {
+            full_name: fullName.trim(),
+            email: email.trim(),
+            phone_number: phone.trim() || null,
+          },
           room_id: roomId,
           check_in_date: checkInToSend,
           check_out_date: checkOutToSend,
           rate_plan_kind: ratePlan,
           num_adults: Number(numAdults) || 1,
           num_children: Number(numChildren) || 0,
-          special_requests: specialRequests.trim() || null,
+          total_amount: totalAmount,
           deposit_paid: deposit,
-          assign_room: true,
-          is_lgu_booking: isLguBooking,
-          use_per_guest: usePerGuestRate,
-          per_guest_count: totalGuests,
         }),
       });
 

@@ -14,6 +14,8 @@ import {
   Home,
   ChevronRight,
   LogOut,
+  Menu,
+  ChevronLeft
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +30,13 @@ const navItems = [
   { label: "Settings", path: "/admin/settings", icon: Settings },
 ];
 
-export default function AdminSidebar() {
+export default function AdminSidebar({ 
+  isCollapsed = false, 
+  onToggle 
+}: { 
+  isCollapsed?: boolean; 
+  onToggle?: () => void;
+}) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -42,38 +50,64 @@ export default function AdminSidebar() {
   };
 
   return (
-    <aside className="fixed inset-y-0 left-0 w-64 flex flex-col bg-[#07008A] text-white shadow-xl z-30">
+    <aside className={cn(
+      "fixed inset-y-0 left-0 flex flex-col bg-[#07008A] text-white shadow-xl z-30 transition-all duration-300",
+      isCollapsed ? "w-20" : "w-64"
+    )}>
       {/* Brand header */}
-      <div className="p-6 border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FED501] text-[#07008A] shadow-lg">
+      <div className={cn(
+        "p-6 border-b border-white/10 flex items-center h-[88px]",
+        isCollapsed ? "justify-center px-4" : "justify-between"
+      )}>
+        <div className="flex items-center gap-3 overflow-hidden">
+          <div className="flex shrink-0 h-10 w-10 items-center justify-center rounded-xl bg-[#FED501] text-[#07008A] shadow-lg">
             <span className="font-bold text-lg">D&amp;M</span>
           </div>
-          <div>
-            <p className="font-bold text-white tracking-tight">Admin</p>
-            <p className="text-xs text-white/70">Travelers Inn</p>
-          </div>
+          {!isCollapsed && (
+            <div className="whitespace-nowrap flex-1">
+              <p className="font-bold text-white tracking-tight leading-tight">Admin</p>
+              <p className="text-xs text-white/70 leading-tight">Travelers Inn</p>
+            </div>
+          )}
         </div>
+        
+        {/* Toggle Button Details inside Header for expanded view or floating for collapsed */}
+        {!isCollapsed && onToggle && (
+          <button onClick={onToggle} className="p-1.5 hover:bg-white/10 rounded-md transition-colors shrink-0">
+            <ChevronLeft className="h-5 w-5 text-white/70" />
+          </button>
+        )}
       </div>
 
+      {/* Floating Toggle Button when Collapsed */}
+      {isCollapsed && onToggle && (
+        <button 
+          onClick={onToggle} 
+          className="absolute -right-3 top-8 bg-[#FED501] text-[#07008A] p-1 rounded-full shadow-md z-40 hover:scale-110 transition-transform"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      )}
+
       {/* Nav */}
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto overflow-x-hidden">
         {navItems.map(({ label, path, icon: Icon }) => {
-          const isActive = pathname === path;
+          const isActive = pathname === path || (path !== "/admin" && pathname.startsWith(path));
           return (
             <Link
               key={path}
               href={path}
+              title={isCollapsed ? label : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                "flex items-center rounded-lg py-2.5 text-sm font-medium transition-all duration-200",
+                isCollapsed ? "justify-center px-0" : "px-3 gap-3",
                 isActive
                   ? "bg-[#FED501] text-[#07008A] shadow-md"
                   : "text-white/90 hover:bg-white/10 hover:text-white"
               )}
             >
               <Icon className="h-5 w-5 shrink-0" />
-              <span className="flex-1">{label}</span>
-              {isActive && <ChevronRight className="h-4 w-4 shrink-0" />}
+              {!isCollapsed && <span className="flex-1 whitespace-nowrap">{label}</span>}
             </Link>
           );
         })}
@@ -84,17 +118,25 @@ export default function AdminSidebar() {
         <button
           type="button"
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/90 hover:bg-white/10 hover:text-white transition-all"
+          title={isCollapsed ? "Logout" : undefined}
+          className={cn(
+            "w-full flex items-center rounded-lg py-2.5 text-sm text-white/90 hover:bg-white/10 hover:text-white transition-all",
+            isCollapsed ? "justify-center px-0" : "px-3 gap-3"
+          )}
         >
           <LogOut className="h-5 w-5 shrink-0" />
-          <span>Logout</span>
+          {!isCollapsed && <span>Logout</span>}
         </button>
         <Link
           href="/"
-          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/80 hover:bg-white/10 hover:text-white transition-all"
+          title={isCollapsed ? "Back to site" : undefined}
+          className={cn(
+            "flex items-center rounded-lg py-2.5 text-sm text-white/80 hover:bg-white/10 hover:text-white transition-all",
+            isCollapsed ? "justify-center px-0" : "px-3 gap-3"
+          )}
         >
           <Home className="h-5 w-5 shrink-0" />
-          Back to site
+          {!isCollapsed && <span className="whitespace-nowrap">Back to site</span>}
         </Link>
       </div>
     </aside>

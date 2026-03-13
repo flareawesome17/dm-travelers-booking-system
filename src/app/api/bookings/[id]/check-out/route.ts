@@ -52,6 +52,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .select("*, guests(*), rooms(*)")
       .single();
 
+    // Mark the associated room as Dirty
+    if (booking.room_id) {
+      await supabase.from("rooms").update({ status: "Dirty" }).eq("id", booking.room_id);
+    }
+
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json({ ...data, late_checkout_fee_applied: lateFee });
   } catch {

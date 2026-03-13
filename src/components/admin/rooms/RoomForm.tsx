@@ -256,6 +256,25 @@ export function RoomForm({ apiUrl, token, room, onSuccess, onClose }: RoomFormPr
       const newImagesAll =
         uploadedUrls.length > 0 ? [...existingImages, ...uploadedUrls] : existingImages;
 
+      const flattenedRates = {
+        rate_24h_enabled: enable24h,
+        rate_24h_price: enable24h && rate24Price ? Number(rate24Price) : null,
+        rate_24h_early_checkin_fee: enable24h && rate24EarlyFee ? Number(rate24EarlyFee) : null,
+        rate_24h_late_checkout_fee: enable24h && rate24LateFee ? Number(rate24LateFee) : null,
+
+        rate_12h_enabled: enable12h,
+        rate_12h_price: enable12h && rate12Price ? Number(rate12Price) : null,
+        rate_12h_late_checkout_fee: enable12h && rate12LateFee ? Number(rate12LateFee) : null,
+
+        rate_5h_enabled: enable5h,
+        rate_5h_price: enable5h && rate5Price ? Number(rate5Price) : null,
+        rate_5h_late_checkout_fee: enable5h && rate5LateFee ? Number(rate5LateFee) : null,
+
+        rate_3h_enabled: enable3h,
+        rate_3h_price: enable3h && rate3Price ? Number(rate3Price) : null,
+        rate_3h_late_checkout_fee: enable3h && rate3LateFee ? Number(rate3LateFee) : null,
+      };
+
       if (!isEdit) {
         payload.room_number = roomNumber;
         payload.room_type = roomType;
@@ -264,6 +283,7 @@ export function RoomForm({ apiUrl, token, room, onSuccess, onClose }: RoomFormPr
         payload.amenities = trimmedAmenities;
         payload.image_urls = uploadedUrls;
         payload.rate_plans = ratePlans;
+        Object.assign(payload, flattenedRates);
       } else {
         if (roomNumber !== room?.room_number) payload.room_number = roomNumber;
         if (roomType !== room?.room_type) payload.room_type = roomType;
@@ -287,6 +307,7 @@ export function RoomForm({ apiUrl, token, room, onSuccess, onClose }: RoomFormPr
         if (initialPlansJson !== newPlansJson) {
           payload.rate_plans = ratePlans;
         }
+        Object.assign(payload, flattenedRates);
       }
 
       const res = await fetch(endpoint, {

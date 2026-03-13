@@ -15,6 +15,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RestaurantOrderForm } from "@/components/admin/restaurant/RestaurantOrderForm";
+import { ChevronLeft, ChevronRight, Search, Receipt } from "lucide-react";
 
 type MenuItem = { id: string; name?: string; description?: string | null; category?: string | null; price?: number | null; is_available?: boolean | null; image_url?: string | null };
 type RestaurantCategory = { id: string; name: string; sort_order?: number | null };
@@ -49,6 +52,22 @@ export default function AdminRestaurantPage() {
   const [orderLines, setOrderLines] = useState<{ menu_item_id: string; quantity: string }[]>([]);
   const router = useRouter();
 
+  // Pagination & Search States
+  const [menuSearch, setMenuSearch] = useState("");
+  const [menuPage, setMenuPage] = useState(1);
+  const [orderSearch, setOrderSearch] = useState("");
+  const [orderPage, setOrderPage] = useState(1);
+  const itemsPerPage = 8;
+
+  const loadOrders = () => {
+    const token = localStorage.getItem("admin_token");
+    if (!token) return;
+    fetch("/api/restaurant/orders", { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((data) => setOrders(Array.isArray(data) ? (data as RestaurantOrder[]) : []))
+      .catch(() => setOrders([]));
+  };
+
   const loadItems = () => {
     const token = localStorage.getItem("admin_token");
     if (!token) { router.replace("/admin/login"); return; }
@@ -68,9 +87,8 @@ export default function AdminRestaurantPage() {
   useEffect(() => {
     const token = localStorage.getItem("admin_token");
     if (!token) { router.replace("/admin/login"); return; }
-    loadItems(); loadCategories();
+    loadItems(); loadCategories(); loadOrders();
     fetch("/api/bookings", { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()).then((data) => setBookings(Array.isArray(data) ? data as BookingOption[] : [])).catch(() => setBookings([]));
-    fetch("/api/restaurant/orders", { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()).then((data) => setOrders(Array.isArray(data) ? data as RestaurantOrder[] : [])).catch(() => setOrders([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
@@ -109,37 +127,33 @@ export default function AdminRestaurantPage() {
 
   return (
     <>
-      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-        <h1 className="text-2xl lg:text-3xl font-bold text-[#07008A] tracking-tight">Restaurant Menu</h1>
-        <p className="text-muted-foreground mt-1">Manage menu items and pricing</p>
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-bold text-[#07008A] tracking-tight">Restaurant Menu</h1>
+          <p className="text-muted-foreground mt-1">Manage menu items and pricing</p>
+        </div>
       </motion.div>
+
+      <Tabs defaultValue="menu" className="w-full space-y-6">
+        <TabsList className="bg-slate-200/50 p-1 w-full max-w-sm grid grid-cols-2">
+          <TabsTrigger value="menu" className="data-[state=active]:bg-white data-[state=active]:text-[#07008A] data-[state=active]:font-semibold shadow-sm">
+            <UtensilsCrossed className="h-4 w-4 mr-2" />
+            Menu
+          </TabsTrigger>
+          <TabsTrigger value="orders" className="data-[state=active]:bg-white data-[state=active]:text-[#07008A] data-[state=active]:font-semibold shadow-sm">
+            <Receipt className="h-4 w-4 mr-2" />
+            Orders & POS
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="menu" className="mt-0 outline-none">
       <Card className="border-0 shadow-lg bg-white overflow-hidden">
         <CardHeader className="border-b bg-slate-50/50 px-6 py-4 flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-[#07008A] flex items-center gap-2"><UtensilsCrossed className="h-5 w-5" /> All Items</CardTitle>
+          <CardTitle className="text-lg font-semibold text-[#07008A] flex items-center gap-2">
+            <UtensilsCrossed className="h-5 w-5" /> 
+            Menu Items
+          </CardTitle>
           <div className="flex items-center gap-2">
-            <Dialog open={orderOpen} onOpenChange={setOrderOpen}>
-              <Button type="button" size="sm" variant="outline" className="rounded-full px-4" onClick={() => { setOrderSource("Restaurant"); setOrderBookingRef(""); setOrderBookingSearch(""); setOrderNotes(""); setOrderItemSearch(""); setOrderLines([]); setOrderOpen(true); }}><Plus className="h-4 w-4 mr-1" /> Add order</Button>
-              <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>Add restaurant order</DialogTitle></DialogHeader>
-                <form className="space-y-4" onSubmit={async (e) => {
-                  e.preventDefault(); const token = localStorage.getItem("admin_token"); if (!token) { router.replace("/admin/login"); return; }
-                  const itemsPayload = orderLines.map((l) => { const q = Number(l.quantity); if (!Number.isFinite(q) || q <= 0) return null; return { menu_item_id: l.menu_item_id, quantity: q }; }).filter(Boolean) as { menu_item_id: string; quantity: number }[];
-                  if (!itemsPayload.length) { toast.error("Select at least one item."); return; }
-                  if (orderSource === "Room Service" && !orderBookingRef.trim()) { toast.error("Booking reference is required for Room Service."); return; }
-                  setOrderSaving(true);
-                  try { const res = await fetch("/api/restaurant/orders", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ order_source: orderSource, booking_reference: orderSource === "Room Service" ? orderBookingRef.trim() || null : null, notes: orderNotes.trim() || null, items: itemsPayload }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error((data as { error?: string }).error || "Failed to create order."); return; } toast.success(orderSource === "Room Service" ? "Order created and charged to booking." : "Restaurant order created."); setOrderOpen(false); setOrderLines([]); setOrderBookingRef(""); setOrderNotes(""); } catch { toast.error("Something went wrong."); } finally { setOrderSaving(false); }
-                }}>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="space-y-2"><Label htmlFor="order-source">Order source</Label><select id="order-source" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={orderSource} onChange={(e) => setOrderSource(e.target.value as any)}><option value="Restaurant">Restaurant</option><option value="Room Service">Room Service</option><option value="Walk-In">Walk-In</option></select></div>
-                    <div className="space-y-2"><Label htmlFor="order-booking-ref">Booking (for room charge)</Label><Input id="order-booking-search" value={orderBookingSearch} onChange={(e) => setOrderBookingSearch(e.target.value)} placeholder="Search..." className="mb-1" disabled={orderSource !== "Room Service"} /><select id="order-booking-ref" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={orderBookingRef} onChange={(e) => setOrderBookingRef(e.target.value)} disabled={orderSource !== "Room Service"}><option value="">Select booking</option>{bookings.filter((b) => { if (!orderBookingSearch.trim()) return true; const term = orderBookingSearch.toLowerCase(); return [b.reference_number, b.guests?.full_name, b.rooms?.room_number, b.status].filter(Boolean).join(" ").toLowerCase().includes(term); }).map((b) => <option key={b.id} value={b.reference_number ?? ""}>{b.rooms?.room_number ? `Room ${b.rooms.room_number}` : "No room"} · {b.guests?.full_name ?? "Guest"} · {b.reference_number}</option>)}</select></div>
-                  </div>
-                  <div className="space-y-2"><Label htmlFor="order-notes">Notes (optional)</Label><Input id="order-notes" value={orderNotes} onChange={(e) => setOrderNotes(e.target.value)} placeholder="Special instructions..." /></div>
-                  <div className="space-y-2"><Label>Items</Label><div className="space-y-2"><div className="flex items-center gap-2"><Input placeholder="Search menu item..." value={orderItemSearch} onChange={(e) => setOrderItemSearch(e.target.value)} className="h-8 text-xs" /><select className="h-8 rounded-full border border-slate-200 bg-white px-3 text-xs text-slate-700" onChange={(e) => { const id = e.target.value; if (!id) return; setOrderLines((p) => p.find((l) => l.menu_item_id === id) ? p : [...p, { menu_item_id: id, quantity: "1" }]); e.target.value = ""; }}><option value="">Add item…</option>{items.filter((m) => { if (orderLines.some((l) => l.menu_item_id === m.id)) return false; if (!orderItemSearch.trim()) return true; return [m.name, m.category].filter(Boolean).join(" ").toLowerCase().includes(orderItemSearch.toLowerCase()); }).map((m) => <option key={m.id} value={m.id}>{m.name} — ₱{Number(m.price ?? 0).toFixed(0)}</option>)}</select></div>
-                    {orderLines.length === 0 ? <p className="text-xs text-slate-500">No items selected.</p> : <div className="max-h-64 overflow-y-auto border rounded-md"><table className="w-full text-xs"><thead><tr className="border-b bg-slate-50"><th className="text-left py-2 px-3">Name</th><th className="text-left py-2 px-3">Category</th><th className="text-right py-2 px-3">Price</th><th className="text-right py-2 px-3">Qty</th><th className="text-right py-2 px-3">Actions</th></tr></thead><tbody>{orderLines.map((line) => { const m = items.find((it) => it.id === line.menu_item_id); if (!m) return null; return <tr key={line.menu_item_id} className="border-b last:border-0"><td className="py-2 px-3">{m.name}</td><td className="py-2 px-3 text-slate-500">{m.category ?? "—"}</td><td className="py-2 px-3 text-right">₱{Number(m.price ?? 0).toFixed(0)}</td><td className="py-2 px-3 text-right"><Input type="number" min={1} className="h-7 w-16 text-xs inline-block" value={line.quantity} onChange={(e) => setOrderLines((p) => p.map((l) => l.menu_item_id === line.menu_item_id ? { ...l, quantity: e.target.value } : l))} /></td><td className="py-2 px-3 text-right"><Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-slate-500 hover:text-red-600 hover:bg-red-50" onClick={() => setOrderLines((p) => p.filter((l) => l.menu_item_id !== line.menu_item_id))}><Trash2 className="h-3 w-3" /></Button></td></tr>; })}</tbody></table></div>}
-                  </div></div>
-                  <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="outline" onClick={() => setOrderOpen(false)}>Cancel</Button><Button type="submit" disabled={orderSaving}>{orderSaving ? "Creating..." : "Create order"}</Button></div>
-                </form>
-              </DialogContent>
-            </Dialog>
             <Dialog open={open} onOpenChange={setOpen}>
               <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={openForCreate}><Plus className="h-4 w-4 mr-1" /> Add item</Button>
               <DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>{editingItem ? "Edit menu item" : "Add menu item"}</DialogTitle></DialogHeader>
@@ -159,14 +173,35 @@ export default function AdminRestaurantPage() {
         <CardContent className="p-0">
           {loading ? <div className="p-6 space-y-4">{[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}</div> : (
             <div className="overflow-x-auto">
-              <div className="flex items-center justify-between px-6 py-3 border-b bg-slate-50/60 text-xs text-slate-600">
-                <div className="flex items-center gap-3"><span className="font-medium">Items ({items.length})</span><select className="h-8 rounded-full border border-slate-200 bg-white px-3 text-xs text-slate-700" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}><option value="all">All categories</option>{categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></div>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 py-4 border-b bg-slate-50/60 gap-4">
+                <div className="relative w-full sm:max-w-xs">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                  <Input type="text" placeholder="Search menu items..." className="pl-9 h-9 text-sm bg-white" value={menuSearch} onChange={(e) => { setMenuSearch(e.target.value); setMenuPage(1); }} />
+                </div>
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <span className="font-medium text-xs text-slate-600 hidden sm:inline-block">Items ({items.length})</span>
+                  <select className="h-9 rounded-md border border-input bg-white px-3 text-xs text-slate-700 w-full sm:w-[160px]" value={filterCategory} onChange={(e) => { setFilterCategory(e.target.value); setMenuPage(1); }}>
+                    <option value="all">All categories</option>
+                    {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  </select>
+                </div>
               </div>
               <table className="w-full text-sm">
                 <thead><tr className="border-b bg-slate-50/80">{["Name", "Category", "Price", "Media", "Status", "Actions"].map((h) => <th key={h} className={`${h === "Actions" ? "text-right pr-6" : "text-left"} py-3 px-4 text-[11px] font-semibold text-slate-600 uppercase tracking-wider ${h === "Name" ? "pl-6" : ""}`}>{h}</th>)}</tr></thead>
                 <tbody>
-                  {items.filter((item) => filterCategory === "all" || item.category === filterCategory).map((item) => (
-                    <tr key={item.id} className="border-b last:border-0 hover:bg-slate-50/50 transition-colors">
+                  {(() => {
+                    const filtered = items.filter((item) => {
+                      const matchesCat = filterCategory === "all" || item.category === filterCategory;
+                      const matchesSearch = !menuSearch || item.name?.toLowerCase().includes(menuSearch.toLowerCase());
+                      return matchesCat && matchesSearch;
+                    });
+                    const startIndex = (menuPage - 1) * itemsPerPage;
+                    const paginated = filtered.slice(startIndex, startIndex + itemsPerPage);
+                    
+                    if (filtered.length === 0) return <tr><td colSpan={6} className="py-8 text-center text-slate-500">No items found.</td></tr>;
+                    
+                    return paginated.map((item) => (
+                      <tr key={item.id} className="border-b last:border-0 hover:bg-slate-50/50 transition-colors">
                       <td className="py-4 px-6 font-medium text-[#07008A]">{item.name ?? "—"}</td>
                       <td className="py-4 px-4 text-xs text-slate-600">{item.category ?? "—"}</td>
                       <td className="py-4 px-4 font-semibold text-[#07008A]">₱{Number(item.price ?? 0).toFixed(0)}</td>
@@ -179,41 +214,126 @@ export default function AdminRestaurantPage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    ));
+                  })()}
                 </tbody>
               </table>
             </div>
           )}
+          
+          {/* Menu Pagination Controls */}
+          {!loading && items.length > 0 && (
+            <div className="flex items-center justify-between px-6 py-3 border-t bg-slate-50/60 text-xs text-slate-600 rounded-b-lg">
+              {(() => {
+                const filtered = items.filter((item) => (filterCategory === "all" || item.category === filterCategory) && (!menuSearch || item.name?.toLowerCase().includes(menuSearch.toLowerCase())));
+                const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
+                const startIndex = (menuPage - 1) * itemsPerPage;
+                return (
+                  <>
+                    <div>Showing <span className="font-semibold">{filtered.length === 0 ? 0 : startIndex + 1}–{Math.min(startIndex + itemsPerPage, filtered.length)}</span> of <span className="font-semibold">{filtered.length}</span> item{filtered.length !== 1 ? "s" : ""}</div>
+                    <div className="inline-flex items-center gap-1">
+                      <Button type="button" variant="outline" size="icon" className="h-7 w-7 rounded-full" disabled={menuPage <= 1} onClick={() => setMenuPage((p) => Math.max(1, p - 1))}><ChevronLeft className="h-3 w-3" /></Button>
+                      <span className="mx-1 text-[11px]">Page <span className="font-semibold">{menuPage}</span> of <span className="font-semibold">{totalPages}</span></span>
+                      <Button type="button" variant="outline" size="icon" className="h-7 w-7 rounded-full" disabled={menuPage >= totalPages} onClick={() => setMenuPage((p) => Math.min(totalPages, p + 1))}><ChevronRight className="h-3 w-3" /></Button>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          )}
         </CardContent>
       </Card>
+      </TabsContent>
 
+      <TabsContent value="orders" className="mt-0 outline-none">
       {/* Recent Orders */}
-      <Card className="mt-6 border-0 shadow-lg bg-white overflow-hidden">
-        <CardHeader className="border-b bg-slate-50/50 px-6 py-4"><CardTitle className="text-lg font-semibold text-[#07008A] flex items-center gap-2">Recent Orders</CardTitle></CardHeader>
+      <Card className="border-0 shadow-lg bg-white overflow-hidden">
+        <CardHeader className="border-b bg-slate-50/50 px-6 py-4 flex flex-row items-center justify-between">
+          <CardTitle className="text-lg font-semibold text-[#07008A] flex items-center gap-2">
+            <Receipt className="h-5 w-5" />
+            Recent Orders
+          </CardTitle>
+          
+          <Dialog open={orderOpen} onOpenChange={setOrderOpen}>
+            <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={() => { setOrderOpen(true); }}><Plus className="h-4 w-4 mr-1" /> New Order</Button>
+            <DialogContent className="sm:max-w-4xl max-h-[95vh] gap-0 p-6 pt-5">
+              <DialogHeader className="mb-4">
+                <DialogTitle className="text-[#07008A] text-xl">Add Restaurant Order</DialogTitle>
+              </DialogHeader>
+              <div className="flex-1 overflow-hidden min-h-[500px]">
+                <RestaurantOrderForm items={items} bookings={bookings} onSuccess={() => { setOrderOpen(false); loadOrders(); }} onCancel={() => setOrderOpen(false)} />
+              </div>
+            </DialogContent>
+          </Dialog>
+        </CardHeader>
         <CardContent className="p-0">
-          {orders.length === 0 ? <div className="p-6 text-sm text-slate-500">No restaurant orders yet.</div> : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead><tr className="border-b bg-slate-50/80">{["Source", "Booking / Room", "Status", "Created", "Total"].map((h) => <th key={h} className={`${h === "Total" ? "text-right pr-6" : "text-left"} py-3 px-4 text-[11px] font-semibold text-slate-600 uppercase tracking-wider ${h === "Source" ? "pl-6" : ""}`}>{h}</th>)}</tr></thead>
-                <tbody>
-                  {orders.map((o) => {
-                    const booking = o.booking_id ? bookings.find((b) => b.id === o.booking_id) : undefined;
-                    return (
-                      <tr key={o.id} className="border-b last:border-0 hover:bg-slate-50/50 transition-colors">
-                        <td className="py-3 px-6 text-xs text-slate-700">{o.order_source ?? "Restaurant"}</td>
-                        <td className="py-3 px-4 text-xs text-slate-600">{booking ? <span>{booking.rooms?.room_number ? `Room ${booking.rooms.room_number}` : "No room"} · {booking.guests?.full_name ?? "Guest"} · {booking.reference_number}</span> : <span className="text-slate-400">Not linked</span>}</td>
-                        <td className="py-3 px-4 text-xs text-slate-600">{o.status ?? (booking ? "Charged to Room" : "Paid")}</td>
-                        <td className="py-3 px-4 text-xs text-slate-500">{o.created_at ? new Date(o.created_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</td>
-                        <td className="py-3 px-6 text-right font-semibold text-[#07008A]">₱{Number(o.total_amount ?? 0).toFixed(0)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 py-4 border-b bg-slate-50/60 gap-4">
+            <div className="relative w-full sm:max-w-xs">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+              <Input type="text" placeholder="Search by source or status..." className="pl-9 h-9 text-sm bg-white" value={orderSearch} onChange={(e) => { setOrderSearch(e.target.value); setOrderPage(1); }} />
             </div>
+          </div>
+          {orders.length === 0 ? <div className="p-6 text-sm text-slate-500 text-center">No restaurant orders yet.</div> : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead><tr className="border-b bg-slate-50/80">{["Source", "Booking / Room", "Status", "Created", "Total"].map((h) => <th key={h} className={`${h === "Total" ? "text-right pr-6" : "text-left"} py-3 px-4 text-[11px] font-semibold text-slate-600 uppercase tracking-wider ${h === "Source" ? "pl-6" : ""}`}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {(() => {
+                      const filteredOrders = orders.filter((o) => {
+                        if (!orderSearch) return true;
+                        const src = o.order_source?.toLowerCase() || "";
+                        const st = o.status?.toLowerCase() || "";
+                        const bRef = o.booking_id ? bookings.find(b => b.id === o.booking_id)?.reference_number?.toLowerCase() || "" : "";
+                        const s = orderSearch.toLowerCase();
+                        return src.includes(s) || st.includes(s) || bRef.includes(s);
+                      });
+                      const startIndex = (orderPage - 1) * itemsPerPage;
+                      const paginatedOrders = filteredOrders.slice(startIndex, startIndex + itemsPerPage);
+                      
+                      if (filteredOrders.length === 0) return <tr><td colSpan={5} className="py-8 text-center text-slate-500">No orders match your search.</td></tr>;
+
+                      return paginatedOrders.map((o) => {
+                        const booking = o.booking_id ? bookings.find((b) => b.id === o.booking_id) : undefined;
+                        return (
+                          <tr key={o.id} className="border-b last:border-0 hover:bg-slate-50/50 transition-colors">
+                            <td className="py-3 px-6 text-xs font-medium text-slate-700">{o.order_source ?? "Restaurant"}</td>
+                            <td className="py-3 px-4 text-xs text-slate-600">{booking ? <span>{booking.rooms?.room_number ? `Room ${booking.rooms.room_number}` : "No room"} · <span className="font-semibold text-slate-700">{booking.guests?.full_name ?? "Guest"}</span> · {booking.reference_number}</span> : <span className="text-slate-400">Not linked</span>}</td>
+                            <td className="py-3 px-4 text-xs"><span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${!o.status || o.status === "Charged to Room" ? "bg-amber-50 text-amber-700 border border-amber-200" : o.status === "Paid" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-700 border border-slate-200"}`}>{o.status ?? (booking ? "Charged to Room" : "Paid")}</span></td>
+                            <td className="py-3 px-4 text-xs text-slate-500">{o.created_at ? new Date(o.created_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+                            <td className="py-3 px-6 text-right font-semibold text-[#07008A]">₱{Number(o.total_amount ?? 0).toFixed(0)}</td>
+                          </tr>
+                        );
+                      });
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Orders Pagination Controls */}
+              <div className="flex items-center justify-between px-6 py-3 border-t bg-slate-50/60 text-xs text-slate-600 rounded-b-lg">
+                {(() => {
+                  const filteredOrders = orders.filter((o) => !orderSearch || o.order_source?.toLowerCase().includes(orderSearch.toLowerCase()) || o.status?.toLowerCase().includes(orderSearch.toLowerCase()));
+                  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / itemsPerPage));
+                  const startIndex = (orderPage - 1) * itemsPerPage;
+                  return (
+                    <>
+                      <div>Showing <span className="font-semibold">{filteredOrders.length === 0 ? 0 : startIndex + 1}–{Math.min(startIndex + itemsPerPage, filteredOrders.length)}</span> of <span className="font-semibold">{filteredOrders.length}</span> order{filteredOrders.length !== 1 ? "s" : ""}</div>
+                      <div className="inline-flex items-center gap-1">
+                        <Button type="button" variant="outline" size="icon" className="h-7 w-7 rounded-full" disabled={orderPage <= 1} onClick={() => setOrderPage((p) => Math.max(1, p - 1))}><ChevronLeft className="h-3 w-3" /></Button>
+                        <span className="mx-1 text-[11px]">Page <span className="font-semibold">{orderPage}</span> of <span className="font-semibold">{totalPages}</span></span>
+                        <Button type="button" variant="outline" size="icon" className="h-7 w-7 rounded-full" disabled={orderPage >= totalPages} onClick={() => setOrderPage((p) => Math.min(totalPages, p + 1))}><ChevronRight className="h-3 w-3" /></Button>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
+      </TabsContent>
+      </Tabs>
     </>
   );
 }
