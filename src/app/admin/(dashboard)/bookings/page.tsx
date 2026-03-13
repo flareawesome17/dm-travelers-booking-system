@@ -142,9 +142,24 @@ export default function AdminBookingsPage() {
     const actual = new Date(checkOutAt);
     if (Number.isNaN(actual.getTime())) return { rate: 0, hoursLate: 0, fee: 0, reason: "Invalid actual check-out time." as const };
     const rateKind = b.rate_plan_kind || "24h";
-    const checkOutDateStr = String(b.check_out_date || "").slice(0, 10);
-    if (!checkOutDateStr) return { rate: 0, hoursLate: 0, fee: 0, reason: "Check-out date is not set." as const };
-    const reserved = new Date(`${checkOutDateStr}T12:00:00`);
+    let reserved: Date;
+
+    if (rateKind === "24h") {
+      const checkOutDateStr = String(b.check_out_date || "").slice(0, 10);
+      if (!checkOutDateStr) return { rate: 0, hoursLate: 0, fee: 0, reason: "Check-out date is not set." as const };
+      reserved = new Date(`${checkOutDateStr}T12:00:00`);
+    } else {
+      const hoursToAdd = parseInt(rateKind.replace(/\D/g, ""), 10) || 0;
+      if (b.actual_check_in_at) {
+        reserved = new Date(b.actual_check_in_at);
+        reserved.setHours(reserved.getHours() + hoursToAdd);
+      } else {
+        const fallbackCheckIn = b.check_in_date ? String(b.check_in_date).slice(0, 10) : new Date().toISOString().slice(0, 10);
+        reserved = new Date(`${fallbackCheckIn}T14:00:00`);
+        reserved.setHours(reserved.getHours() + hoursToAdd);
+      }
+    }
+
     if (Number.isNaN(reserved.getTime())) return { rate: 0, hoursLate: 0, fee: 0, reason: "Reserved check-out time is not set correctly." as const };
     let rate = 0;
     if (rateKind === "24h") rate = Number(b.rooms?.rate_24h_late_checkout_fee || 0);
@@ -154,6 +169,13 @@ export default function AdminBookingsPage() {
     if (!Number.isFinite(rate) || rate <= 0) return { rate: 0, hoursLate: 0, fee: 0, reason: "No late check-out fee rate is set for this room." } as const;
     if (actual <= reserved) return { rate, hoursLate: 0, fee: 0, reason: "Not late (on or before reserved time)." as const };
     const diffMs = actual.getTime() - reserved.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    
+    // Add 30-minute grace period
+    if (diffMinutes <= 30) {
+      return { rate, hoursLate: 0, fee: 0, reason: "Within 30-minute grace period." as const };
+    }
+
     const hoursLate = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60)));
     return { rate, hoursLate, fee: rate * hoursLate, reason: "Late check-out detected." as const };
   };
@@ -412,11 +434,34 @@ export default function AdminBookingsPage() {
       {/* Check-out dialog */}
       <AlertDialog open={!!checkOutBooking} onOpenChange={(o) => !o && setCheckOutBooking(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Confirm check-out?</AlertDialogTitle><AlertDialogDescription>This will mark the booking as <span className="font-semibold">Checked-Out</span>. Late check-out fees apply automatically after 12:00 NN.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>Confirm check-out?</AlertDialogTitle><AlertDialogDescription>This will mark the booking as <span className="font-semibold">Checked-Out</span>. Late check-out fees apply automatically after the designated checkout time.</AlertDialogDescription></AlertDialogHeader>
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700">Actual check-out time</label>
             <input type="datetime-local" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={checkOutAt} onChange={(e) => setCheckOutAt(e.target.value)} />
-            {checkOutBooking?.check_out_date && <p className="text-xs text-slate-500">Reserved: <span className="font-medium">{`${String(checkOutBooking.check_out_date).slice(0, 10)} 12:00`}</span></p>}
+            {checkOutBooking && (
+              <p className="text-xs text-slate-500">
+                Expected checkout: <span className="font-medium">
+                  {(() => {
+                    const rateKind = checkOutBooking.rate_plan_kind || "24h";
+                    if (rateKind === "24h") return `${String(checkOutBooking.check_out_date || "").slice(0, 10)} 12:00 PM`;
+                    const hoursToAdd = parseInt(rateKind.replace(/\D/g, ""), 10) || 0;
+                    let exp = new Date();
+                    if (checkOutBooking.actual_check_in_at) {
+                      exp = new Date(checkOutBooking.actual_check_in_at);
+                    } else {
+                      const fallbackCheckInStr = String(checkOutBooking.check_in_date || "").slice(0, 10);
+                      exp = new Date(`${fallbackCheckInStr}T14:00:00`);
+                    }
+                    exp.setHours(exp.getHours() + hoursToAdd);
+                    if (isNaN(exp.getTime())) return "Unknown";
+                    const pad = (n: number) => String(n).padStart(2, "0");
+                    const ampm = exp.getHours() >= 12 ? "PM" : "AM";
+                    const h12 = exp.getHours() % 12 || 12;
+                    return `${exp.getFullYear()}-${pad(exp.getMonth() + 1)}-${pad(exp.getDate())} ${pad(h12)}:${pad(exp.getMinutes())} ${ampm}`;
+                  })()}
+                </span>
+              </p>
+            )}
             {(() => { const p = computeLateCheckOutPreview(); return <p className={cn("text-xs", p.fee > 0 ? "text-slate-700" : "text-slate-500")}>Breakdown: <span className="font-semibold text-[#07008A]">₱{p.fee.toFixed(0)}</span> (<span className="font-mono">₱{p.rate.toFixed(0)}</span> × <span className="font-mono">{p.hoursLate}</span> hour{p.hoursLate !== 1 ? "s" : ""} late) — {p.reason}</p>; })()}
           </div>
           <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-amber-600 hover:bg-amber-700 text-white" onClick={async () => { const b = checkOutBooking; if (!b?.id) return; try { const actual = checkOutAt ? new Date(checkOutAt).toISOString() : new Date().toISOString(); const res = await api(`/api/bookings/${b.id}/check-out`, { method: "POST", body: JSON.stringify({ actual_check_out_at: actual }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error((data as { error?: string }).error || "Check-out failed."); return; } const fee = Number((data as { late_checkout_fee_applied?: number }).late_checkout_fee_applied || 0); toast.success(fee > 0 ? `Checked out. Late fee: ₱${fee.toFixed(0)}.` : "Checked out."); setCheckOutBooking(null); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }}>Confirm check-out</AlertDialogAction></AlertDialogFooter>
