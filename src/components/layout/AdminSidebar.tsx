@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -30,11 +31,11 @@ const navItems = [
   { label: "Settings", path: "/admin/settings", icon: Settings },
 ];
 
-export default function AdminSidebar({ 
-  isCollapsed = false, 
-  onToggle 
-}: { 
-  isCollapsed?: boolean; 
+export default function AdminSidebar({
+  isCollapsed = false,
+  onToggle
+}: {
+  isCollapsed?: boolean;
   onToggle?: () => void;
 }) {
   const pathname = usePathname();
@@ -60,17 +61,15 @@ export default function AdminSidebar({
         isCollapsed ? "justify-center px-4" : "justify-between"
       )}>
         <div className="flex items-center gap-3 overflow-hidden">
-          <div className="flex shrink-0 h-10 w-10 items-center justify-center rounded-xl bg-[#FED501] text-[#07008A] shadow-lg">
-            <span className="font-bold text-lg">D&amp;M</span>
-          </div>
+          <Image src="/logo.png" alt="D&M Logo" width={40} height={40} className="shrink-0 object-contain" />
           {!isCollapsed && (
             <div className="whitespace-nowrap flex-1">
               <p className="font-bold text-white tracking-tight leading-tight">Admin</p>
-              <p className="text-xs text-white/70 leading-tight">Travelers Inn</p>
+              <p className="text-xs text-white/70 leading-tight">D&M Travelers Inn</p>
             </div>
           )}
         </div>
-        
+
         {/* Toggle Button Details inside Header for expanded view or floating for collapsed */}
         {!isCollapsed && onToggle && (
           <button onClick={onToggle} className="p-1.5 hover:bg-white/10 rounded-md transition-colors shrink-0">
@@ -81,8 +80,8 @@ export default function AdminSidebar({
 
       {/* Floating Toggle Button when Collapsed */}
       {isCollapsed && onToggle && (
-        <button 
-          onClick={onToggle} 
+        <button
+          onClick={onToggle}
           className="absolute -right-3 top-8 bg-[#FED501] text-[#07008A] p-1 rounded-full shadow-md z-40 hover:scale-110 transition-transform"
         >
           <ChevronRight className="h-4 w-4" />
