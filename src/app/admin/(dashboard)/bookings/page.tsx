@@ -29,6 +29,7 @@ import { BookingForm } from "@/components/admin/bookings/BookingForm";
 import { EditBookingForm } from "@/components/admin/bookings/EditBookingForm";
 import { RecordPaymentModal } from "@/components/admin/bookings/RecordPaymentModal";
 import { ReceiptModal } from "@/components/admin/bookings/ReceiptModal";
+import { CountdownTimer } from "@/components/admin/bookings/CountdownTimer";
 import { toast } from "@/components/ui/sonner";
 
 const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -43,7 +44,7 @@ function getStatusVariant(status?: string) {
 
 type BookingRow = {
   id?: string; reference_number?: string; status?: string;
-  check_in_date?: string; check_out_date?: string;
+  check_in_date?: string; check_out_date?: string; actual_check_in_at?: string;
   total_amount?: number; deposit_paid?: number; balance_due?: number;
   rate_plan_kind?: string; special_requests?: string | null;
   early_checkin_fee_applied?: number; late_checkout_fee_applied?: number; is_lgu_booking?: boolean;
@@ -257,9 +258,17 @@ export default function AdminBookingsPage() {
                         </div>
                       </td>
                       <td className="py-4 px-4 align-top text-xs text-slate-600 whitespace-nowrap">
-                         <div className="flex flex-col gap-1">
+                         <div className="flex flex-col gap-1 items-start">
                            <span><span className="text-slate-400 text-[10px] uppercase font-semibold mr-1">In</span> {b.check_in_date ?? "—"}</span>
                            <span><span className="text-slate-400 text-[10px] uppercase font-semibold mr-1">Out</span> {b.check_out_date ?? "—"}</span>
+                           {b.status === "Checked-In" && (
+                             <CountdownTimer 
+                               checkInDateStr={b.check_in_date} 
+                               checkOutDateStr={b.check_out_date} 
+                               actualCheckInAt={b.actual_check_in_at} 
+                               ratePlanKind={b.rate_plan_kind} 
+                             />
+                           )}
                          </div>
                       </td>
                       <td className="py-4 px-4 align-top text-xs">
