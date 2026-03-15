@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from("bookings")
-      .select("*, guests(*), rooms(*)")
+      .select("*, guests(*), rooms(*), restaurant_orders:restaurant_orders(*)")
       .order("created_at", { ascending: false });
 
     if (error) {

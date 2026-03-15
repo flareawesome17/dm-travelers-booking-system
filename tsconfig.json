@@ -41,7 +41,6 @@
   ],
   "exclude": [
     "node_modules",
-    "src/_pages_legacy",
     "src/components/Navbar.tsx",
     "src/components/Footer.tsx",
     "server"

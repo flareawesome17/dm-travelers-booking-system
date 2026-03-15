@@ -171,12 +171,13 @@ export default function AdminBookingsPage() {
     const diffMs = actual.getTime() - reserved.getTime();
     const diffMinutes = Math.floor(diffMs / (1000 * 60));
     
-    // Add 30-minute grace period
+    // Add 30-minute grace period per hour. 
+    // Example: 1h 30m delay = 1 hour charge, 1h 31m delay = 2 hours charge.
     if (diffMinutes <= 30) {
       return { rate, hoursLate: 0, fee: 0, reason: "Within 30-minute grace period." as const };
     }
 
-    const hoursLate = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60)));
+    const hoursLate = Math.ceil((diffMinutes - 30) / 60);
     return { rate, hoursLate, fee: rate * hoursLate, reason: "Late check-out detected." as const };
   };
 
@@ -394,7 +395,7 @@ export default function AdminBookingsPage() {
       {/* Edit dialog */}
       <Dialog open={!!editBooking} onOpenChange={(o) => !o && setEditBooking(null)}>
         <DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Edit booking</DialogTitle></DialogHeader>
-          {editBooking?.id && <EditBookingForm apiUrl="" token={token()} booking={{ id: editBooking.id, status: editBooking.status, check_in_date: editBooking.check_in_date, check_out_date: editBooking.check_out_date, special_requests: editBooking.special_requests, deposit_paid: editBooking.deposit_paid, total_amount: editBooking.total_amount, balance_due: editBooking.balance_due }} onSuccess={() => { setLoading(true); fetchBookings(); }} onClose={() => setEditBooking(null)} />}
+          {editBooking?.id && <EditBookingForm apiUrl="" token={token()} booking={{ id: editBooking.id, status: editBooking.status, check_in_date: editBooking.check_in_date, check_out_date: editBooking.check_out_date, special_requests: editBooking.special_requests, deposit_paid: editBooking.deposit_paid, total_amount: editBooking.total_amount, balance_due: editBooking.balance_due, is_lgu_booking: editBooking.is_lgu_booking }} onSuccess={() => { setLoading(true); fetchBookings(); }} onClose={() => setEditBooking(null)} />}
         </DialogContent>
       </Dialog>
 

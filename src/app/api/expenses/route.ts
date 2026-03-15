@@ -2,21 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { verifyAdminToken } from "@/lib/auth";
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest) {
   const auth = verifyAdminToken(req);
   if ("error" in auth) return auth.error;
 
   try {
-    const { id } = await params;
-    const body = await req.json();
     const supabase = getSupabaseAdmin();
-
     const { data, error } = await supabase
-      .from("bookings")
-      .update(body)
-      .eq("id", id)
-      .select("*, guests(*), rooms(*), restaurant_orders:restaurant_orders(*)")
-      .single();
+      .from("expenses")
+      .select("*")
+      .order("date", { ascending: false });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json(data);
@@ -25,16 +20,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: NextRequest) {
   const auth = verifyAdminToken(req);
   if ("error" in auth) return auth.error;
 
   try {
-    const { id } = await params;
+    const body = await req.json();
     const supabase = getSupabaseAdmin();
-    const { error } = await supabase.from("bookings").delete().eq("id", id);
+    
+    const { data, error } = await supabase
+      .from("expenses")
+      .insert(body)
+      .select()
+      .single();
+
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-    return NextResponse.json({ success: true });
+    return NextResponse.json(data);
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

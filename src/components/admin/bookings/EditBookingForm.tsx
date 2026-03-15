@@ -14,6 +14,7 @@ type BookingRow = {
   deposit_paid?: number;
   total_amount?: number;
   balance_due?: number;
+  is_lgu_booking?: boolean;
 };
 
 type EditBookingFormProps = {
@@ -40,6 +41,7 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
   const [checkOut, setCheckOut] = useState(booking.check_out_date?.slice(0, 10) ?? "");
   const [specialRequests, setSpecialRequests] = useState(booking.special_requests ?? "");
   const [depositPaid, setDepositPaid] = useState(String(booking.deposit_paid ?? 0));
+  const [isLguBooking, setIsLguBooking] = useState(booking.is_lgu_booking ?? false);
   const [submitting, setSubmitting] = useState(false);
 
   const totalAmount = Number(booking.total_amount ?? 0);
@@ -72,6 +74,7 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
           special_requests: specialRequests.trim() || null,
           deposit_paid: deposit,
           balance_due: balanceDue,
+          is_lgu_booking: isLguBooking,
         }),
       });
 
@@ -115,6 +118,23 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
         <div className="space-y-2">
           <Label>Check-out date</Label>
           <Input type="date" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} required />
+        </div>
+      </div>
+      <div className="flex items-center gap-2 border rounded-md px-3 py-2 bg-slate-50/70">
+        <input
+          id="is_lgu_booking_edit"
+          type="checkbox"
+          checked={isLguBooking}
+          onChange={(e) => setIsLguBooking(e.target.checked)}
+          className="h-4 w-4 rounded border-slate-300"
+        />
+        <div className="space-y-0.5">
+          <Label htmlFor="is_lgu_booking_edit" className="text-sm font-medium text-slate-800 cursor-pointer">
+            Mark as LGU booking
+          </Label>
+          <p className="text-xs text-slate-500">
+            Use this for local government unit stays.
+          </p>
         </div>
       </div>
       <div className="space-y-2">

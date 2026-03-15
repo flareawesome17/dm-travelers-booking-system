@@ -10,6 +10,7 @@ type BookingRow = {
   early_checkin_fee_applied?: number; late_checkout_fee_applied?: number; is_lgu_booking?: boolean;
   guests?: { full_name?: string; email?: string; phone_number?: string };
   rooms?: { room_number?: string; room_type?: string; } | null;
+  restaurant_orders?: { id: string; total_amount: number; status: string; }[];
 };
 
 type ReceiptModalProps = {
@@ -25,7 +26,9 @@ export function ReceiptModal({ booking, onClose }: ReceiptModalProps) {
   const balance = Number(booking.balance_due ?? total);
   const earlyFee = Number(booking.early_checkin_fee_applied ?? 0);
   const lateFee = Number(booking.late_checkout_fee_applied ?? 0);
-  const baseRate = total - earlyFee - lateFee;
+  const restaurantTotal = booking.restaurant_orders?.reduce((sum, order) => 
+    order.status === "Charged to Room" ? sum + Number(order.total_amount || 0) : sum, 0) || 0;
+  const baseRate = total - earlyFee - lateFee - restaurantTotal;
 
   return (
     <Dialog open={!!booking} onOpenChange={(open) => !open && onClose()}>
@@ -47,11 +50,11 @@ export function ReceiptModal({ booking, onClose }: ReceiptModalProps) {
           {/* Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-slate-300 pb-6 mb-6">
             <div className="flex items-center gap-4">
-              <img src="/logo.png" alt="Traveler's Booking System" className="h-16 w-auto object-contain print:h-12" />
+              <img src="/logo.png" alt="D&M Travelers Inn" className="h-16 w-auto object-contain print:h-12" />
               <div>
-                <h1 className="text-2xl font-bold text-[#07008A] tracking-tight print:text-black">Traveler's Booking System</h1>
-                <p className="text-sm text-slate-500 mt-1">123 Hotel Avenue, Cityville</p>
-                <p className="text-sm text-slate-500">contact@travelersbooking.com</p>
+                <h1 className="text-2xl font-bold text-[#07008A] tracking-tight print:text-black">D&M Travelers Inn</h1>
+                <p className="text-sm text-slate-500 mt-1">Looc Proper, Plaridel, Misamis Occidental</p>
+                <p className="text-sm text-slate-500">+63 951 868 3018</p>
               </div>
             </div>
             <div className="text-left sm:text-right">
@@ -100,25 +103,48 @@ export function ReceiptModal({ booking, onClose }: ReceiptModalProps) {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b-2 border-slate-800 text-slate-800 print:border-black">
-                  <th className="py-2 font-bold text-sm uppercase tracking-wider">Description</th>
-                  <th className="py-2 font-bold text-sm uppercase tracking-wider text-right w-32">Amount</th>
+                  <th className="py-4 font-bold text-xs uppercase tracking-wider">Description</th>
+                  <th className="py-4 font-bold text-xs uppercase tracking-wider text-center w-24">Qty/Unit</th>
+                  <th className="py-4 font-bold text-xs uppercase tracking-wider text-right w-32">Total</th>
                 </tr>
               </thead>
-              <tbody className="text-sm">
-                <tr className="border-b border-slate-200">
-                  <td className="py-3 text-slate-700">Room Accommodation Rate</td>
-                  <td className="py-3 text-right font-medium text-slate-900 text-base">₱{baseRate.toFixed(2)}</td>
+              <tbody className="divide-y divide-slate-100">
+                <tr>
+                  <td className="py-4 pr-4">
+                    <div className="font-semibold text-slate-800">Room Accommodation</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">{booking.rooms?.room_type || "Standard Room"} · {booking.rooms?.room_number ? `Room ${booking.rooms.room_number}` : "No room"}</div>
+                  </td>
+                  <td className="py-4 text-center">1</td>
+                  <td className="py-4 text-right font-medium text-slate-900">₱{baseRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 </tr>
                 {earlyFee > 0 && (
-                  <tr className="border-b border-slate-200 bg-slate-50 print:bg-transparent">
-                    <td className="py-3 text-slate-600 pl-4 border-l-2 border-slate-300 print:border-black">Early Check-in Fee</td>
-                    <td className="py-3 text-right font-medium text-slate-900">₱{earlyFee.toFixed(2)}</td>
+                  <tr>
+                    <td className="py-4 pr-4">
+                      <div className="font-semibold text-slate-800">Early Check-in Fee</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">Applied for check-in before standard time</div>
+                    </td>
+                    <td className="py-4 text-center">1</td>
+                    <td className="py-4 text-right font-medium text-slate-900">₱{earlyFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   </tr>
                 )}
                 {lateFee > 0 && (
-                  <tr className="border-b border-slate-200 bg-slate-50 print:bg-transparent">
-                    <td className="py-3 text-slate-600 pl-4 border-l-2 border-slate-300 print:border-black">Late Check-out Fee</td>
-                    <td className="py-3 text-right font-medium text-slate-900">₱{lateFee.toFixed(2)}</td>
+                  <tr>
+                    <td className="py-4 pr-4">
+                      <div className="font-semibold text-slate-800">Late Check-out Fee</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">Applied for check-out after standard time</div>
+                    </td>
+                    <td className="py-4 text-center">1</td>
+                    <td className="py-4 text-right font-medium text-slate-900">₱{lateFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  </tr>
+                )}
+                {restaurantTotal > 0 && (
+                  <tr>
+                    <td className="py-4 pr-4">
+                      <div className="font-semibold text-slate-800">Restaurant Orders</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">Charged to room from hotel restaurant</div>
+                    </td>
+                    <td className="py-4 text-center">—</td>
+                    <td className="py-4 text-right font-medium text-slate-900">₱{restaurantTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   </tr>
                 )}
               </tbody>

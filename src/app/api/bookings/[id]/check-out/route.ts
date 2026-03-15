@@ -51,7 +51,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         
         // Only charge late fee if they are more than 30 minutes late
         if (diffMinutes > 30) {
-          const hoursLate = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60)));
+          // Add 30-minute grace period per hour.
+          // Example: 1h 30m delay (90 min) = 1 hour charge, 1h 31m delay (91 min) = 2 hours charge.
+          const hoursLate = Math.ceil((diffMinutes - 30) / 60);
           lateFee = rate * hoursLate;
         }
       }

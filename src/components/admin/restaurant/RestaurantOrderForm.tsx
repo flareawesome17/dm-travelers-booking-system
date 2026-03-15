@@ -19,6 +19,8 @@ type OrderFormProps = {
 
 export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: OrderFormProps) {
   const [orderSource, setOrderSource] = useState<"Restaurant" | "Room Service" | "Walk-In">("Restaurant");
+  const [customerName, setCustomerName] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"Cash" | "GCash" | "Card" | "Charged to Room" | "Pending Payment">("Pending Payment");
   const [orderBookingRef, setOrderBookingRef] = useState<string>("");
   const [orderBookingSearch, setOrderBookingSearch] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
@@ -89,6 +91,8 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           order_source: orderSource,
+          customer_name: customerName.trim() || null,
+          payment_method: orderSource === "Room Service" ? "Charged to Room" : paymentMethod,
           booking_reference: orderSource === "Room Service" ? orderBookingRef.trim() || null : null,
           notes: orderNotes.trim() || null,
           items: orderLines,
@@ -110,17 +114,23 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
     <form onSubmit={handleSubmit} className="flex flex-col h-full max-h-[85vh]">
       <ScrollArea className="flex-1 pr-4 pl-1 pb-4">
         <div className="space-y-6">
-          {/* Top Section: Details */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Order Configuration */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
             <div className="space-y-2">
-              <Label htmlFor="order-source">Order source</Label>
+              <Label htmlFor="order-source" className="text-xs font-bold uppercase text-slate-500">Order source</Label>
               <select 
                 id="order-source" 
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-[#07008A]/20 focus:border-[#07008A] transition-all" 
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-[#07008A]/20 focus:border-[#07008A] transition-all shadow-sm" 
                 value={orderSource} 
                 onChange={(e) => {
-                  setOrderSource(e.target.value as any);
-                  if (e.target.value !== "Room Service") setOrderBookingRef("");
+                  const newSource = e.target.value as any;
+                  setOrderSource(newSource);
+                  if (newSource === "Room Service") {
+                    setOrderBookingRef("");
+                    setPaymentMethod("Charged to Room");
+                  } else {
+                    setPaymentMethod("Pending Payment");
+                  }
                 }}
               >
                 <option value="Restaurant">Restaurant (Dine-in)</option>
@@ -128,41 +138,90 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
                 <option value="Walk-In">Walk-In (Takeout)</option>
               </select>
             </div>
-            
+
             <div className="space-y-2">
-              <Label htmlFor="order-booking-search">Charge to Room / Booking</Label>
-              <Input 
-                id="order-booking-search" 
-                value={orderBookingSearch} 
-                onChange={(e) => setOrderBookingSearch(e.target.value)} 
-                placeholder="Search guest or room..." 
-                className="mb-2 h-9 text-xs" 
-                disabled={orderSource !== "Room Service"} 
-              />
+              <Label htmlFor="payment-method" className="text-xs font-bold uppercase text-slate-500">Payment Status</Label>
               <select 
-                id="order-booking-ref" 
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-[#07008A]/20 focus:border-[#07008A] transition-all disabled:opacity-50" 
-                value={orderBookingRef} 
-                onChange={(e) => setOrderBookingRef(e.target.value)} 
-                disabled={orderSource !== "Room Service"}
+                id="payment-method" 
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-[#07008A]/20 focus:border-[#07008A] transition-all disabled:opacity-50 shadow-sm" 
+                value={paymentMethod} 
+                onChange={(e) => setPaymentMethod(e.target.value as any)}
+                disabled={orderSource === "Room Service"}
               >
-                <option value="">Select a booking...</option>
-                {filteredBookings.map((b) => (
-                  <option key={b.id} value={b.reference_number ?? ""}>
-                    {b.rooms?.room_number ? `Rm ${b.rooms.room_number}` : "No room"} - {b.guests?.full_name ?? "Guest"} ({b.reference_number})
-                  </option>
-                ))}
+                <option value="Pending Payment">Pay Later / Pending</option>
+                <option value="Cash">Paid - Cash</option>
+                <option value="GCash">Paid - GCash</option>
+                <option value="Card">Paid - Card</option>
+                {orderSource === "Room Service" && <option value="Charged to Room">Charged to Room</option>}
               </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="customer-name" className="text-xs font-bold uppercase text-slate-500">{orderSource === "Room Service" ? "Guest Name" : "Customer Name"}</Label>
+              <Input 
+                id="customer-name" 
+                value={customerName} 
+                onChange={(e) => setCustomerName(e.target.value)} 
+                placeholder={orderSource === "Room Service" ? "Select a booking first..." : "Enter guest name..."} 
+                disabled={orderSource === "Room Service"}
+                className="h-10 border-slate-200 focus:border-[#07008A] transition-all shadow-sm"
+              />
             </div>
           </div>
 
+          {/* Room Service Link Section */}
+          {orderSource === "Room Service" && (
+            <div className="p-4 rounded-xl border border-[#07008A]/10 bg-[#07008A]/[0.02] space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center gap-2 text-[#07008A]">
+                <Search className="h-4 w-4" />
+                <span className="text-sm font-semibold">Link to Guest Booking</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="order-booking-search" className="text-xs text-slate-500">Quick Search</Label>
+                  <Input 
+                    id="order-booking-search" 
+                    value={orderBookingSearch} 
+                    onChange={(e) => setOrderBookingSearch(e.target.value)} 
+                    placeholder="Search by name, room or ref..." 
+                    className="h-10 text-sm" 
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="order-booking-ref" className="text-xs text-slate-500">Select Matching Booking</Label>
+                  <select 
+                    id="order-booking-ref" 
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-[#07008A]/20 focus:border-[#07008A] transition-all" 
+                    value={orderBookingRef} 
+                    onChange={(e) => {
+                      const ref = e.target.value;
+                      setOrderBookingRef(ref);
+                      const b = bookings.find(x => x.reference_number === ref);
+                      if (b && b.guests?.full_name) {
+                        setCustomerName(b.guests.full_name);
+                      }
+                    }} 
+                  >
+                    <option value="">Choose guest...</option>
+                    {filteredBookings.map((b) => (
+                      <option key={b.id} value={b.reference_number ?? ""}>
+                        {b.rooms?.room_number ? `Rm ${b.rooms.room_number}` : "No room"} - {b.guests?.full_name ?? "Guest"} ({b.reference_number})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
-            <Label htmlFor="order-notes">Order Notes (optional)</Label>
+            <Label htmlFor="order-notes" className="text-xs font-bold uppercase text-slate-500">Order Notes (optional)</Label>
             <Input 
               id="order-notes" 
               value={orderNotes} 
               onChange={(e) => setOrderNotes(e.target.value)} 
               placeholder="Allergies, special instructions, fast prep needed..." 
+              className="h-10 border-slate-200 focus:border-[#07008A]"
             />
           </div>
 

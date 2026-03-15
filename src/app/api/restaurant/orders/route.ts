@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   
   try {
     const body = await req.json();
-    const { order_source, booking_reference, notes, items } = body;
+    const { order_source, customer_name, payment_method, booking_reference, notes, items } = body;
     const supabase = getSupabaseAdmin();
 
     if (!items || !items.length) {
@@ -72,8 +72,13 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    // Determine initial status based on source
-    const initialStatus = order_source === "Room Service" ? "Charged to Room" : "Pending";
+    // Determine initial status based on source and payment
+    let initialStatus = "Pending";
+    if (order_source === "Room Service") {
+      initialStatus = "Charged to Room";
+    } else if (payment_method && payment_method !== "Pending Payment") {
+      initialStatus = "Paid";
+    }
 
     // 1. Insert order
     const { data: orderData, error: oErr } = await supabase
@@ -82,6 +87,8 @@ export async function POST(req: NextRequest) {
         booking_id,
         room_id,
         order_source,
+        customer_name,
+        payment_method: order_source === "Room Service" ? "Charged to Room" : (payment_method || "Pending Payment"),
         notes,
         status: initialStatus,
         subtotal,

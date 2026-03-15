@@ -255,6 +255,7 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
           num_children: Number(numChildren) || 0,
           total_amount: totalAmount,
           deposit_paid: deposit,
+          is_lgu_booking: isLguBooking,
         }),
       });
 
