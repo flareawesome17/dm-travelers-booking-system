@@ -46,6 +46,7 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
   const [numChildren, setNumChildren] = useState("0");
   const [specialRequests, setSpecialRequests] = useState("");
   const [depositPaid, setDepositPaid] = useState("0");
+  const [depositMethod, setDepositMethod] = useState<"Cash" | "GCash" | "Card">("Cash");
   const [submitting, setSubmitting] = useState(false);
   const [roomAvailability, setRoomAvailability] = useState<
     { check_in_date: string; check_out_date: string; status: string; rate_plan_kind?: string | null }[]
@@ -268,6 +269,7 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
           num_children: Number(numChildren) || 0,
           total_amount: totalAmount,
           deposit_paid: deposit,
+          deposit_method: deposit > 0 ? depositMethod : null,
           is_lgu_booking: isLguBooking,
         }),
       });
@@ -626,6 +628,16 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
                 onChange={(e) => setDepositPaid(e.target.value)}
                 className="w-28"
               />
+              <select
+                value={depositMethod}
+                onChange={(e) => setDepositMethod(e.target.value as "Cash" | "GCash" | "Card")}
+                className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-[#07008A]/20"
+                disabled={deposit <= 0}
+              >
+                <option value="Cash">Cash</option>
+                <option value="GCash">GCash</option>
+                <option value="Card">Card</option>
+              </select>
             </div>
             <div className="flex justify-between text-slate-700">
               <span>Balance due</span>
