@@ -2,15 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { verifyAdminToken } from "@/lib/auth";
 
-function manilaDateString(d: Date = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Manila",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(d);
-}
-
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = verifyAdminToken(req);
   if ("error" in auth) return auth.error;
@@ -19,17 +10,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { id } = await params;
     const body = await req.json();
     const supabase = getSupabaseAdmin();
-
-    const today = manilaDateString();
-    const { data: ledger, error: lErr } = await supabase
-      .from("daily_ledgers")
-      .select("status")
-      .eq("date", today)
-      .maybeSingle();
-    if (lErr) return NextResponse.json({ error: lErr.message }, { status: 500 });
-    if (ledger?.status === "closed") {
-      return NextResponse.json({ error: "Today's ledger is closed. Perform checkout adjustments on the next open day." }, { status: 400 });
-    }
 
     const actualCheckOut = body.actual_check_out_at ? new Date(body.actual_check_out_at) : new Date();
 

@@ -46,7 +46,8 @@ function manilaDateString(d: Date = new Date()): string {
 export default function AdminLedgerPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [date, setDate] = useState(manilaDateString());
+  const [activeDate, setActiveDate] = useState<string>("");
+  const [date, setDate] = useState<string>("");
   const [ledger, setLedger] = useState<Ledger | null>(null);
   const [incomeTx, setIncomeTx] = useState<Tx[]>([]);
   const [expenseTx, setExpenseTx] = useState<Tx[]>([]);
@@ -67,7 +68,7 @@ export default function AdminLedgerPage() {
   const [otp, setOtp] = useState("");
   const [confirmText, setConfirmText] = useState("");
 
-  const isToday = date === manilaDateString();
+  const isActiveLedger = !!date && date === activeDate;
   const confirmPhrase = `CLOSE ${date}`;
 
   const totals = useMemo(() => {
@@ -77,7 +78,7 @@ export default function AdminLedgerPage() {
     return { totalIncome, totalExpense, netTotal };
   }, [ledger]);
 
-  const fetchLedger = useCallback(async (targetDate: string) => {
+  const fetchActiveLedger = useCallback(async () => {
     const token = localStorage.getItem("admin_token");
     if (!token) {
       router.replace("/admin/login");
@@ -86,9 +87,41 @@ export default function AdminLedgerPage() {
 
     setRefreshing(true);
     try {
-      const today = manilaDateString();
-      const url = targetDate === today ? "/api/ledger/current" : `/api/ledger/${targetDate}`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch("/api/ledger/current", { headers: { Authorization: `Bearer ${token}` } });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload?.error || "Failed to load ledger.");
+
+      const payloadDate = typeof payload?.date === "string" ? payload.date : "";
+      if (payloadDate) {
+        setActiveDate(payloadDate);
+        setDate((prev) => (prev ? prev : payloadDate));
+      }
+
+      const l = payload.ledger;
+      setLedger(l);
+      setIncomeTx(Array.isArray(payload.income_transactions) ? payload.income_transactions : []);
+      setExpenseTx(Array.isArray(payload.expense_transactions) ? payload.expense_transactions : []);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to load ledger.");
+      setLedger(null);
+      setIncomeTx([]);
+      setExpenseTx([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [router]);
+
+  const fetchLedgerByDate = useCallback(async (targetDate: string) => {
+    const token = localStorage.getItem("admin_token");
+    if (!token) {
+      router.replace("/admin/login");
+      return;
+    }
+
+    setRefreshing(true);
+    try {
+      const res = await fetch(`/api/ledger/${targetDate}`, { headers: { Authorization: `Bearer ${token}` } });
       const payload = await res.json();
       if (!res.ok) throw new Error(payload?.error || "Failed to load ledger.");
 
@@ -108,8 +141,17 @@ export default function AdminLedgerPage() {
   }, [router]);
 
   useEffect(() => {
-    fetchLedger(date);
-  }, [date, fetchLedger]);
+    fetchActiveLedger();
+  }, [fetchActiveLedger]);
+
+  useEffect(() => {
+    if (!date) return;
+    if (activeDate && date === activeDate) {
+      fetchActiveLedger();
+    } else if (date !== activeDate) {
+      fetchLedgerByDate(date);
+    }
+  }, [activeDate, date, fetchActiveLedger, fetchLedgerByDate]);
 
   const requestOtp = async () => {
     const token = localStorage.getItem("admin_token");
@@ -161,8 +203,7 @@ export default function AdminLedgerPage() {
       setConfirmText("");
       setOtpMaskedTo(null);
       setOtpExpiresAt(null);
-      setDate(manilaDateString());
-      await fetchLedger(manilaDateString());
+      await fetchActiveLedger();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Failed to close the day.");
     } finally {
@@ -205,7 +246,7 @@ export default function AdminLedgerPage() {
       setTxCategory("");
       setTxDescription("");
       setTxAmount("");
-      await fetchLedger(date);
+      await fetchActiveLedger();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Failed to add transaction.");
     } finally {
@@ -232,14 +273,20 @@ export default function AdminLedgerPage() {
             />
           </div>
 
-          <Button variant="outline" size="sm" className="h-9" onClick={() => fetchLedger(date)} disabled={refreshing}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9"
+            onClick={() => (isActiveLedger ? fetchActiveLedger() : fetchLedgerByDate(date))}
+            disabled={refreshing || !date}
+          >
             <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
           </Button>
 
           <Dialog open={openAdd} onOpenChange={setOpenAdd}>
             <DialogTrigger asChild>
-              <Button size="sm" className="h-9 bg-[#07008A] hover:bg-[#05006a] text-white" disabled={!isToday || ledger?.status === "closed"}>
+              <Button size="sm" className="h-9 bg-[#07008A] hover:bg-[#05006a] text-white" disabled={!isActiveLedger || ledger?.status === "closed"}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Transaction
               </Button>
@@ -295,7 +342,7 @@ export default function AdminLedgerPage() {
               <Button
                 size="sm"
                 className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white"
-                disabled={!isToday || ledger?.status === "closed"}
+                disabled={!isActiveLedger || ledger?.status === "closed"}
               >
                 <Lock className="h-4 w-4 mr-2" />
                 Close Day

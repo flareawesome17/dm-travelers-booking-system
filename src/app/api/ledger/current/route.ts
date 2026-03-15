@@ -1,21 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { verifyAdminToken } from "@/lib/auth";
-
-function manilaDateString(d: Date = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Manila",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(d);
-}
-
-function manilaDayRangeIso(date: string): { startIso: string; endIso: string } {
-  const start = new Date(`${date}T00:00:00+08:00`);
-  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-  return { startIso: start.toISOString(), endIso: end.toISOString() };
-}
+import { findNextOpenLedgerDate, manilaDateString } from "@/lib/ledgerDate";
 
 async function getOrCreateLedger(date: string) {
   const supabase = getSupabaseAdmin();
@@ -44,7 +30,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const supabase = getSupabaseAdmin();
-    const date = manilaDateString();
+    const today = manilaDateString();
+    const date = await findNextOpenLedgerDate(supabase, today);
     const ledger = await getOrCreateLedger(date);
 
     const { data: payments, error: pErr } = await supabase

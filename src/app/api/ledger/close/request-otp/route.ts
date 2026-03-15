@@ -3,15 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { verifyAdminToken } from "@/lib/auth";
 import { sendMail } from "@/lib/mailer";
 import crypto from "crypto";
-
-function manilaDateString(d: Date = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Manila",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(d);
-}
+import { findNextOpenLedgerDate, manilaDateString } from "@/lib/ledgerDate";
 
 async function getOrCreateLedger(supabase: ReturnType<typeof getSupabaseAdmin>, date: string) {
   const { data: existing, error: eErr } = await supabase
@@ -60,7 +52,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const supabase = getSupabaseAdmin();
-    const date = manilaDateString();
+    const today = manilaDateString();
+    const date = await findNextOpenLedgerDate(supabase, today);
     const ledger = await getOrCreateLedger(supabase, date);
 
     if (ledger.status === "closed") {
