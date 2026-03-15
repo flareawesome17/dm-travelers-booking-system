@@ -40,9 +40,6 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules",
-    "src/components/Navbar.tsx",
-    "src/components/Footer.tsx",
-    "server"
+    "node_modules"
   ]
 }
