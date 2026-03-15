@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { verifyAdminToken } from "@/lib/auth";
+import { findNextOpenLedgerDate, manilaDateString } from "@/lib/ledgerDate";
 
 export async function GET(req: NextRequest) {
   const auth = verifyAdminToken(req);
@@ -21,6 +22,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { order_source, customer_name, payment_method, booking_reference, notes, items } = body;
     const supabase = getSupabaseAdmin();
+
+    const today = manilaDateString();
+    const accountingDate = await findNextOpenLedgerDate(supabase, today);
 
     if (!items || !items.length) {
       return NextResponse.json({ error: "Order must contain items" }, { status: 400 });
@@ -88,6 +92,7 @@ export async function POST(req: NextRequest) {
         room_id,
         order_source,
         customer_name,
+        accounting_date: accountingDate,
         payment_method: order_source === "Room Service" ? "Charged to Room" : (payment_method || "Pending Payment"),
         notes,
         status: initialStatus,

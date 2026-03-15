@@ -1,21 +1,18 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import jwt from "jsonwebtoken";
+import { verifyAdminToken } from "@/lib/auth";
+import { findNextOpenLedgerDate, manilaDateString } from "@/lib/ledgerDate";
 
-export async function POST(request: Request) {
+export async function POST(req: NextRequest) {
+  const auth = verifyAdminToken(req);
+  if ("error" in auth) return auth.error;
+
   try {
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const token = authHeader.split(" ")[1];
-    try {
-      jwt.verify(token, process.env.JWT_SECRET || "changeme");
-    } catch {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
+    const supabase = getSupabaseAdmin();
+    const today = manilaDateString();
+    const accountingDate = await findNextOpenLedgerDate(supabase, today);
 
-    const body = await request.json();
+    const body = await req.json();
     const { booking_id, amount, method, type, transaction_id } = body;
 
     if (!booking_id || !amount || !method || !type) {
@@ -26,8 +23,6 @@ export async function POST(request: Request) {
     if (isNaN(payAmount) || payAmount <= 0) {
       return NextResponse.json({ error: "Payment amount must be greater than zero" }, { status: 400 });
     }
-
-    const supabase = getSupabaseAdmin();
 
     // 1. Fetch current booking details to calculate new balance
     const { data: booking, error: fetchError } = await supabase
@@ -53,6 +48,7 @@ export async function POST(request: Request) {
         method,
         type,
         transaction_id: tId,
+        accounting_date: accountingDate,
         status: "Success",
       });
 
@@ -102,6 +98,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ 
       success: true, 
       message: "Payment recorded successfully",
+      recorded_for_date: accountingDate,
       balance_due: newBalanceDue,
       status: newStatus
     });

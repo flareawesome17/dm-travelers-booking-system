@@ -10,6 +10,7 @@ import {
   Sparkles,
   UtensilsCrossed,
   BarChart3,
+  ClipboardCheck,
   Users,
   Settings,
   Home,
@@ -27,6 +28,7 @@ const navItems = [
   { label: "Housekeeping", path: "/admin/housekeeping", icon: Sparkles },
   { label: "Restaurant", path: "/admin/restaurant", icon: UtensilsCrossed },
   { label: "Reports", path: "/admin/reports", icon: BarChart3 },
+  { label: "Daily Closing", path: "/admin/ledger", icon: ClipboardCheck },
   { label: "Users", path: "/admin/users", icon: Users },
   { label: "Settings", path: "/admin/settings", icon: Settings },
 ];

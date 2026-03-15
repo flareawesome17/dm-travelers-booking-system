@@ -32,11 +32,13 @@ export default function AdminRoomsPage() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<RoomRow | null>(null);
+  const [adminToken, setAdminToken] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
     const token = localStorage.getItem("admin_token");
     if (!token) { router.replace("/admin/login"); return; }
+    setAdminToken(token);
     fetch("/api/rooms", { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((data) => setRooms(Array.isArray(data) ? (data as RoomRow[]) : []))
@@ -63,7 +65,7 @@ export default function AdminRoomsPage() {
             </Button>
             <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{editingRoom ? "Edit room" : "Add new room"}</DialogTitle></DialogHeader>
-              <RoomForm apiUrl="" token={localStorage.getItem("admin_token") || ""} room={editingRoom ?? undefined}
+              <RoomForm apiUrl="" token={adminToken || ""} room={editingRoom ?? undefined}
                 onSuccess={(room) => { setRooms((prev) => { if (!room || typeof room !== "object") return prev; const u = room as RoomRow; if (!u.id) return prev; const idx = prev.findIndex((r) => r.id === u.id); if (idx === -1) return [...prev, u]; const n = [...prev]; n[idx] = u; return n; }); }}
                 onClose={() => setOpen(false)} />
             </DialogContent>

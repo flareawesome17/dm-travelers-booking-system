@@ -661,18 +661,18 @@ export function RoomForm({ apiUrl, token, room, onSuccess, onClose }: RoomFormPr
         {(existingImages.length > 0 || newImagePreviews.length > 0) && (
           <div className="mt-2 grid grid-cols-4 gap-2">
             {existingImages.map((src, idx) => (
-              // eslint-disable-next-line jsx-a11y/alt-text
               <img
                 key={`existing-${idx}`}
                 src={src}
+                alt={`Room image ${idx + 1}`}
                 className="h-16 w-full rounded-md object-cover border border-slate-200 bg-slate-100"
               />
             ))}
             {newImagePreviews.map((src, idx) => (
-              // eslint-disable-next-line jsx-a11y/alt-text
               <img
                 key={`new-${idx}`}
                 src={src}
+                alt={`New room image ${idx + 1}`}
                 className="h-16 w-full rounded-md object-cover border border-dashed border-[#07008A]/40 bg-slate-50"
               />
             ))}

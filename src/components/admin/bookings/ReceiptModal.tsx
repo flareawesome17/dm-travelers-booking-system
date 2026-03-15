@@ -24,6 +24,7 @@ export function ReceiptModal({ booking, onClose }: ReceiptModalProps) {
   const total = Number(booking.total_amount ?? 0);
   const deposit = Number(booking.deposit_paid ?? 0);
   const balance = Number(booking.balance_due ?? total);
+  const totalPaid = Math.max(0, total - balance);
   const earlyFee = Number(booking.early_checkin_fee_applied ?? 0);
   const lateFee = Number(booking.late_checkout_fee_applied ?? 0);
   const restaurantTotal = booking.restaurant_orders?.reduce((sum, order) => 
@@ -161,6 +162,10 @@ export function ReceiptModal({ booking, onClose }: ReceiptModalProps) {
               <div className="flex justify-between mb-4 text-sm pb-4 border-b border-slate-300">
                 <span className="font-bold text-slate-600">Deposit Paid</span>
                 <span className="text-emerald-600 font-medium print:text-black">- ₱{deposit.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between mb-4 text-sm">
+                <span className="font-bold text-slate-600">Total Paid</span>
+                <span className="text-emerald-700 font-bold print:text-black">₱{totalPaid.toFixed(2)}</span>
               </div>
               <div className="flex flex-row justify-between items-center bg-slate-100 p-4 rounded-lg print:bg-transparent print:border-2 print:border-black print:p-2 ml-auto w-full gap-4">
                 <span className="font-bold text-slate-800 text-sm sm:text-base uppercase tracking-wider shrink-0">Balance Due</span>

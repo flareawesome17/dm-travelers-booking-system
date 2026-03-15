@@ -13,42 +13,55 @@ export async function GET(req: NextRequest) {
 
   try {
     const supabase = getSupabaseAdmin();
+    const startDay = startDate ? startDate.split("T")[0] : null;
+    const endDay = endDate ? endDate.split("T")[0] : null;
 
-    // 1. Fetch Bookings (Rooms)
-    let bQuery = supabase.from("bookings").select("total_amount, deposit_paid, balance_due, payment_method, created_at, status").not("status", "eq", "Cancelled");
-    if (startDate) bQuery = bQuery.gte("created_at", startDate);
-    if (endDate) bQuery = bQuery.lte("created_at", endDate);
-    const { data: bookings, error: bErr } = await bQuery;
-    if (bErr) throw bErr;
+    // 1. Fetch Booking Payments (Rooms) - actual cash received
+    let pQuery = supabase
+      .from("payments")
+      .select("id, booking_id, amount, method, status, transaction_time, accounting_date")
+      .eq("status", "Success");
+    if (startDay) pQuery = pQuery.gte("accounting_date", startDay);
+    if (endDay) pQuery = pQuery.lte("accounting_date", endDay);
+    const { data: payments, error: pErr } = await pQuery;
+    if (pErr) throw pErr;
 
     // 2. Fetch Restaurant Orders (Dine-in/Walk-in only, as room service is in bookings)
     let rQuery = supabase.from("restaurant_orders")
-      .select("total_amount, payment_method, created_at, status, order_source")
-      .not("status", "eq", "Cancelled")
+      .select("total_amount, payment_method, created_at, status, order_source, accounting_date")
+      .eq("status", "Paid")
       .not("order_source", "eq", "Room Service"); // Avoid double counting
-    if (startDate) rQuery = rQuery.gte("created_at", startDate);
-    if (endDate) rQuery = rQuery.lte("created_at", endDate);
+    if (startDay) rQuery = rQuery.gte("accounting_date", startDay);
+    if (endDay) rQuery = rQuery.lte("accounting_date", endDay);
     const { data: rOrders, error: rErr } = await rQuery;
     if (rErr) throw rErr;
 
     // 3. Fetch Expenses
     let eQuery = supabase.from("expenses").select("*");
-    if (startDate) eQuery = eQuery.gte("date", startDate.split("T")[0]);
-    if (endDate) eQuery = eQuery.lte("date", endDate.split("T")[0]);
+    if (startDay) eQuery = eQuery.gte("date", startDay);
+    if (endDay) eQuery = eQuery.lte("date", endDay);
     const { data: expenses, error: eErr } = await eQuery;
     if (eErr) throw eErr;
 
-    // --- Calculations ---
-    const roomRevenue = (bookings ?? []).reduce((s, b) => s + Number(b.total_amount || 0), 0);
+    // --- Calculations (Actual Paid Revenue) ---
+    const roomRevenue = (payments ?? []).reduce((s, p) => s + Number(p.amount || 0), 0);
+
     const restaurantRevenue = (rOrders ?? []).reduce((s, r) => s + Number(r.total_amount || 0), 0);
+
     const totalRevenue = roomRevenue + restaurantRevenue;
     const totalExpenses = (expenses ?? []).reduce((s, e) => s + Number(e.amount || 0), 0);
     const netProfit = totalRevenue - totalExpenses;
 
     const byMethod: Record<string, number> = {};
-    [...(bookings ?? []), ...(rOrders ?? [])].forEach((item) => {
-      const m = item.payment_method || "Unknown";
-      byMethod[m] = (byMethod[m] || 0) + Number(item.total_amount || 0);
+    (payments ?? []).forEach((p) => {
+      const m = p.method || "Unknown";
+      const amt = Number(p.amount || 0);
+      if (amt > 0) byMethod[m] = (byMethod[m] || 0) + amt;
+    });
+    (rOrders ?? []).forEach((r) => {
+      const m = r.payment_method || "Unknown";
+      const paid = Number(r.total_amount || 0);
+      if (paid > 0) byMethod[m] = (byMethod[m] || 0) + paid;
     });
 
     const bySource = {
@@ -68,6 +81,9 @@ export async function GET(req: NextRequest) {
       return new NextResponse(header + rows, { headers: { "Content-Type": "text/csv", "Content-Disposition": "attachment; filename=revenue_report.csv" } });
     }
 
+    const bookingCount = Array.from(new Set((payments ?? []).map((p) => p.booking_id).filter(Boolean))).length;
+    const orderCount = (rOrders ?? []).length;
+
     return NextResponse.json({
       total_revenue: totalRevenue,
       room_revenue: roomRevenue,
@@ -76,8 +92,8 @@ export async function GET(req: NextRequest) {
       net_profit: netProfit,
       by_method: byMethod,
       by_source: bySource,
-      booking_count: bookings?.length || 0,
-      order_count: rOrders?.length || 0,
+      booking_count: bookingCount,
+      order_count: orderCount,
       expenses_list: expenses || []
     });
   } catch (error: any) {
