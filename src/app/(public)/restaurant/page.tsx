@@ -1,32 +1,57 @@
 "use client";
 
 import { motion, useInView } from "framer-motion";
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import { toast } from "@/components/ui/sonner";
 
-const menuItems = [
-  { name: "Tapsilog", category: "Breakfast", price: 180, desc: "Beef tapa, garlic rice, and fried egg" },
-  { name: "Longsilog", category: "Breakfast", price: 150, desc: "Longganisa, garlic rice, and fried egg" },
-  { name: "Pancake Stack", category: "Breakfast", price: 160, desc: "Fluffy pancakes with maple syrup and butter" },
-  { name: "Sinigang na Baboy", category: "Lunch", price: 280, desc: "Pork sour soup with vegetables" },
-  { name: "Kare-Kare", category: "Lunch", price: 320, desc: "Oxtail stew with peanut sauce" },
-  { name: "Grilled Tuna Belly", category: "Lunch", price: 350, desc: "Fresh local tuna, grilled to perfection" },
-  { name: "Lechon Kawali", category: "Dinner", price: 380, desc: "Crispy deep-fried pork belly" },
-  { name: "Seafood Platter", category: "Dinner", price: 650, desc: "Assorted fresh seafood, grilled and steamed" },
-  { name: "Chicken Inasal", category: "Dinner", price: 280, desc: "Grilled marinated chicken with rice" },
-  { name: "Mango Shake", category: "Drinks", price: 120, desc: "Fresh local mango smoothie" },
-  { name: "Halo-Halo", category: "Drinks", price: 150, desc: "Classic Filipino shaved ice dessert drink" },
-  { name: "San Miguel Beer", category: "Drinks", price: 80, desc: "Ice-cold local beer" },
-];
-
-const categories = ["All", "Breakfast", "Lunch", "Dinner", "Drinks"];
+type MenuItem = {
+  id: string;
+  name?: string | null;
+  description?: string | null;
+  price?: number | null;
+  category?: string | null;
+  image_url?: string | null;
+};
 
 export default function RestaurantPage() {
   const [filter, setFilter] = useState("All");
+  const [items, setItems] = useState<MenuItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
 
-  const filtered = filter === "All" ? menuItems : menuItems.filter((m) => m.category === filter);
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetch("/api/public/menu")
+      .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        if (!ok) throw new Error(j?.error || "Failed to load menu.");
+        if (!cancelled) setItems(Array.isArray(j) ? j : []);
+      })
+      .catch((e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to load menu."))
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const categories = useMemo(() => {
+    const uniq = new Set<string>();
+    for (const i of items) {
+      const c = typeof i.category === "string" ? i.category.trim() : "";
+      if (c) uniq.add(c);
+    }
+    return ["All", ...Array.from(uniq).sort((a, b) => a.localeCompare(b))];
+  }, [items]);
+
+  const filtered = useMemo(() => {
+    if (filter === "All") return items;
+    return items.filter((m) => String(m.category || "") === filter);
+  }, [filter, items]);
 
   return (
     <div className="pt-20">
@@ -79,22 +104,28 @@ export default function RestaurantPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map((item, i) => (
-              <motion.div
-                key={item.name}
-                initial={{ opacity: 0, y: 15 }}
-                animate={isInView ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.4, delay: i * 0.06 }}
-                className="bg-card rounded-xl p-5 flex justify-between items-start shadow-soft hover:shadow-elevated transition-shadow"
-              >
-                <div>
-                  <h3 className="font-heading text-base font-semibold text-foreground mb-1">{item.name}</h3>
-                  <p className="text-xs text-muted-foreground mb-1.5">{item.desc}</p>
-                  <span className="text-xs bg-muted px-2 py-0.5 rounded text-muted-foreground">{item.category}</span>
-                </div>
-                <span className="text-primary font-bold text-lg ml-4 flex-shrink-0">₱{item.price}</span>
-              </motion.div>
-            ))}
+            {loading ? (
+              <div className="col-span-full text-center text-sm text-muted-foreground">Loading menu...</div>
+            ) : filtered.length === 0 ? (
+              <div className="col-span-full text-center text-sm text-muted-foreground">No items available.</div>
+            ) : (
+              filtered.map((item, i) => (
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={isInView ? { opacity: 1, y: 0 } : {}}
+                  transition={{ duration: 0.4, delay: i * 0.06 }}
+                  className="bg-card rounded-xl p-5 flex justify-between items-start shadow-soft hover:shadow-elevated transition-shadow"
+                >
+                  <div>
+                    <h3 className="font-heading text-base font-semibold text-foreground mb-1">{item.name ?? "—"}</h3>
+                    <p className="text-xs text-muted-foreground mb-1.5">{item.description ?? ""}</p>
+                    <span className="text-xs bg-muted px-2 py-0.5 rounded text-muted-foreground">{item.category ?? "Other"}</span>
+                  </div>
+                  <span className="text-primary font-bold text-lg ml-4 flex-shrink-0">₱{Number(item.price || 0)}</span>
+                </motion.div>
+              ))
+            )}
           </div>
         </div>
       </section>

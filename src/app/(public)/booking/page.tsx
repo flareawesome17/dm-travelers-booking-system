@@ -1,31 +1,157 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { CalendarDays, ArrowRight, ArrowLeft, CheckCircle, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/sonner";
 
-const roomOptions = [
-  { id: "standard", name: "Standard Room", price: 1500, image: "/images/room-standard.jpg" },
-  { id: "standard-twin", name: "Standard Twin", price: 1800, image: "/images/room-standard.jpg" },
-  { id: "deluxe", name: "Deluxe Room", price: 2500, image: "/images/room-deluxe.jpg" },
-  { id: "deluxe-family", name: "Deluxe Family", price: 3200, image: "/images/room-deluxe.jpg" },
-  { id: "suite", name: "Executive Suite", price: 4500, image: "/images/room-suite.jpg" },
-];
+type RoomTypeOption = {
+  room_type: string;
+  sample_image_url: string | null;
+  min_price: number | null;
+  total_rooms: number;
+  available_rooms: number | null;
+  max_capacity: number | null;
+};
+
+function fallbackImageForRoomType(roomType: string) {
+  const t = roomType.toLowerCase();
+  if (t.includes("suite")) return "/images/room-suite.jpg";
+  if (t.includes("deluxe")) return "/images/room-deluxe.jpg";
+  if (t.includes("standard")) return "/images/room-standard.jpg";
+  return "/images/room-standard.jpg";
+}
 
 export default function BookingPage() {
   const [step, setStep] = useState(1);
   const [selectedRoom, setSelectedRoom] = useState("");
   const [form, setForm] = useState({ name: "", email: "", phone: "", checkin: "", checkout: "", guests: "1", request: "" });
   const [verificationCode, setVerificationCode] = useState("");
+  const [roomTypes, setRoomTypes] = useState<RoomTypeOption[]>([]);
+  const [loadingRooms, setLoadingRooms] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [bookingId, setBookingId] = useState<string>("");
+  const [referenceNumber, setReferenceNumber] = useState<string>("");
 
   const totalSteps = 4;
 
   const handleNext = () => setStep((s) => Math.min(s + 1, totalSteps));
   const handleBack = () => setStep((s) => Math.max(s - 1, 1));
 
-  const selectedRoomData = roomOptions.find((r) => r.id === selectedRoom);
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingRooms(true);
+    fetch("/api/public/room-types")
+      .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        if (!ok) throw new Error(j?.error || "Failed to load rooms.");
+        const list = Array.isArray(j?.room_types) ? j.room_types : [];
+        if (!cancelled) setRoomTypes(list);
+      })
+      .catch((e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to load rooms."))
+      .finally(() => {
+        if (!cancelled) setLoadingRooms(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedRoomData = useMemo(() => roomTypes.find((r) => r.room_type === selectedRoom), [roomTypes, selectedRoom]);
+
+  const createBooking = async () => {
+    if (!selectedRoom) {
+      toast.error("Please select a room.");
+      return;
+    }
+    if (!form.name || !form.email || !form.phone || !form.checkin || !form.checkout) {
+      toast.error("Please fill in all required fields.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/public/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: form.name,
+          email: form.email,
+          phone_number: form.phone,
+          room_type_requested: selectedRoom,
+          check_in_date: form.checkin,
+          check_out_date: form.checkout,
+          num_adults: Number(form.guests || 1),
+          num_children: 0,
+          special_requests: form.request,
+        }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload?.error || "Failed to create booking.");
+      setBookingId(String(payload.booking_id || ""));
+      setReferenceNumber(String(payload.reference_number || ""));
+      toast.success("We sent a verification code to your email.");
+      setStep(3);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to create booking.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const verifyBooking = async () => {
+    if (!bookingId) {
+      toast.error("Missing booking info. Please try again.");
+      return;
+    }
+    if (verificationCode.length !== 6) {
+      toast.error("Please enter the 6-digit code.");
+      return;
+    }
+    setVerifying(true);
+    try {
+      const res = await fetch("/api/public/bookings/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          booking_id: bookingId,
+          email: form.email,
+          code: verificationCode,
+        }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload?.error || "Verification failed.");
+      toast.success("Booking confirmed.");
+      setStep(4);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Verification failed.");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const resendCode = async () => {
+    if (!bookingId) return;
+    try {
+      const res = await fetch("/api/public/bookings/resend-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ booking_id: bookingId, email: form.email }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload?.error || "Failed to resend code.");
+      toast.success("Verification code resent.");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to resend code.");
+    }
+  };
+
+  const goBackFromVerify = () => {
+    setStep(2);
+    setVerificationCode("");
+  };
 
   return (
     <div className="pt-20 min-h-screen bg-background">
@@ -56,21 +182,33 @@ export default function BookingPage() {
           {step === 1 && (
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
               <h2 className="font-heading text-xl font-semibold text-foreground mb-4">Select Your Room</h2>
-              {roomOptions.map((room) => (
+              {loadingRooms ? (
+                <div className="text-sm text-muted-foreground">Loading rooms...</div>
+              ) : roomTypes.length === 0 ? (
+                <div className="text-sm text-muted-foreground">No rooms available.</div>
+              ) : roomTypes.map((room) => (
                 <button
-                  key={room.id}
-                  onClick={() => setSelectedRoom(room.id)}
+                  key={room.room_type}
+                  onClick={() => setSelectedRoom(room.room_type)}
                   className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left ${
-                    selectedRoom === room.id ? "border-primary shadow-gold bg-primary/5" : "border-border bg-card hover:border-primary/30"
+                    selectedRoom === room.room_type ? "border-primary shadow-gold bg-primary/5" : "border-border bg-card hover:border-primary/30"
                   }`}
                 >
-                  <Image src={room.image} alt={room.name} width={80} height={64} className="rounded-lg object-cover" />
+                  <Image
+                    src={room.sample_image_url || fallbackImageForRoomType(room.room_type)}
+                    alt={room.room_type}
+                    width={80}
+                    height={64}
+                    className="rounded-lg object-cover"
+                  />
                   <div className="flex-1">
-                    <h3 className="font-heading font-semibold text-foreground">{room.name}</h3>
-                    <p className="text-sm text-muted-foreground">Starting at ₱{room.price.toLocaleString()}/night</p>
+                    <h3 className="font-heading font-semibold text-foreground">{room.room_type}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {room.min_price != null ? `Starting at ₱${Number(room.min_price).toLocaleString()}/night` : "Rate not set"}
+                    </p>
                   </div>
-                  <div className={`w-5 h-5 rounded-full border-2 ${selectedRoom === room.id ? "border-primary bg-primary" : "border-muted-foreground/30"}`}>
-                    {selectedRoom === room.id && <div className="w-full h-full rounded-full flex items-center justify-center"><CheckCircle className="w-4 h-4 text-primary-foreground" /></div>}
+                  <div className={`w-5 h-5 rounded-full border-2 ${selectedRoom === room.room_type ? "border-primary bg-primary" : "border-muted-foreground/30"}`}>
+                    {selectedRoom === room.room_type && <div className="w-full h-full rounded-full flex items-center justify-center"><CheckCircle className="w-4 h-4 text-primary-foreground" /></div>}
                   </div>
                 </button>
               ))}
@@ -87,10 +225,18 @@ export default function BookingPage() {
               <div className="bg-card rounded-xl p-6 shadow-soft space-y-4">
                 {selectedRoomData && (
                   <div className="flex items-center gap-3 pb-4 border-b border-border">
-                    <Image src={selectedRoomData.image} alt="" width={64} height={48} className="rounded-lg object-cover" />
+                    <Image
+                      src={selectedRoomData.sample_image_url || fallbackImageForRoomType(selectedRoomData.room_type)}
+                      alt=""
+                      width={64}
+                      height={48}
+                      className="rounded-lg object-cover"
+                    />
                     <div>
-                      <p className="font-semibold text-foreground">{selectedRoomData.name}</p>
-                      <p className="text-sm text-primary font-bold">₱{selectedRoomData.price.toLocaleString()}/night</p>
+                      <p className="font-semibold text-foreground">{selectedRoomData.room_type}</p>
+                      {selectedRoomData.min_price != null ? (
+                        <p className="text-sm text-primary font-bold">₱{Number(selectedRoomData.min_price).toLocaleString()}/night</p>
+                      ) : null}
                     </div>
                   </div>
                 )}
@@ -131,8 +277,13 @@ export default function BookingPage() {
                 <Button variant="outline" onClick={handleBack} className="border-border text-foreground">
                   <ArrowLeft className="w-4 h-4 mr-1" /> Back
                 </Button>
-                <Button onClick={handleNext} disabled={!form.name || !form.email || !form.phone || !form.checkin || !form.checkout} className="flex-1 bg-gradient-gold text-secondary font-semibold shadow-gold hover:opacity-90 disabled:opacity-50">
-                  Continue <ArrowRight className="w-4 h-4 ml-1" />
+                <Button
+                  onClick={createBooking}
+                  disabled={submitting || !form.name || !form.email || !form.phone || !form.checkin || !form.checkout}
+                  className="flex-1 bg-gradient-gold text-secondary font-semibold shadow-gold hover:opacity-90 disabled:opacity-50"
+                >
+                  {submitting ? "Sending code..." : "Continue"}
+                  <ArrowRight className="w-4 h-4 ml-1" />
                 </Button>
               </div>
             </motion.div>
@@ -157,14 +308,21 @@ export default function BookingPage() {
                   maxLength={6}
                 />
                 <p className="text-xs text-muted-foreground mb-4">
-                  Didn&apos;t receive it? <button className="text-primary font-medium hover:underline">Resend code</button>
+                  Didn&apos;t receive it?{" "}
+                  <button type="button" onClick={resendCode} className="text-primary font-medium hover:underline">
+                    Resend code
+                  </button>
                 </p>
                 <div className="flex gap-3">
                   <Button variant="outline" onClick={handleBack} className="border-border text-foreground">
                     <ArrowLeft className="w-4 h-4 mr-1" /> Back
                   </Button>
-                  <Button onClick={handleNext} disabled={verificationCode.length < 6} className="flex-1 bg-gradient-gold text-secondary font-semibold shadow-gold hover:opacity-90 disabled:opacity-50">
-                    Verify &amp; Confirm
+                  <Button
+                    onClick={verifyBooking}
+                    disabled={verifying || verificationCode.length < 6}
+                    className="flex-1 bg-gradient-gold text-secondary font-semibold shadow-gold hover:opacity-90 disabled:opacity-50"
+                  >
+                    {verifying ? "Verifying..." : "Verify & Confirm"}
                   </Button>
                 </div>
               </div>
@@ -188,13 +346,24 @@ export default function BookingPage() {
                   Your reservation has been confirmed. A confirmation email has been sent to {form.email}.
                 </p>
                 <div className="bg-muted rounded-lg p-4 text-left space-y-2 text-sm mb-6">
-                  <div className="flex justify-between"><span className="text-muted-foreground">Reference</span><span className="font-mono font-bold text-foreground">DM-{Math.random().toString(36).substr(2, 8).toUpperCase()}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Room</span><span className="font-semibold text-foreground">{selectedRoomData?.name}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Reference</span><span className="font-mono font-bold text-foreground">{referenceNumber || "—"}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Room</span><span className="font-semibold text-foreground">{selectedRoomData?.room_type}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Check-in</span><span className="text-foreground">{form.checkin}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Check-out</span><span className="text-foreground">{form.checkout}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Guest</span><span className="text-foreground">{form.name}</span></div>
                 </div>
-                <Button onClick={() => { setStep(1); setSelectedRoom(""); setForm({ name: "", email: "", phone: "", checkin: "", checkout: "", guests: "1", request: "" }); setVerificationCode(""); }} variant="outline" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground">
+                <Button
+                  onClick={() => {
+                    setStep(1);
+                    setSelectedRoom("");
+                    setForm({ name: "", email: "", phone: "", checkin: "", checkout: "", guests: "1", request: "" });
+                    setVerificationCode("");
+                    setBookingId("");
+                    setReferenceNumber("");
+                  }}
+                  variant="outline"
+                  className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                >
                   Make Another Booking
                 </Button>
               </div>

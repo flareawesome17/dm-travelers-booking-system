@@ -1,78 +1,60 @@
 "use client";
 
 import { motion, useInView } from "framer-motion";
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Users, Maximize, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/sonner";
 
-const allRooms = [
-  {
-    id: "standard",
-    name: "Standard Room",
-    type: "Standard",
-    image: "/images/room-standard.jpg",
-    price: 1500,
-    guests: 2,
-    size: "22 sqm",
-    desc: "A cozy room with all the essentials for a comfortable and relaxing stay. Features include a queen-size bed, work desk, and en-suite bathroom.",
-    amenities: ["Free Wi-Fi", "Air Conditioning", "Hot Shower", "Cable TV", "Work Desk"],
-  },
-  {
-    id: "standard-twin",
-    name: "Standard Twin Room",
-    type: "Standard",
-    image: "/images/room-standard.jpg",
-    price: 1800,
-    guests: 2,
-    size: "24 sqm",
-    desc: "Perfect for friends or colleagues traveling together. Two single beds with full room amenities.",
-    amenities: ["Free Wi-Fi", "Air Conditioning", "Hot Shower", "Cable TV", "Mini Fridge"],
-  },
-  {
-    id: "deluxe",
-    name: "Deluxe Room",
-    type: "Deluxe",
-    image: "/images/room-deluxe.jpg",
-    price: 2500,
-    guests: 2,
-    size: "30 sqm",
-    desc: "Spacious elegance with premium furnishings and garden views. King-size bed with luxury linens and a seating area.",
-    amenities: ["Free Wi-Fi", "Air Conditioning", "Rain Shower", "Smart TV", "Mini Bar", "Coffee Maker"],
-  },
-  {
-    id: "deluxe-family",
-    name: "Deluxe Family Room",
-    type: "Deluxe",
-    image: "/images/room-deluxe.jpg",
-    price: 3200,
-    guests: 4,
-    size: "38 sqm",
-    desc: "Ideal for families with extra space, additional beds, and child-friendly amenities.",
-    amenities: ["Free Wi-Fi", "Air Conditioning", "Rain Shower", "Smart TV", "Mini Bar", "Extra Beds"],
-  },
-  {
-    id: "suite",
-    name: "Executive Suite",
-    type: "Suite",
-    image: "/images/room-suite.jpg",
-    price: 4500,
-    guests: 4,
-    size: "50 sqm",
-    desc: "Our finest accommodation featuring a separate living area, premium furnishings, and panoramic tropical views.",
-    amenities: ["Free Wi-Fi", "Air Conditioning", "Jacuzzi Tub", "Smart TV", "Mini Bar", "Living Area", "Balcony"],
-  },
-];
+type RoomTypeOption = {
+  room_type: string;
+  sample_image_url: string | null;
+  min_price: number | null;
+  total_rooms: number;
+  max_capacity: number | null;
+};
 
-const roomTypes = ["All", "Standard", "Deluxe", "Suite"];
+function fallbackImageForRoomType(roomType: string) {
+  const t = roomType.toLowerCase();
+  if (t.includes("suite")) return "/images/room-suite.jpg";
+  if (t.includes("deluxe")) return "/images/room-deluxe.jpg";
+  if (t.includes("standard")) return "/images/room-standard.jpg";
+  return "/images/room-standard.jpg";
+}
 
 export default function RoomsPage() {
   const [filter, setFilter] = useState("All");
+  const [roomTypes, setRoomTypes] = useState<RoomTypeOption[]>([]);
+  const [loading, setLoading] = useState(true);
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
 
-  const filtered = filter === "All" ? allRooms : allRooms.filter((r) => r.type === filter);
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetch("/api/public/room-types")
+      .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        if (!ok) throw new Error(j?.error || "Failed to load rooms.");
+        const list = Array.isArray(j?.room_types) ? j.room_types : [];
+        if (!cancelled) setRoomTypes(list);
+      })
+      .catch((e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to load rooms."))
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const filters = useMemo(() => ["All", ...roomTypes.map((r) => r.room_type)], [roomTypes]);
+  const filtered = useMemo(() => {
+    if (filter === "All") return roomTypes;
+    return roomTypes.filter((r) => r.room_type === filter);
+  }, [filter, roomTypes]);
 
   return (
     <div className="pt-20">
@@ -102,7 +84,7 @@ export default function RoomsPage() {
         <div className="container mx-auto px-4">
           {/* Filters */}
           <div className="flex flex-wrap gap-2 justify-center mb-10">
-            {roomTypes.map((type) => (
+            {filters.map((type) => (
               <button
                 key={type}
                 onClick={() => setFilter(type)}
@@ -119,49 +101,51 @@ export default function RoomsPage() {
 
           {/* Room Cards */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-            {filtered.map((room, i) => (
-              <motion.div
-                key={room.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={isInView ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.5, delay: i * 0.1 }}
-                className="bg-card rounded-xl overflow-hidden shadow-soft flex flex-col md:flex-row group"
-              >
-                <div className="relative w-full md:w-2/5 overflow-hidden">
-                  <Image
-                    src={room.image}
-                    alt={room.name}
-                    width={400}
-                    height={300}
-                    className="w-full h-48 md:h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                </div>
-                <div className="p-5 lg:p-6 flex-1 flex flex-col">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-heading text-xl font-bold text-foreground">{room.name}</h3>
-                    <span className="text-primary font-bold text-lg">₱{room.price.toLocaleString()}</span>
+            {loading ? (
+              <div className="col-span-full text-center text-sm text-muted-foreground">Loading rooms...</div>
+            ) : filtered.length === 0 ? (
+              <div className="col-span-full text-center text-sm text-muted-foreground">No rooms available.</div>
+            ) : (
+              filtered.map((room, i) => (
+                <motion.div
+                  key={room.room_type}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={isInView ? { opacity: 1, y: 0 } : {}}
+                  transition={{ duration: 0.5, delay: i * 0.1 }}
+                  className="bg-card rounded-xl overflow-hidden shadow-soft flex flex-col md:flex-row group"
+                >
+                  <div className="relative w-full md:w-2/5 overflow-hidden">
+                    <Image
+                      src={room.sample_image_url || fallbackImageForRoomType(room.room_type)}
+                      alt={room.room_type}
+                      width={400}
+                      height={300}
+                      className="w-full h-48 md:h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
                   </div>
-                  <p className="text-sm text-muted-foreground mb-3 flex-1">{room.desc}</p>
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
-                    <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> {room.guests} Guests</span>
-                    <span className="flex items-center gap-1"><Maximize className="w-3.5 h-3.5" /> {room.size}</span>
+                  <div className="p-5 lg:p-6 flex-1 flex flex-col">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-heading text-xl font-bold text-foreground">{room.room_type}</h3>
+                      <span className="text-primary font-bold text-lg">
+                        {room.min_price != null ? `₱${Number(room.min_price).toLocaleString()}` : "—"}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-3 flex-1">
+                      Comfortable accommodation designed for a relaxing stay.
+                    </p>
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
+                      <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Up to {room.max_capacity ?? "—"} Guests</span>
+                      <span className="flex items-center gap-1"><Maximize className="w-3.5 h-3.5" /> {room.total_rooms} room(s)</span>
+                    </div>
+                    <Link href="/booking">
+                      <Button className="w-full bg-gradient-gold text-secondary font-semibold hover:opacity-90">
+                        Book This Room <ArrowRight className="w-4 h-4 ml-1" />
+                      </Button>
+                    </Link>
                   </div>
-                  <div className="flex flex-wrap gap-1.5 mb-4">
-                    {room.amenities.slice(0, 4).map((a) => (
-                      <span key={a} className="text-xs bg-muted px-2 py-1 rounded-md text-muted-foreground">{a}</span>
-                    ))}
-                    {room.amenities.length > 4 && (
-                      <span className="text-xs bg-muted px-2 py-1 rounded-md text-muted-foreground">+{room.amenities.length - 4}</span>
-                    )}
-                  </div>
-                  <Link href="/booking">
-                    <Button className="w-full bg-gradient-gold text-secondary font-semibold hover:opacity-90">
-                      Book This Room <ArrowRight className="w-4 h-4 ml-1" />
-                    </Button>
-                  </Link>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              ))
+            )}
           </div>
         </div>
       </section>
