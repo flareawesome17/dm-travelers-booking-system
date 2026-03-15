@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { 
   Settings as SettingsIcon, Save, Building2, Clock, 
-  Banknote, Share2, Info, Loader2, Globe, Phone, Mail, MapPin
+  Banknote, Share2, Info, Loader2, Globe, Phone, Mail, MapPin, ShieldAlert
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
 export default function AdminSettingsPage() {
@@ -204,6 +205,37 @@ export default function AdminSettingsPage() {
                 <div className="space-y-2">
                   <p className="text-xs text-white/80 leading-relaxed italic">
                     The logo and property details are used across all receipts, invoices, and booking confirmations.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-sm bg-slate-50 border border-slate-200">
+              <CardHeader className="border-b bg-white">
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <ShieldAlert className="h-4 w-4 text-amber-600" />
+                  Site Status
+                </CardTitle>
+                <CardDescription>Control public access to the website</CardDescription>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-3">
+                  <Label htmlFor="site_status">Current Status</Label>
+                  <Select 
+                    value={settings.site_status || "live"} 
+                    onValueChange={(value) => handleUpdate("site_status", value)}
+                  >
+                    <SelectTrigger id="site_status" className="w-full bg-white">
+                      <SelectValue placeholder="Select site status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="live">Live (Publicly Accessible)</SelectItem>
+                      <SelectItem value="development">Under Development</SelectItem>
+                      <SelectItem value="maintenance">Under Maintenance</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Changing this from "Live" will prevent visitors from accessing the website.
                   </p>
                 </div>
               </CardContent>
