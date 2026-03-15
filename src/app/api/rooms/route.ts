@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { verifyAdminToken } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 
 export async function GET(req: NextRequest) {
-  const auth = verifyAdminToken(req);
+  const auth = await requirePermission(req, "rooms.read");
   if ("error" in auth) return auth.error;
   try {
     const supabase = getSupabaseAdmin();
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = verifyAdminToken(req);
+  const auth = await requirePermission(req, "rooms.create");
   if ("error" in auth) return auth.error;
   try {
     const body = await req.json();

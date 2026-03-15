@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { verifyAdminToken } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 
 export async function GET(req: NextRequest) {
-  const auth = verifyAdminToken(req);
+  const auth = await requirePermission(req, "reports.read");
   if ("error" in auth) return auth.error;
 
   const url = new URL(req.url);

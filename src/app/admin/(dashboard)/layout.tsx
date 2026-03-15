@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import AdminSidebar from "@/components/layout/AdminSidebar";
 
 const IDLE_MS = 15 * 60 * 1000;
@@ -12,7 +12,10 @@ export default function AdminDashboardLayout({
   children: React.ReactNode;
 }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [permissions, setPermissions] = useState<string[]>([]);
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
   const lastActivityRef = useRef<number>(Date.now());
   const lastWriteRef = useRef<number>(0);
 
@@ -26,6 +29,69 @@ export default function AdminDashboardLayout({
     })();
     if (!token) router.replace("/admin/login");
   }, [router]);
+
+  useEffect(() => {
+    const token = (() => {
+      try {
+        return localStorage.getItem("admin_token");
+      } catch {
+        return null;
+      }
+    })();
+    if (!token) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/rbac/me", { headers: { Authorization: `Bearer ${token}` } });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          try {
+            localStorage.removeItem("admin_token");
+            localStorage.removeItem("admin_last_activity");
+          } catch {
+            // ignore
+          }
+          router.replace("/admin/login");
+          return;
+        }
+        const perms = Array.isArray(payload?.permissions) ? payload.permissions.filter((p: any) => typeof p === "string") : [];
+        if (!cancelled) setPermissions(perms);
+      } finally {
+        if (!cancelled) setPermissionsLoaded(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  useEffect(() => {
+    if (!permissionsLoaded) return;
+    if (!pathname.startsWith("/admin")) return;
+    if (pathname === "/admin" || pathname === "/admin/login") return;
+
+    const required: Array<[string, string]> = [
+      ["/admin/bookings", "bookings.read"],
+      ["/admin/rooms", "rooms.read"],
+      ["/admin/housekeeping", "housekeeping.read"],
+      ["/admin/restaurant", "restaurant.read"],
+      ["/admin/reports", "reports.read"],
+      ["/admin/ledger", "ledger.read"],
+      ["/admin/users", "users.manage"],
+      ["/admin/roles", "roles.manage"],
+      ["/admin/settings", "settings.manage"],
+    ];
+
+    const permSet = new Set(permissions);
+    for (const [prefix, perm] of required) {
+      if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
+        if (!permSet.has(perm)) router.replace("/admin");
+        return;
+      }
+    }
+  }, [pathname, permissions, permissionsLoaded, router]);
 
   useEffect(() => {
     const markActivity = () => {
@@ -97,7 +163,7 @@ export default function AdminDashboardLayout({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-[#07008A]/[0.03]">
-      <AdminSidebar isCollapsed={isCollapsed} onToggle={() => setIsCollapsed(!isCollapsed)} />
+      <AdminSidebar isCollapsed={isCollapsed} onToggle={() => setIsCollapsed(!isCollapsed)} permissions={permissions} />
       <main className={`min-h-screen overflow-auto transition-all duration-300 ${isCollapsed ? 'ml-20' : 'ml-64'}`}>
         <div className="p-6 lg:p-8 max-w-6xl mx-auto">{children}</div>
       </main>

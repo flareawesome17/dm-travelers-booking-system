@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { verifyAdminToken } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const auth = verifyAdminToken(req);
+  const auth = await requirePermission(req, "rooms.update");
   if ("error" in auth) return auth.error;
   try {
     const { id } = await params;
@@ -16,7 +16,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const auth = verifyAdminToken(req);
+  const auth = await requirePermission(req, "rooms.delete");
   if ("error" in auth) return auth.error;
   try {
     const { id } = await params;

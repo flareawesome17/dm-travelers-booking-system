@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { verifyAdminToken } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 import bcrypt from "bcryptjs";
 
 export async function GET(req: NextRequest) {
-  const auth = verifyAdminToken(req);
+  const auth = await requirePermission(req, "users.manage");
   if ("error" in auth) return auth.error;
 
   try {
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = verifyAdminToken(req);
+  const auth = await requirePermission(req, "users.manage");
   if ("error" in auth) return auth.error;
 
   try {

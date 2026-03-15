@@ -11,6 +11,7 @@ import {
   UtensilsCrossed,
   BarChart3,
   ClipboardCheck,
+  KeyRound,
   Users,
   Settings,
   Home,
@@ -23,25 +24,29 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { label: "Dashboard", path: "/admin", icon: LayoutDashboard },
-  { label: "Bookings", path: "/admin/bookings", icon: CalendarCheck },
-  { label: "Rooms", path: "/admin/rooms", icon: BedDouble },
-  { label: "Housekeeping", path: "/admin/housekeeping", icon: Sparkles },
-  { label: "Restaurant", path: "/admin/restaurant", icon: UtensilsCrossed },
-  { label: "Reports", path: "/admin/reports", icon: BarChart3 },
-  { label: "Daily Closing", path: "/admin/ledger", icon: ClipboardCheck },
-  { label: "Users", path: "/admin/users", icon: Users },
-  { label: "Settings", path: "/admin/settings", icon: Settings },
+  { label: "Bookings", path: "/admin/bookings", icon: CalendarCheck, permission: "bookings.read" },
+  { label: "Rooms", path: "/admin/rooms", icon: BedDouble, permission: "rooms.read" },
+  { label: "Housekeeping", path: "/admin/housekeeping", icon: Sparkles, permission: "housekeeping.read" },
+  { label: "Restaurant", path: "/admin/restaurant", icon: UtensilsCrossed, permission: "restaurant.read" },
+  { label: "Reports", path: "/admin/reports", icon: BarChart3, permission: "reports.read" },
+  { label: "Daily Closing", path: "/admin/ledger", icon: ClipboardCheck, permission: "ledger.read" },
+  { label: "Users", path: "/admin/users", icon: Users, permission: "users.manage" },
+  { label: "Roles", path: "/admin/roles", icon: KeyRound, permission: "roles.manage" },
+  { label: "Settings", path: "/admin/settings", icon: Settings, permission: "settings.manage" },
 ];
 
 export default function AdminSidebar({
   isCollapsed = false,
-  onToggle
+  onToggle,
+  permissions = [],
 }: {
   isCollapsed?: boolean;
   onToggle?: () => void;
+  permissions?: string[];
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const permSet = new Set(permissions);
 
   const handleLogout = () => {
     try {
@@ -92,7 +97,9 @@ export default function AdminSidebar({
 
       {/* Nav */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto overflow-x-hidden">
-        {navItems.map(({ label, path, icon: Icon }) => {
+        {navItems
+          .filter((i) => !i.permission || permSet.has(i.permission))
+          .map(({ label, path, icon: Icon }) => {
           const isActive = pathname === path || (path !== "/admin" && pathname.startsWith(path));
           return (
             <Link

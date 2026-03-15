@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { verifyAdminToken } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 import { findNextOpenLedgerDate, manilaDateString } from "@/lib/ledgerDate";
 
 async function getOrCreateLedger(supabase: ReturnType<typeof getSupabaseAdmin>, date: string) {
@@ -22,7 +22,7 @@ async function getOrCreateLedger(supabase: ReturnType<typeof getSupabaseAdmin>, 
 }
 
 export async function POST(req: NextRequest) {
-  const auth = verifyAdminToken(req);
+  const auth = await requirePermission(req, "ledger.transactions.create");
   if ("error" in auth) return auth.error;
 
   try {
