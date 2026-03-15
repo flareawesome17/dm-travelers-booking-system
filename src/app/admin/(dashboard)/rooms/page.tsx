@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { BedDouble, Plus, Pencil, Trash2 } from "lucide-react";
+import { BedDouble, Plus, Pencil, Trash2, Search, FilterX } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,10 +16,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Input } from "@/components/ui/input";
 
 type RoomRow = {
   id: string; room_number?: string; room_type?: string; floor?: number; capacity?: number;
   status?: string; rate_plans?: unknown; amenities?: string[]; image_urls?: string[];
+  is_active?: boolean;
   rate_24h_price?: number | null; rate_24h_early_checkin_fee?: number | null;
   rate_24h_late_checkout_fee?: number | null; rate_12h_price?: number | null;
   rate_12h_late_checkout_fee?: number | null; rate_5h_price?: number | null;
@@ -33,6 +35,11 @@ export default function AdminRoomsPage() {
   const [open, setOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<RoomRow | null>(null);
   const [adminToken, setAdminToken] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [floorFilter, setFloorFilter] = useState<string>("all");
+  const [activeOnly, setActiveOnly] = useState<boolean>(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -46,6 +53,56 @@ export default function AdminRoomsPage() {
       .finally(() => setLoading(false));
   }, [router]);
 
+  const floors = useMemo(() => {
+    const uniq = new Set<number>();
+    for (const r of rooms) if (typeof r.floor === "number") uniq.add(r.floor);
+    return Array.from(uniq).sort((a, b) => a - b);
+  }, [rooms]);
+
+  const roomTypes = useMemo(() => {
+    const uniq = new Set<string>();
+    for (const r of rooms) if (r.room_type) uniq.add(r.room_type);
+    return Array.from(uniq).sort((a, b) => a.localeCompare(b));
+  }, [rooms]);
+
+  const statuses = useMemo(() => {
+    const preferred = ["Available", "Occupied", "Dirty", "In Cleaning", "Maintenance"];
+    const seen = new Set<string>();
+    for (const s of preferred) seen.add(s);
+    for (const r of rooms) if (r.status && !seen.has(r.status)) { preferred.push(r.status); seen.add(r.status); }
+    return preferred;
+  }, [rooms]);
+
+  const filteredRooms = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return rooms.filter((r) => {
+      if (activeOnly && r.is_active === false) return false;
+      if (statusFilter !== "all" && String(r.status || "") !== statusFilter) return false;
+      if (typeFilter !== "all" && String(r.room_type || "") !== typeFilter) return false;
+      if (floorFilter !== "all" && String(r.floor ?? "") !== floorFilter) return false;
+      if (!q) return true;
+      const hay = [
+        r.room_number,
+        r.room_type,
+        r.status,
+        r.floor != null ? String(r.floor) : "",
+        r.capacity != null ? String(r.capacity) : "",
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [activeOnly, floorFilter, query, rooms, statusFilter, typeFilter]);
+
+  const clearFilters = () => {
+    setQuery("");
+    setStatusFilter("all");
+    setTypeFilter("all");
+    setFloorFilter("all");
+    setActiveOnly(true);
+  };
+
   return (
     <>
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
@@ -53,23 +110,101 @@ export default function AdminRoomsPage() {
         <p className="text-muted-foreground mt-1">Room inventory and pricing</p>
       </motion.div>
       <Card className="border-0 shadow-lg bg-white/95 backdrop-blur-sm overflow-hidden">
-        <CardHeader className="border-b bg-slate-50/50 px-6 py-4 flex items-center justify-between gap-4">
-          <CardTitle className="text-lg font-semibold text-[#07008A] flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#07008A]/10 text-[#07008A]"><BedDouble className="h-5 w-5" /></div>
-            <span>All Rooms</span>
-            <span className="ml-2 text-xs font-medium rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{rooms.length} total</span>
-          </CardTitle>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={() => { setEditingRoom(null); setOpen(true); }}>
-              <Plus className="h-4 w-4 mr-1" /> Add room
-            </Button>
-            <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader><DialogTitle>{editingRoom ? "Edit room" : "Add new room"}</DialogTitle></DialogHeader>
-              <RoomForm apiUrl="" token={adminToken || ""} room={editingRoom ?? undefined}
-                onSuccess={(room) => { setRooms((prev) => { if (!room || typeof room !== "object") return prev; const u = room as RoomRow; if (!u.id) return prev; const idx = prev.findIndex((r) => r.id === u.id); if (idx === -1) return [...prev, u]; const n = [...prev]; n[idx] = u; return n; }); }}
-                onClose={() => setOpen(false)} />
-            </DialogContent>
-          </Dialog>
+        <CardHeader className="border-b bg-slate-50/50 px-6 py-4">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-4">
+              <CardTitle className="text-lg font-semibold text-[#07008A] flex items-center gap-2">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#07008A]/10 text-[#07008A]"><BedDouble className="h-5 w-5" /></div>
+                <span>All Rooms</span>
+                <span className="ml-2 text-xs font-medium rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
+                  {filteredRooms.length} shown · {rooms.length} total
+                </span>
+              </CardTitle>
+              <Dialog open={open} onOpenChange={setOpen}>
+                <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={() => { setEditingRoom(null); setOpen(true); }}>
+                  <Plus className="h-4 w-4 mr-1" /> Add room
+                </Button>
+                <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader><DialogTitle>{editingRoom ? "Edit room" : "Add new room"}</DialogTitle></DialogHeader>
+                  <RoomForm apiUrl="" token={adminToken || ""} room={editingRoom ?? undefined}
+                    onSuccess={(room) => { setRooms((prev) => { if (!room || typeof room !== "object") return prev; const u = room as RoomRow; if (!u.id) return prev; const idx = prev.findIndex((r) => r.id === u.id); if (idx === -1) return [...prev, u]; const n = [...prev]; n[idx] = u; return n; }); }}
+                    onClose={() => setOpen(false)} />
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
+              <div className="lg:col-span-5">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <Input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search room #, type, status, floor..."
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
+              <div className="lg:col-span-2">
+                <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider">Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-[#07008A]/20"
+                >
+                  <option value="all">All</option>
+                  {statuses.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="lg:col-span-2">
+                <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider">Type</label>
+                <select
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-[#07008A]/20"
+                >
+                  <option value="all">All</option>
+                  {roomTypes.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="lg:col-span-1">
+                <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider">Floor</label>
+                <select
+                  value={floorFilter}
+                  onChange={(e) => setFloorFilter(e.target.value)}
+                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-[#07008A]/20"
+                >
+                  <option value="all">All</option>
+                  {floors.map((f) => (
+                    <option key={f} value={String(f)}>{f}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="lg:col-span-2 flex items-center justify-between gap-2">
+                <label className="flex items-center gap-2 text-sm text-slate-700 select-none">
+                  <input
+                    type="checkbox"
+                    checked={activeOnly}
+                    onChange={(e) => setActiveOnly(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-[#07008A] focus:ring-[#07008A]/30"
+                  />
+                  Active only
+                </label>
+                <Button type="button" variant="outline" size="sm" className="h-10" onClick={clearFilters}>
+                  <FilterX className="h-4 w-4 mr-2" />
+                  Reset
+                </Button>
+              </div>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
@@ -85,7 +220,7 @@ export default function AdminRoomsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rooms.map((r) => (
+                  {filteredRooms.map((r) => (
                     <tr key={r.id} className="border-b last:border-0 hover:bg-slate-50/70 transition-colors">
                       <td className="py-4 px-6 font-mono font-medium text-[#07008A]">{r.room_number ?? "—"}</td>
                       <td className="py-4 px-6"><span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">{r.room_type ?? "—"}</span></td>

@@ -21,6 +21,30 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .single();
     if (bErr || !booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
 
+    if (!booking.room_id) {
+      return NextResponse.json({ error: "No room assigned to this booking." }, { status: 400 });
+    }
+
+    const roomStatus = booking.rooms?.status;
+    if (roomStatus !== "Available") {
+      return NextResponse.json(
+        { error: `Room is not ready for check-in. Current status: ${roomStatus || "Unknown"}.` },
+        { status: 400 }
+      );
+    }
+
+    const { data: lockedRoom, error: roomLockErr } = await supabase
+      .from("rooms")
+      .update({ status: "Occupied", updated_at: new Date().toISOString() })
+      .eq("id", booking.room_id)
+      .eq("status", "Available")
+      .select("id")
+      .limit(1);
+    if (roomLockErr) return NextResponse.json({ error: roomLockErr.message }, { status: 500 });
+    if (!lockedRoom || lockedRoom.length === 0) {
+      return NextResponse.json({ error: "Room is no longer available for check-in." }, { status: 400 });
+    }
+
     let earlyFee = 0;
     if (booking.rate_plan_kind === "24h" && booking.check_in_date) {
       const reserved = new Date(`${String(booking.check_in_date).slice(0, 10)}T14:00:00`);
@@ -48,7 +72,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .select("*, guests(*), rooms(*)")
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) {
+      await supabase
+        .from("rooms")
+        .update({ status: "Available", updated_at: new Date().toISOString() })
+        .eq("id", booking.room_id)
+        .eq("status", "Occupied");
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     return NextResponse.json({ ...data, early_checkin_fee_applied: earlyFee });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

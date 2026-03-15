@@ -6,6 +6,7 @@ type BookingRow = {
   id?: string; reference_number?: string; status?: string;
   check_in_date?: string; check_out_date?: string;
   total_amount?: number; deposit_paid?: number; balance_due?: number;
+  restaurant_charges_total?: number;
   rate_plan_kind?: string; special_requests?: string | null;
   early_checkin_fee_applied?: number; late_checkout_fee_applied?: number; is_lgu_booking?: boolean;
   guests?: { full_name?: string; email?: string; phone_number?: string };
@@ -21,15 +22,22 @@ type ReceiptModalProps = {
 export function ReceiptModal({ booking, onClose }: ReceiptModalProps) {
   if (!booking) return null;
 
-  const total = Number(booking.total_amount ?? 0);
+  const roomTotal = Number(booking.total_amount ?? 0);
   const deposit = Number(booking.deposit_paid ?? 0);
-  const balance = Number(booking.balance_due ?? total);
-  const totalPaid = Math.max(0, total - balance);
   const earlyFee = Number(booking.early_checkin_fee_applied ?? 0);
   const lateFee = Number(booking.late_checkout_fee_applied ?? 0);
-  const restaurantTotal = booking.restaurant_orders?.reduce((sum, order) => 
-    order.status === "Charged to Room" ? sum + Number(order.total_amount || 0) : sum, 0) || 0;
-  const baseRate = total - earlyFee - lateFee - restaurantTotal;
+  const restaurantTotal =
+    booking.restaurant_charges_total != null
+      ? Number(booking.restaurant_charges_total || 0)
+      : booking.restaurant_orders?.reduce(
+          (sum, order) => (order.status === "Charged to Room" ? sum + Number(order.total_amount || 0) : sum),
+          0,
+        ) || 0;
+
+  const grandTotal = roomTotal + restaurantTotal;
+  const balance = Number(booking.balance_due ?? grandTotal);
+  const totalPaid = Math.max(0, grandTotal - balance);
+  const baseRate = Math.max(0, roomTotal - earlyFee - lateFee);
 
   return (
     <Dialog open={!!booking} onOpenChange={(open) => !open && onClose()}>
@@ -157,7 +165,7 @@ export function ReceiptModal({ booking, onClose }: ReceiptModalProps) {
             <div className="w-full sm:w-2/3 md:w-1/2">
               <div className="flex justify-between mb-2 text-sm">
                 <span className="font-bold text-slate-600">Subtotal</span>
-                <span className="text-slate-900 font-medium">₱{total.toFixed(2)}</span>
+                <span className="text-slate-900 font-medium">₱{grandTotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between mb-4 text-sm pb-4 border-b border-slate-300">
                 <span className="font-bold text-slate-600">Deposit Paid</span>

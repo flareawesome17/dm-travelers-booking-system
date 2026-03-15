@@ -12,7 +12,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .from("bookings")
       .select("check_in_date, check_out_date, status, rate_plan_kind")
       .eq("room_id", id)
-      .not("status", "in", '("Cancelled","No Show")')
+      .not("status", "in", '("Cancelled","No Show","Checked-Out")')
       .order("check_in_date");
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json(data ?? []);

@@ -38,17 +38,22 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
     });
   }, [items, orderItemSearch, orderLines]);
 
+  const activeRoomServiceBookings = useMemo(() => {
+    return bookings.filter((b) => b.status === "Checked-In");
+  }, [bookings]);
+
   const filteredBookings = useMemo(() => {
-    // Only show active bookings (not checked out)
-    const activeBookings = bookings.filter((b) => b.status !== "Checked Out");
-    
     const term = orderBookingSearch.toLowerCase().trim();
-    if (!term) return activeBookings;
-    
-    return activeBookings.filter((b) => 
-      [b.reference_number, b.guests?.full_name, b.rooms?.room_number].filter(Boolean).join(" ").toLowerCase().includes(term)
+    if (!term) return activeRoomServiceBookings;
+
+    return activeRoomServiceBookings.filter((b) =>
+      [b.reference_number, b.guests?.full_name, b.rooms?.room_number]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(term),
     );
-  }, [bookings, orderBookingSearch]);
+  }, [activeRoomServiceBookings, orderBookingSearch]);
 
   const addLine = (menu_item_id: string) => {
     setOrderLines((prev) => [...prev, { menu_item_id, quantity: 1 }]);
@@ -196,7 +201,7 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
                     onChange={(e) => {
                       const ref = e.target.value;
                       setOrderBookingRef(ref);
-                      const b = bookings.find(x => x.reference_number === ref);
+                      const b = activeRoomServiceBookings.find((x) => x.reference_number === ref);
                       if (b && b.guests?.full_name) {
                         setCustomerName(b.guests.full_name);
                       }

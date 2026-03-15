@@ -36,12 +36,24 @@ export async function POST(req: NextRequest) {
     if (booking_reference) {
       const { data: bookingData, error: bErr } = await supabase
         .from("bookings")
-        .select("id, room_id, restaurant_charges_total")
+        .select("id, room_id, restaurant_charges_total, status")
         .eq("reference_number", booking_reference)
         .single();
         
       if (bErr || !bookingData) {
         return NextResponse.json({ error: "Invalid booking reference" }, { status: 400 });
+      }
+
+      if (order_source === "Room Service") {
+        if (bookingData.status !== "Checked-In") {
+          return NextResponse.json(
+            { error: "Only checked-in bookings can be charged for room service." },
+            { status: 400 }
+          );
+        }
+        if (!bookingData.room_id) {
+          return NextResponse.json({ error: "This booking has no assigned room." }, { status: 400 });
+        }
       }
       booking_id = bookingData.id;
       room_id = bookingData.room_id || null;

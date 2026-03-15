@@ -78,8 +78,21 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
       const s = parseYmd(b.check_in_date);
       const e = parseYmd(b.check_out_date);
       if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return null;
+
       const start = toDateOnly(s);
-      const end = toDateOnly(e);
+
+      const isShortStay =
+        String(b.rate_plan_kind || "")
+          .toLowerCase()
+          .trim() !== "24h";
+
+      if (isShortStay) {
+        return { start, end: start };
+      }
+
+      const endExclusive = toDateOnly(e);
+      const end = new Date(endExclusive.getFullYear(), endExclusive.getMonth(), endExclusive.getDate() - 1);
+      if (Number.isNaN(end.getTime())) return { start, end: start };
       return start <= end ? { start, end } : { start: end, end: start };
     })
     .filter(Boolean) as { start: Date; end: Date }[];

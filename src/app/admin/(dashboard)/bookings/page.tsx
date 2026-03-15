@@ -45,12 +45,12 @@ function getStatusVariant(status?: string) {
 type BookingRow = {
   id?: string; reference_number?: string; status?: string;
   check_in_date?: string; check_out_date?: string; actual_check_in_at?: string;
-  total_amount?: number; deposit_paid?: number; balance_due?: number;
+  total_amount?: number; deposit_paid?: number; balance_due?: number; restaurant_charges_total?: number;
   rate_plan_kind?: string; special_requests?: string | null;
   early_checkin_fee_applied?: number; late_checkout_fee_applied?: number; is_lgu_booking?: boolean;
   guests?: { full_name?: string; email?: string; phone_number?: string };
   rooms?: {
-    room_number?: string; room_type?: string;
+    room_number?: string; room_type?: string; status?: string;
     rate_24h_early_checkin_fee?: number | null; rate_24h_late_checkout_fee?: number | null;
     rate_12h_late_checkout_fee?: number | null; rate_5h_late_checkout_fee?: number | null;
     rate_3h_late_checkout_fee?: number | null;
@@ -297,9 +297,29 @@ export default function AdminBookingsPage() {
                       <td className="py-4 px-4 align-top text-xs">
                          <div className="flex flex-col gap-1.5 w-max">
                            <div className="flex items-center gap-2">
-                             <span className="font-semibold text-[#07008A] text-sm">₱{Number(b.total_amount ?? 0).toFixed(0)}</span>
-                             {(() => { const total = Number(b.total_amount ?? 0); const deposit = Number(b.deposit_paid ?? 0); const balance = Number(b.balance_due ?? 0); if (!total) return null; if (balance <= 0 && total > 0) return <span className="inline-flex rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700 border border-emerald-100">Paid full</span>; if (deposit > 0 && balance > 0) return <span className="inline-flex rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-medium text-amber-700 border border-amber-100">Partial</span>; return <span className="inline-flex rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium text-slate-700 border border-slate-200">Unpaid</span>; })()}
+                             {(() => {
+                               const room = Number(b.total_amount ?? 0);
+                               const resto = Number(b.restaurant_charges_total ?? 0);
+                               const total = room + resto;
+                               const deposit = Number(b.deposit_paid ?? 0);
+                               const balance = Number(b.balance_due ?? 0);
+                               return (
+                                 <>
+                                   <span className="font-semibold text-[#07008A] text-sm">₱{total.toFixed(0)}</span>
+                                   {!total ? null : balance <= 0 && total > 0 ? (
+                                     <span className="inline-flex rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700 border border-emerald-100">Paid full</span>
+                                   ) : deposit > 0 && balance > 0 ? (
+                                     <span className="inline-flex rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-medium text-amber-700 border border-amber-100">Partial</span>
+                                   ) : (
+                                     <span className="inline-flex rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium text-slate-700 border border-slate-200">Unpaid</span>
+                                   )}
+                                 </>
+                               );
+                             })()}
                            </div>
+                           {Number(b.restaurant_charges_total || 0) > 0 && (
+                             <span className="text-[10px] text-amber-700 font-medium">+ ₱{Number(b.restaurant_charges_total || 0).toFixed(0)} Restaurant</span>
+                           )}
                            {(Number(b.balance_due) > 0 || Number(b.deposit_paid) > 0) && (
                              <div className="flex flex-col gap-0.5 text-[10px] text-slate-500">
                                {Number(b.deposit_paid) > 0 && <span>Dep: ₱{Number(b.deposit_paid).toFixed(0)}</span>}
@@ -343,7 +363,21 @@ export default function AdminBookingsPage() {
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               {b.status !== "Checked-In" && b.status !== "Checked-Out" && b.status !== "Cancelled" && (
-                                <DropdownMenuItem onClick={() => setCheckInBooking(b)} className="text-emerald-600 focus:text-emerald-600 focus:bg-emerald-50 cursor-pointer text-sm">
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    const roomStatus = b.rooms?.status;
+                                    if (!roomStatus) {
+                                      toast.error("No room assigned. Assign a room before check-in.");
+                                      return;
+                                    }
+                                    if (roomStatus !== "Available") {
+                                      toast.error(`Room is not ready for check-in. Current status: ${roomStatus}.`);
+                                      return;
+                                    }
+                                    setCheckInBooking(b);
+                                  }}
+                                  className="text-emerald-600 focus:text-emerald-600 focus:bg-emerald-50 cursor-pointer text-sm"
+                                >
                                   <LogIn className="mr-2 h-4 w-4" /> Check In Guest
                                 </DropdownMenuItem>
                               )}
