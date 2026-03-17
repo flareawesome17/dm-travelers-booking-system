@@ -358,9 +358,11 @@ export default function AdminBookingsPage() {
                                   <Banknote className="mr-2 h-4 w-4" /> Record Payment
                                 </DropdownMenuItem>
                               )}
-                              <DropdownMenuItem onClick={() => setEditBooking(b)} className="cursor-pointer text-[#07008A] focus:text-[#07008A] focus:bg-[#07008A]/10 text-sm">
-                                <Pencil className="mr-2 h-4 w-4" /> Edit Details
-                              </DropdownMenuItem>
+                              {b.status !== "Checked-In" && b.status !== "Checked-Out" && b.status !== "Cancelled" && (
+                                <DropdownMenuItem onClick={() => setEditBooking(b)} className="cursor-pointer text-[#07008A] focus:text-[#07008A] focus:bg-[#07008A]/10 text-sm">
+                                  <Pencil className="mr-2 h-4 w-4" /> Edit Details
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuSeparator />
                               {b.status !== "Checked-In" && b.status !== "Checked-Out" && b.status !== "Cancelled" && (
                                 <DropdownMenuItem
@@ -386,7 +388,7 @@ export default function AdminBookingsPage() {
                                   <LogOut className="mr-2 h-4 w-4" /> Check Out Guest
                                 </DropdownMenuItem>
                               )}
-                              {b.status !== "Cancelled" && (
+                              {b.status !== "Checked-In" && b.status !== "Checked-Out" && b.status !== "Cancelled" && (
                                 <DropdownMenuItem onClick={async () => { if (!b.id) return; try { const res = await api(`/api/bookings/${b.id}`, { method: "PATCH", body: JSON.stringify({ status: "Cancelled" }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error((data as { error?: string }).error || "Failed to cancel."); return; } toast.success("Cancelled."); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }} className="text-red-500 focus:text-red-500 focus:bg-red-50 cursor-pointer text-sm">
                                   <XCircle className="mr-2 h-4 w-4" /> Cancel Booking
                                 </DropdownMenuItem>

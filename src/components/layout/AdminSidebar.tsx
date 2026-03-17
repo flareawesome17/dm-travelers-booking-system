@@ -18,13 +18,15 @@ import {
   ChevronRight,
   LogOut,
   Menu,
-  ChevronLeft
+  ChevronLeft,
+  Building2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { label: "Dashboard", path: "/admin", icon: LayoutDashboard },
   { label: "Bookings", path: "/admin/bookings", icon: CalendarCheck, permission: "bookings.read" },
+  { label: "LGU & Collectibles", path: "/admin/lgu-monitoring", icon: Building2, permission: "bookings.read" },
   { label: "Rooms", path: "/admin/rooms", icon: BedDouble, permission: "rooms.read" },
   { label: "Housekeeping", path: "/admin/housekeeping", icon: Sparkles, permission: "housekeeping.read" },
   { label: "Restaurant", path: "/admin/restaurant", icon: UtensilsCrossed, permission: "restaurant.read" },
