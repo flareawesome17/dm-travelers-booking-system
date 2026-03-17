@@ -8,8 +8,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if ("error" in auth) return auth.error;
 
   try {
-    const { email, password, role_id, is_active } = await req.json();
+    const { name, email, password, role_id, is_active } = await req.json();
     const updateData: any = {};
+    if (typeof name === "string") updateData.name = name.trim() || null;
     if (email) updateData.email = email.toLowerCase().trim();
     if (password) {
       if (password.length < 8) return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
@@ -20,7 +21,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const { id } = await params;
     const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase.from("admin_users").update(updateData).eq("id", id).select("id, email, role_id, is_active, created_at").single();
+    const { data, error } = await supabase
+      .from("admin_users")
+      .update(updateData)
+      .eq("id", id)
+      .select("id, name, email, role_id, is_active, created_at")
+      .single();
     
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json(data);

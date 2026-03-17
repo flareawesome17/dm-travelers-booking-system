@@ -15,13 +15,14 @@ import { toast } from "@/components/ui/sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 
-type AdminUser = { id: string; email?: string; role_id?: number; is_active?: boolean; created_at?: string };
+type AdminUser = { id: string; name?: string | null; email?: string; role_id?: number; is_active?: boolean; created_at?: string };
 const ROLE_LABELS: Record<number, string> = { 1: "Super Admin", 2: "Manager", 3: "Staff", 4: "Housekeeping" };
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [roleId, setRoleId] = useState<string>("3");
@@ -30,6 +31,7 @@ export default function AdminUsersPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
+  const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [editShowPassword, setEditShowPassword] = useState(false);
@@ -60,21 +62,27 @@ export default function AdminUsersPage() {
     e.preventDefault();
     const token = localStorage.getItem("admin_token");
     if (!token) { router.replace("/admin/login"); return; }
+    if (!name.trim()) { toast.error("Name is required."); return; }
     if (!email.trim() || !password.trim()) { toast.error("Email and password are required."); return; }
     if (password.length < 8) { toast.error("Password must be at least 8 characters."); return; }
     setSaving(true);
     try {
-      const res = await fetch("/api/admin/users", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ email: email.trim(), password, role_id: Number(roleId) || 3, is_active: isActive }) });
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), password, role_id: Number(roleId) || 3, is_active: isActive }),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { toast.error((data as { error?: string }).error || "Failed to create admin user."); return; }
       setUsers((prev) => { const c = data as AdminUser; if (!c.id) return prev; return [c, ...prev]; });
       toast.success("Admin user created.");
-      setOpen(false); setEmail(""); setPassword(""); setRoleId("3"); setIsActive(true); setShowPassword(false);
+      setOpen(false); setName(""); setEmail(""); setPassword(""); setRoleId("3"); setIsActive(true); setShowPassword(false);
     } catch { toast.error("Something went wrong."); } finally { setSaving(false); }
   };
 
   const openEditModal = (user: AdminUser) => {
     setEditingUser(user);
+    setEditName(user.name || "");
     setEditEmail(user.email || "");
     setEditPassword("");
     setEditRoleId(String(user.role_id || 3));
@@ -91,7 +99,17 @@ export default function AdminUsersPage() {
     if (editPassword && editPassword.length < 8) { toast.error("Password must be at least 8 characters."); return; }
     setSaving(true);
     try {
-      const res = await fetch(`/api/admin/users/${editingUser.id}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ email: editEmail.trim() || undefined, password: editPassword || undefined, role_id: Number(editRoleId) || 3, is_active: editIsActive }) });
+      const res = await fetch(`/api/admin/users/${editingUser.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          name: editName.trim() || "",
+          email: editEmail.trim() || undefined,
+          password: editPassword || undefined,
+          role_id: Number(editRoleId) || 3,
+          is_active: editIsActive,
+        }),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { toast.error((data as { error?: string }).error || "Failed to update admin user."); return; }
       setUsers((prev) => prev.map(u => u.id === editingUser.id ? { ...u, ...data } : u));
@@ -120,7 +138,7 @@ export default function AdminUsersPage() {
     const matchesStatus = statusFilter === "all" ? true : statusFilter === "active" ? u.is_active : !u.is_active;
     const term = search.trim().toLowerCase();
     if (!term) return matchesStatus;
-    const haystack = [u.email, ROLE_LABELS[u.role_id || 3]].filter(Boolean).join(" ").toLowerCase();
+    const haystack = [u.name, u.email, ROLE_LABELS[u.role_id || 3]].filter(Boolean).join(" ").toLowerCase();
     return matchesStatus && haystack.includes(term);
   });
 
@@ -140,6 +158,10 @@ export default function AdminUsersPage() {
             <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1" /> Add user</Button>
             <DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Add admin user</DialogTitle></DialogHeader>
               <form className="space-y-4" onSubmit={handleSave}>
+                <div className="space-y-2">
+                  <Label htmlFor="admin-name-u">Name</Label>
+                  <Input id="admin-name-u" value={name} onChange={(e) => setName(e.target.value)} placeholder="Juan Dela Cruz" required />
+                </div>
                 <div className="space-y-2"><Label htmlFor="admin-email-u">Email</Label><Input id="admin-email-u" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@example.com" required /></div>
                 <div className="space-y-2"><Label htmlFor="admin-password-u">Password</Label><div className="relative"><Input id="admin-password-u" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" required className="pr-10" /><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div></div>
                 <div className="space-y-2"><Label htmlFor="admin-role">Role</Label><select id="admin-role" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={roleId} onChange={(e) => setRoleId(e.target.value)}><option value="1">Super Admin</option><option value="2">Manager</option><option value="3">Staff</option><option value="4">Housekeeping</option></select></div>
@@ -151,6 +173,10 @@ export default function AdminUsersPage() {
           <Dialog open={editOpen} onOpenChange={setEditOpen}>
             <DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Edit admin user</DialogTitle></DialogHeader>
               <form className="space-y-4" onSubmit={handleEdit}>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-admin-name">Name</Label>
+                  <Input id="edit-admin-name" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Juan Dela Cruz" />
+                </div>
                 <div className="space-y-2"><Label htmlFor="edit-admin-email">Email</Label><Input id="edit-admin-email" type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="admin@example.com" /></div>
                 <div className="space-y-2"><Label htmlFor="edit-admin-password">Password (Optional)</Label><div className="relative"><Input id="edit-admin-password" type={editShowPassword ? "text" : "password"} value={editPassword} onChange={(e) => setEditPassword(e.target.value)} placeholder="Leave blank to keep current password" className="pr-10" /><button type="button" onClick={() => setEditShowPassword(!editShowPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">{editShowPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div></div>
                 <div className="space-y-2"><Label htmlFor="edit-admin-role">Role</Label><select id="edit-admin-role" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={editRoleId} onChange={(e) => setEditRoleId(e.target.value)}><option value="1">Super Admin</option><option value="2">Manager</option><option value="3">Staff</option><option value="4">Housekeeping</option></select></div>
@@ -177,8 +203,8 @@ export default function AdminUsersPage() {
           {loading ? <div className="p-6 space-y-4">{[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}</div> : (
             <>
               <div className="overflow-x-auto">
-                <table className="w-full"><thead><tr className="border-b bg-slate-50/80"><th className="text-left py-3 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Email</th><th className="text-left py-3 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Role</th><th className="text-left py-3 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Active</th><th className="text-right py-3 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Actions</th></tr></thead>
-                  <tbody>{paginatedUsers.map((u) => <tr key={u.id} className="border-b last:border-0 hover:bg-slate-50/50 transition-colors"><td className="py-4 px-6 font-medium text-[#07008A]">{u.email ?? "—"}</td><td className="py-4 px-6 text-sm text-slate-600">{u.role_id != null ? ROLE_LABELS[u.role_id] ?? u.role_id : "—"}</td><td className="py-4 px-6"><Badge variant={u.is_active ? "default" : "secondary"}>{u.is_active ? "Yes" : "No"}</Badge></td><td className="py-4 px-6 text-right"><div className="flex items-center justify-end gap-2"><TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-[#07008A]" onClick={() => openEditModal(u)}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Edit user</p></TooltipContent></Tooltip><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-red-600" onClick={() => handleDelete(u.id)} disabled={deletingId === u.id}>{deletingId === u.id ? <Skeleton className="h-4 w-4 rounded-full" /> : <Trash2 className="h-4 w-4" />}</Button></TooltipTrigger><TooltipContent><p>Delete user</p></TooltipContent></Tooltip></TooltipProvider></div></td></tr>)}</tbody>
+                <table className="w-full"><thead><tr className="border-b bg-slate-50/80"><th className="text-left py-3 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Name</th><th className="text-left py-3 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Email</th><th className="text-left py-3 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Role</th><th className="text-left py-3 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Active</th><th className="text-right py-3 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Actions</th></tr></thead>
+                  <tbody>{paginatedUsers.map((u) => <tr key={u.id} className="border-b last:border-0 hover:bg-slate-50/50 transition-colors"><td className="py-4 px-6 font-medium text-slate-800">{u.name ?? "—"}</td><td className="py-4 px-6 font-medium text-[#07008A]">{u.email ?? "—"}</td><td className="py-4 px-6 text-sm text-slate-600">{u.role_id != null ? ROLE_LABELS[u.role_id] ?? u.role_id : "—"}</td><td className="py-4 px-6"><Badge variant={u.is_active ? "default" : "secondary"}>{u.is_active ? "Yes" : "No"}</Badge></td><td className="py-4 px-6 text-right"><div className="flex items-center justify-end gap-2"><TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-[#07008A]" onClick={() => openEditModal(u)}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Edit user</p></TooltipContent></Tooltip><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-red-600" onClick={() => handleDelete(u.id)} disabled={deletingId === u.id}>{deletingId === u.id ? <Skeleton className="h-4 w-4 rounded-full" /> : <Trash2 className="h-4 w-4" />}</Button></TooltipTrigger><TooltipContent><p>Delete user</p></TooltipContent></Tooltip></TooltipProvider></div></td></tr>)}</tbody>
                 </table>
               </div>
               {totalPages > 1 && (

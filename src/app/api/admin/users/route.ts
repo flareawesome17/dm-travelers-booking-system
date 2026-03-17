@@ -9,7 +9,10 @@ export async function GET(req: NextRequest) {
 
   try {
     const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase.from("admin_users").select("id, email, role_id, is_active, created_at").order("created_at", { ascending: false });
+    const { data, error } = await supabase
+      .from("admin_users")
+      .select("id, name, email, role_id, is_active, created_at")
+      .order("created_at", { ascending: false });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json(data ?? []);
   } catch {
@@ -22,13 +25,26 @@ export async function POST(req: NextRequest) {
   if ("error" in auth) return auth.error;
 
   try {
-    const { email, password, role_id, is_active } = await req.json();
+    const { name, email, password, role_id, is_active } = await req.json();
+    if (!name || typeof name !== "string" || !name.trim()) {
+      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    }
     if (!email || !password) return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
     if (password.length < 8) return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
 
     const passwordHash = await bcrypt.hash(password, 12);
     const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase.from("admin_users").insert({ email: email.toLowerCase().trim(), password_hash: passwordHash, role_id: role_id ?? 3, is_active: is_active ?? true }).select("id, email, role_id, is_active, created_at").single();
+    const { data, error } = await supabase
+      .from("admin_users")
+      .insert({
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
+        password_hash: passwordHash,
+        role_id: role_id ?? 3,
+        is_active: is_active ?? true,
+      })
+      .select("id, name, email, role_id, is_active, created_at")
+      .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json(data, { status: 201 });
   } catch {

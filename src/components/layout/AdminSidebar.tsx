@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -19,7 +20,8 @@ import {
   LogOut,
   Menu,
   ChevronLeft,
-  Building2
+  Building2,
+  User
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +39,24 @@ const navItems = [
   { label: "Settings", path: "/admin/settings", icon: Settings, permission: "settings.manage" },
 ];
 
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "===".slice((base64.length + 3) % 4);
+    const json = decodeURIComponent(
+      Array.prototype.map
+        .call(atob(padded), (c: string) => `%${(`00${c.charCodeAt(0).toString(16)}`).slice(-2)}`)
+        .join(""),
+    );
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
 export default function AdminSidebar({
   isCollapsed = false,
   onToggle,
@@ -49,6 +69,27 @@ export default function AdminSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const permSet = new Set(permissions);
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      setToken(localStorage.getItem("admin_token"));
+    } catch {
+      setToken(null);
+    }
+  }, []);
+
+  const currentAdmin = useMemo(() => {
+    if (!token) return null;
+    const p = decodeJwtPayload(token);
+    if (!p) return null;
+    const name = typeof p.name === "string" ? p.name : null;
+    const email = typeof p.email === "string" ? p.email : null;
+    const roleId = typeof p.role_id === "number" ? p.role_id : Number(p.role_id);
+    const roleLabel =
+      roleId === 1 ? "Super Admin" : roleId === 2 ? "Manager" : roleId === 3 ? "Staff" : roleId === 4 ? "Housekeeping" : null;
+    return { name, email, roleLabel };
+  }, [token]);
 
   const handleLogout = () => {
     try {
@@ -125,6 +166,24 @@ export default function AdminSidebar({
 
       {/* Footer actions */}
       <div className="p-4 border-t border-white/10 space-y-2">
+        {!isCollapsed && currentAdmin && (currentAdmin.name || currentAdmin.email) && (
+          <div className="mb-2 rounded-lg bg-white/5 px-3 py-2">
+            <p className="text-xs text-white/60">Signed in as</p>
+            <p className="text-sm font-semibold leading-tight">{currentAdmin.name || "Admin"}</p>
+            <p className="text-xs text-white/70 truncate">{currentAdmin.roleLabel || "Staff"}</p>
+          </div>
+        )}
+        <Link
+          href="/admin/account"
+          title={isCollapsed ? "My Account" : undefined}
+          className={cn(
+            "flex items-center rounded-lg py-2.5 text-sm text-white/90 hover:bg-white/10 hover:text-white transition-all",
+            isCollapsed ? "justify-center px-0" : "px-3 gap-3",
+          )}
+        >
+          <User className="h-5 w-5 shrink-0" />
+          {!isCollapsed && <span>My Account</span>}
+        </Link>
         <button
           type="button"
           onClick={handleLogout}

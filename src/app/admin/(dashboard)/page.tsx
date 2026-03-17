@@ -14,6 +14,24 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "===".slice((base64.length + 3) % 4);
+    const json = decodeURIComponent(
+      Array.prototype.map
+        .call(atob(padded), (c: string) => `%${(`00${c.charCodeAt(0).toString(16)}`).slice(-2)}`)
+        .join(""),
+    );
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
 type Booking = {
   id: string;
   reference_number?: string;
@@ -44,11 +62,19 @@ export default function AdminDashboardPage() {
   const [orders, setOrders] = useState<RestaurantOrder[]>([]);
   const [revenue, setRevenue] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [welcome, setWelcome] = useState<{ name: string | null; roleLabel: string | null } | null>(null);
   const router = useRouter();
 
   useEffect(() => {
     const token = localStorage.getItem("admin_token");
     if (!token) { router.replace("/admin/login"); return; }
+
+    const p = decodeJwtPayload(token);
+    const name = p && typeof p.name === "string" ? p.name : null;
+    const roleId = p ? (typeof p.role_id === "number" ? p.role_id : Number(p.role_id)) : NaN;
+    const roleLabel =
+      roleId === 1 ? "Super Admin" : roleId === 2 ? "Manager" : roleId === 3 ? "Staff" : roleId === 4 ? "Housekeeping" : null;
+    setWelcome({ name, roleLabel });
     
     const fetchData = async () => {
       try {
@@ -98,6 +124,20 @@ export default function AdminDashboardPage() {
 
   const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } };
   const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } };
+  const timeOfDay = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return "Good morning";
+    if (h < 18) return "Good afternoon";
+    return "Good evening";
+  })();
+  const initials = (() => {
+    const n = welcome?.name?.trim();
+    if (!n) return "A";
+    const parts = n.split(/\s+/).filter(Boolean);
+    const a = parts[0]?.[0] ?? "A";
+    const b = parts.length > 1 ? parts[parts.length - 1]?.[0] : "";
+    return (a + (b || "")).toUpperCase();
+  })();
 
   return (
     <div className="space-y-8 pb-12">
@@ -105,6 +145,54 @@ export default function AdminDashboardPage() {
         <h1 className="text-2xl lg:text-3xl font-bold text-[#07008A] tracking-tight">Dashboard Overview</h1>
         <p className="text-muted-foreground mt-1">Live updates from D&M Travelers Inn</p>
       </motion.div>
+
+      {welcome?.name || welcome?.roleLabel ? (
+        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
+          <Card className="border-0 shadow-md bg-gradient-to-br from-[#07008A]/12 via-white to-[#FED501]/16 overflow-hidden">
+            <CardContent className="relative p-5 sm:p-6">
+              {/* Decorative accents */}
+              <div className="pointer-events-none absolute -top-20 -right-24 h-56 w-56 rounded-full bg-[#FED501]/20 blur-2xl" />
+              <div className="pointer-events-none absolute -bottom-24 -left-28 h-64 w-64 rounded-full bg-[#07008A]/15 blur-2xl" />
+              <div className="pointer-events-none absolute inset-0 opacity-[0.08]" style={{
+                backgroundImage:
+                  "radial-gradient(circle at 1px 1px, rgba(7,0,138,0.35) 1px, transparent 0)",
+                backgroundSize: "18px 18px",
+              }} />
+
+              <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-2xl bg-[#07008A] text-white flex items-center justify-center shadow-lg shadow-[#07008A]/25 ring-1 ring-white/70">
+                    <span className="text-sm font-extrabold tracking-wide">{initials}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#07008A]/70">
+                      {timeOfDay}
+                    </p>
+                    <p className="text-base sm:text-lg font-bold text-slate-900 truncate">
+                      {welcome?.name ? `Welcome back, ${welcome.name}.` : "Welcome back."}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-slate-500">Signed in as</span>
+                      <span className="inline-flex items-center rounded-full border border-[#07008A]/15 bg-white/70 px-2.5 py-0.5 text-xs font-semibold text-[#07008A] shadow-sm">
+                        {welcome?.roleLabel || "Staff"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Link href="/admin/account">
+                    <Button size="sm" className="h-10 bg-[#07008A] hover:bg-[#05006a] text-white shadow-sm">
+                      Manage my account
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      ) : null}
 
       {/* Quick Stats Grid */}
       <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">

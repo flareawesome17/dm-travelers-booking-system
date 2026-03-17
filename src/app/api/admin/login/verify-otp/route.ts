@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 
     const { data: user, error: uErr } = await supabase
       .from("admin_users")
-      .select("id, email, role_id, is_active")
+      .select("id, name, email, role_id, is_active")
       .eq("email", email)
       .eq("is_active", true)
       .single();
@@ -64,8 +64,8 @@ export async function POST(req: NextRequest) {
       .eq("id", otpRow.id);
     if (useErr) return NextResponse.json({ error: useErr.message }, { status: 500 });
 
-    const token = signAdminToken({ sub: user.id, email: user.email, role_id: user.role_id });
-    return NextResponse.json({ token, user: { id: user.id, email: user.email, role_id: user.role_id } });
+    const token = signAdminToken({ sub: user.id, name: user.name ?? null, email: user.email, role_id: user.role_id });
+    return NextResponse.json({ token, user: { id: user.id, name: user.name ?? null, email: user.email, role_id: user.role_id } });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

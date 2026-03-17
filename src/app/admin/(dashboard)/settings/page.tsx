@@ -21,6 +21,10 @@ export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [pwCurrent, setPwCurrent] = useState("");
+  const [pwNew, setPwNew] = useState("");
+  const [pwConfirm, setPwConfirm] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -69,6 +73,46 @@ export default function AdminSettingsPage() {
     }
   };
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = localStorage.getItem("admin_token");
+    if (!token) { router.replace("/admin/login"); return; }
+    if (!pwCurrent.trim() || !pwNew.trim() || !pwConfirm.trim()) {
+      toast.error("Please fill out all password fields.");
+      return;
+    }
+    if (pwNew.length < 8) {
+      toast.error("New password must be at least 8 characters.");
+      return;
+    }
+    if (pwNew !== pwConfirm) {
+      toast.error("New password and confirmation do not match.");
+      return;
+    }
+
+    setPwSaving(true);
+    try {
+      const res = await fetch("/api/admin/me/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ current_password: pwCurrent, new_password: pwNew }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error((data as { error?: string }).error || "Failed to change password.");
+        return;
+      }
+      toast.success("Password updated.");
+      setPwCurrent("");
+      setPwNew("");
+      setPwConfirm("");
+    } catch {
+      toast.error("Something went wrong.");
+    } finally {
+      setPwSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -113,6 +157,9 @@ export default function AdminSettingsPage() {
           </TabsTrigger>
           <TabsTrigger value="social" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <Share2 className="h-4 w-4 mr-2" /> Social
+          </TabsTrigger>
+          <TabsTrigger value="security" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            <SettingsIcon className="h-4 w-4 mr-2" /> Security
           </TabsTrigger>
         </TabsList>
 
@@ -383,6 +430,56 @@ export default function AdminSettingsPage() {
                   placeholder="https://instagram.com/..."
                 />
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Security */}
+        <TabsContent value="security">
+          <Card className="border-0 shadow-sm max-w-3xl mx-auto">
+            <CardHeader className="border-b bg-slate-50/30">
+              <CardTitle className="text-base font-bold">Change Password</CardTitle>
+              <CardDescription>Update your own admin password</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <form className="space-y-4" onSubmit={handleChangePassword}>
+                <div className="space-y-2">
+                  <Label htmlFor="current-password">Current password</Label>
+                  <Input
+                    id="current-password"
+                    type="password"
+                    value={pwCurrent}
+                    onChange={(e) => setPwCurrent(e.target.value)}
+                    autoComplete="current-password"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">New password</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    value={pwNew}
+                    onChange={(e) => setPwNew(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password">Confirm new password</Label>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    value={pwConfirm}
+                    onChange={(e) => setPwConfirm(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button type="submit" disabled={pwSaving} className="bg-[#07008A] hover:bg-[#05006a] text-white">
+                    {pwSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                    {pwSaving ? "Updating..." : "Update password"}
+                  </Button>
+                </div>
+              </form>
             </CardContent>
           </Card>
         </TabsContent>
