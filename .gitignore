@@ -7,25 +7,41 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# dependencies
 node_modules
-dist
-dist-ssr
-.next
+/dist
+/dist-ssr
+/.next/
+/out/
+
+# build
+*.tsbuildinfo
+next-env.d.ts
+
+# env files
 .env
 .env.local
 .env.*.local
 *.local
 
-# Cursor AI
+# AI tool directories
+.agents/
+.augment/
+.claude/
 .cursor/
+skills-lock.json
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+Thumbs.db
+
+# testing
+/coverage
