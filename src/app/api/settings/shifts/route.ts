@@ -99,9 +99,12 @@ export async function PUT(req: NextRequest) {
     }
 
     const normalizedRows: ShiftRow[] = parsed.data.map((shift) => ({
-      ...shift,
+      id: shift.id,
+      name: shift.name,
       start_time: normalizeTime(shift.start_time),
       end_time: normalizeTime(shift.end_time),
+      sort_order: shift.sort_order,
+      is_active: shift.is_active,
     }));
 
     const overlap = findOverlap(normalizedRows);
