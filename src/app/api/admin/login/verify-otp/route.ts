@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { signAdminToken } from "@/lib/auth";
+import { setAdminSessionCookie, signAdminToken } from "@/lib/auth";
 import crypto from "crypto";
 import {
   parseAndValidate,
@@ -79,7 +79,11 @@ export async function POST(req: NextRequest) {
     if (useErr) return internalError();
 
     const token = signAdminToken({ sub: user.id, name: user.name ?? null, email: user.email, role_id: user.role_id });
-    return NextResponse.json({ token, user: { id: user.id, name: user.name ?? null, email: user.email, role_id: user.role_id } });
+    const response = NextResponse.json({
+      token,
+      user: { id: user.id, name: user.name ?? null, email: user.email, role_id: user.role_id },
+    });
+    return setAdminSessionCookie(response, token);
   } catch {
     return internalError();
   }

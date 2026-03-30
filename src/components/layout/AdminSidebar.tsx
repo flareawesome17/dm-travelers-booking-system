@@ -158,12 +158,22 @@ export default function AdminSidebar({
   }, [token]);
 
   const handleLogout = () => {
-    try {
-      localStorage.removeItem("admin_token");
-    } catch {
-      // ignore
-    }
-    router.push("/admin/login");
+    void (async () => {
+      try {
+        await fetch("/api/admin/logout", { method: "POST" });
+      } catch {
+        // ignore
+      }
+      try {
+        localStorage.removeItem("admin_token");
+        localStorage.removeItem("admin_last_activity");
+      } catch {
+        // ignore
+      }
+      setToken(null);
+      router.replace("/admin/login");
+      router.refresh();
+    })();
   };
 
   const isItemActive = (path: string) =>
