@@ -65,7 +65,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     };
     if (lateFee > 0) {
       updateData.late_checkout_fee_applied = lateFee;
-      updateData.total_amount = Number(booking.total_amount || 0) + lateFee;
       updateData.balance_due = Number(booking.balance_due || 0) + lateFee;
     }
 

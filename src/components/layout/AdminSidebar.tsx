@@ -11,33 +11,47 @@ import {
   Sparkles,
   UtensilsCrossed,
   BarChart3,
-  ClipboardCheck,
   KeyRound,
   Users,
   Settings,
   Home,
   ChevronRight,
   LogOut,
-  Menu,
   ChevronLeft,
   Building2,
-  User
+  User,
+  X,
+  PackageSearch,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
-const navItems = [
+const operationsItems = [
   { label: "Dashboard", path: "/admin", icon: LayoutDashboard },
   { label: "Bookings", path: "/admin/bookings", icon: CalendarCheck, permission: "bookings.read" },
-  { label: "LGU & Collectibles", path: "/admin/lgu-monitoring", icon: Building2, permission: "bookings.read" },
+  { label: "Receivables", path: "/admin/receivables", icon: Building2, permission: "bookings.read" },
   { label: "Rooms", path: "/admin/rooms", icon: BedDouble, permission: "rooms.read" },
   { label: "Housekeeping", path: "/admin/housekeeping", icon: Sparkles, permission: "housekeeping.read" },
   { label: "Restaurant", path: "/admin/restaurant", icon: UtensilsCrossed, permission: "restaurant.read" },
+  { label: "Inventory", path: "/admin/inventory", icon: PackageSearch, permission: "inventory.read" },
+];
+
+const managementItems = [
   { label: "Reports", path: "/admin/reports", icon: BarChart3, permission: "reports.read" },
-  { label: "Daily Closing", path: "/admin/ledger", icon: ClipboardCheck, permission: "ledger.read" },
+  { label: "Shifts", path: "/admin/shifts", icon: Clock, permission: "shifts.read" },
   { label: "Users", path: "/admin/users", icon: Users, permission: "users.manage" },
   { label: "Roles", path: "/admin/roles", icon: KeyRound, permission: "roles.manage" },
   { label: "Settings", path: "/admin/settings", icon: Settings, permission: "settings.manage" },
 ];
+
+// Keep flat navItems for backwards compat
+const navItems = [...operationsItems, ...managementItems];
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
@@ -57,14 +71,66 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
+interface NavItemProps {
+  label: string;
+  path: string;
+  icon: React.ComponentType<{ className?: string }>;
+  isActive: boolean;
+  isCollapsed: boolean;
+}
+
+function NavItem({ label, path, icon: Icon, isActive, isCollapsed }: NavItemProps) {
+  const linkContent = (
+    <Link
+      href={path}
+      className={cn(
+        "group/nav-item relative flex items-center rounded-xl text-sm font-medium transition-all duration-200",
+        isCollapsed ? "justify-center w-11 h-11 mx-auto" : "px-3 py-2.5 gap-3",
+        isActive
+          ? "bg-white/15 text-white shadow-sm"
+          : "text-white/70 hover:bg-white/8 hover:text-white"
+      )}
+    >
+      {/* Active indicator bar */}
+      {isActive && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-[#FED501] rounded-r-full" />
+      )}
+      <Icon className={cn(
+        "h-[18px] w-[18px] shrink-0 transition-transform duration-200",
+        isActive ? "text-[#FED501]" : "group-hover/nav-item:scale-110"
+      )} />
+      {!isCollapsed && (
+        <span className="flex-1 whitespace-nowrap truncate">{label}</span>
+      )}
+    </Link>
+  );
+
+  if (isCollapsed) {
+    return (
+      <Tooltip delayDuration={0}>
+        <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+        <TooltipContent side="right" sideOffset={12} className="bg-slate-900 text-white border-slate-800 text-xs font-medium px-3 py-1.5">
+          {label}
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return linkContent;
+}
+
 export default function AdminSidebar({
   isCollapsed = false,
   onToggle,
   permissions = [],
+  isMobileOpen = false,
+  onMobileClose,
 }: {
   isCollapsed?: boolean;
   onToggle?: () => void;
   permissions?: string[];
+  isMobileOpen?: boolean;
+  onMobileClose?: () => void;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -100,114 +166,241 @@ export default function AdminSidebar({
     router.push("/admin/login");
   };
 
-  return (
-    <aside className={cn(
-      "fixed inset-y-0 left-0 flex flex-col bg-[#07008A] text-white shadow-xl z-30 transition-all duration-300",
-      isCollapsed ? "w-20" : "w-64"
-    )}>
+  const isItemActive = (path: string) =>
+    pathname === path || (path !== "/admin" && pathname.startsWith(path));
+
+  const filterByPermission = (items: typeof navItems) =>
+    items.filter((i) => !i.permission || permSet.has(i.permission));
+
+  const filteredOps = filterByPermission(operationsItems);
+  const filteredMgmt = filterByPermission(managementItems);
+
+  const initials = (() => {
+    const n = currentAdmin?.name?.trim();
+    if (!n) return "A";
+    const parts = n.split(/\s+/).filter(Boolean);
+    const a = parts[0]?.[0] ?? "A";
+    const b = parts.length > 1 ? parts[parts.length - 1]?.[0] : "";
+    return (a + (b || "")).toUpperCase();
+  })();
+
+  const sidebarContent = (
+    <>
       {/* Brand header */}
       <div className={cn(
-        "p-6 border-b border-white/10 flex items-center h-[88px]",
-        isCollapsed ? "justify-center px-4" : "justify-between"
+        "flex items-center border-b border-white/8 shrink-0",
+        isCollapsed ? "justify-center px-3 h-[72px]" : "justify-between px-5 h-[72px]"
       )}>
         <div className="flex items-center gap-3 overflow-hidden">
-          <Image src="/logo.png" alt="D&M Logo" width={40} height={40} className="shrink-0 object-contain" />
+          <Image src="/logo.png" alt="D&M Logo" width={36} height={36} className="shrink-0 object-contain" />
           {!isCollapsed && (
-            <div className="whitespace-nowrap flex-1">
-              <p className="font-bold text-white tracking-tight leading-tight">Admin</p>
-              <p className="text-xs text-white/70 leading-tight">D&M Travelers Inn</p>
+            <div className="whitespace-nowrap flex-1 min-w-0">
+              <p className="font-bold text-white text-sm tracking-tight leading-tight">Admin</p>
+              <p className="text-[11px] text-white/50 leading-tight truncate">D&M Travelers Inn</p>
             </div>
           )}
         </div>
 
-        {/* Toggle Button Details inside Header for expanded view or floating for collapsed */}
-        {!isCollapsed && onToggle && (
-          <button onClick={onToggle} className="p-1.5 hover:bg-white/10 rounded-md transition-colors shrink-0">
-            <ChevronLeft className="h-5 w-5 text-white/70" />
+        {/* Desktop toggle */}
+        {!isCollapsed && onToggle && !isMobileOpen && (
+          <button
+            onClick={onToggle}
+            className="p-1.5 hover:bg-white/10 rounded-lg transition-colors shrink-0"
+            aria-label="Collapse sidebar"
+          >
+            <ChevronLeft className="h-4 w-4 text-white/50" />
+          </button>
+        )}
+
+        {/* Mobile close */}
+        {isMobileOpen && onMobileClose && (
+          <button
+            onClick={onMobileClose}
+            className="p-1.5 hover:bg-white/10 rounded-lg transition-colors shrink-0"
+            aria-label="Close sidebar"
+          >
+            <X className="h-4 w-4 text-white/50" />
           </button>
         )}
       </div>
 
-      {/* Floating Toggle Button when Collapsed */}
-      {isCollapsed && onToggle && (
+      {/* Collapsed expand button */}
+      {isCollapsed && onToggle && !isMobileOpen && (
         <button
           onClick={onToggle}
-          className="absolute -right-3 top-8 bg-[#FED501] text-[#07008A] p-1 rounded-full shadow-md z-40 hover:scale-110 transition-transform"
+          className="absolute -right-3 top-7 bg-[#FED501] text-[#07008A] p-1 rounded-full shadow-lg z-40 hover:scale-110 transition-transform ring-2 ring-[#07008A]/20"
+          aria-label="Expand sidebar"
         >
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className="h-3.5 w-3.5" />
         </button>
       )}
 
-      {/* Nav */}
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto overflow-x-hidden">
-        {navItems
-          .filter((i) => !i.permission || permSet.has(i.permission))
-          .map(({ label, path, icon: Icon }) => {
-          const isActive = pathname === path || (path !== "/admin" && pathname.startsWith(path));
-          return (
-            <Link
-              key={path}
-              href={path}
-              title={isCollapsed ? label : undefined}
-              className={cn(
-                "flex items-center rounded-lg py-2.5 text-sm font-medium transition-all duration-200",
-                isCollapsed ? "justify-center px-0" : "px-3 gap-3",
-                isActive
-                  ? "bg-[#FED501] text-[#07008A] shadow-md"
-                  : "text-white/90 hover:bg-white/10 hover:text-white"
-              )}
-            >
-              <Icon className="h-5 w-5 shrink-0" />
-              {!isCollapsed && <span className="flex-1 whitespace-nowrap">{label}</span>}
-            </Link>
-          );
-        })}
-      </nav>
+      {/* Navigation */}
+      <TooltipProvider>
+        <nav className={cn(
+          "sidebar-scroll flex-1 overflow-y-auto overflow-x-hidden py-4",
+          isCollapsed ? "px-2" : "px-3"
+        )}>
+          {/* Operations Group */}
+          {!isCollapsed && (
+            <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-white/30">
+              Operations
+            </p>
+          )}
+          <div className="space-y-0.5">
+            {filteredOps.map(({ label, path, icon }) => (
+              <NavItem
+                key={path}
+                label={label}
+                path={path}
+                icon={icon}
+                isActive={isItemActive(path)}
+                isCollapsed={isCollapsed && !isMobileOpen}
+              />
+            ))}
+          </div>
 
-      {/* Footer actions */}
-      <div className="p-4 border-t border-white/10 space-y-2">
-        {!isCollapsed && currentAdmin && (currentAdmin.name || currentAdmin.email) && (
-          <div className="mb-2 rounded-lg bg-white/5 px-3 py-2">
-            <p className="text-xs text-white/60">Signed in as</p>
-            <p className="text-sm font-semibold leading-tight">{currentAdmin.name || "Admin"}</p>
-            <p className="text-xs text-white/70 truncate">{currentAdmin.roleLabel || "Staff"}</p>
+          {/* Separator */}
+          <div className={cn("my-4", isCollapsed ? "mx-2" : "mx-3")}>
+            <div className="h-px bg-white/8" />
+          </div>
+
+          {/* Management Group */}
+          {!isCollapsed && (
+            <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-white/30">
+              Management
+            </p>
+          )}
+          <div className="space-y-0.5">
+            {filteredMgmt.map(({ label, path, icon }) => (
+              <NavItem
+                key={path}
+                label={label}
+                path={path}
+                icon={icon}
+                isActive={isItemActive(path)}
+                isCollapsed={isCollapsed && !isMobileOpen}
+              />
+            ))}
+          </div>
+        </nav>
+      </TooltipProvider>
+
+      {/* Footer */}
+      <div className={cn(
+        "border-t border-white/8 shrink-0",
+        isCollapsed && !isMobileOpen ? "p-2" : "p-3"
+      )}>
+        {/* User info card */}
+        {(!isCollapsed || isMobileOpen) && currentAdmin && (currentAdmin.name || currentAdmin.email) && (
+          <div className="mb-3 rounded-xl bg-white/5 border border-white/5 px-3 py-2.5">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-lg bg-[#FED501]/15 text-[#FED501] flex items-center justify-center shrink-0">
+                <span className="text-[11px] font-bold">{initials}</span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] text-white/40 leading-tight">Signed in as</p>
+                <p className="text-xs font-semibold leading-tight truncate text-white/90">{currentAdmin.name || "Admin"}</p>
+                <p className="text-[10px] text-white/50 truncate">{currentAdmin.roleLabel || "Staff"}</p>
+              </div>
+            </div>
           </div>
         )}
-        <Link
-          href="/admin/account"
-          title={isCollapsed ? "My Account" : undefined}
-          className={cn(
-            "flex items-center rounded-lg py-2.5 text-sm text-white/90 hover:bg-white/10 hover:text-white transition-all",
-            isCollapsed ? "justify-center px-0" : "px-3 gap-3",
+
+        {/* Collapsed user avatar */}
+        {isCollapsed && !isMobileOpen && currentAdmin && (
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <div className="mb-2 h-10 w-10 rounded-xl bg-[#FED501]/15 text-[#FED501] flex items-center justify-center mx-auto cursor-default">
+                <span className="text-[11px] font-bold">{initials}</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={12} className="bg-slate-900 text-white border-slate-800">
+              <p className="text-xs font-semibold">{currentAdmin.name || "Admin"}</p>
+              <p className="text-[10px] text-white/60">{currentAdmin.roleLabel || "Staff"}</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+
+        <div className="space-y-0.5">
+          <NavItem
+            label="My Account"
+            path="/admin/account"
+            icon={User}
+            isActive={isItemActive("/admin/account")}
+            isCollapsed={isCollapsed && !isMobileOpen}
+          />
+
+          {/* Logout button */}
+          {isCollapsed && !isMobileOpen ? (
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex items-center justify-center w-11 h-11 mx-auto rounded-xl text-white/70 hover:bg-white/8 hover:text-white transition-all"
+                >
+                  <LogOut className="h-[18px] w-[18px]" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={12} className="bg-slate-900 text-white border-slate-800 text-xs font-medium px-3 py-1.5">
+                Logout
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="w-full flex items-center rounded-xl py-2.5 px-3 gap-3 text-sm text-white/70 hover:bg-white/8 hover:text-white transition-all"
+            >
+              <LogOut className="h-[18px] w-[18px] shrink-0" />
+              <span>Logout</span>
+            </button>
           )}
-        >
-          <User className="h-5 w-5 shrink-0" />
-          {!isCollapsed && <span>My Account</span>}
-        </Link>
-        <button
-          type="button"
-          onClick={handleLogout}
-          title={isCollapsed ? "Logout" : undefined}
-          className={cn(
-            "w-full flex items-center rounded-lg py-2.5 text-sm text-white/90 hover:bg-white/10 hover:text-white transition-all",
-            isCollapsed ? "justify-center px-0" : "px-3 gap-3"
-          )}
-        >
-          <LogOut className="h-5 w-5 shrink-0" />
-          {!isCollapsed && <span>Logout</span>}
-        </button>
-        <Link
-          href="/"
-          title={isCollapsed ? "Back to site" : undefined}
-          className={cn(
-            "flex items-center rounded-lg py-2.5 text-sm text-white/80 hover:bg-white/10 hover:text-white transition-all",
-            isCollapsed ? "justify-center px-0" : "px-3 gap-3"
-          )}
-        >
-          <Home className="h-5 w-5 shrink-0" />
-          {!isCollapsed && <span className="whitespace-nowrap">Back to site</span>}
-        </Link>
+
+          {/* Back to site */}
+          <NavItem
+            label="Back to site"
+            path="/"
+            icon={Home}
+            isActive={false}
+            isCollapsed={isCollapsed && !isMobileOpen}
+          />
+        </div>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Mobile overlay backdrop */}
+      {isMobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 tablet:hidden backdrop-blur-sm"
+          onClick={onMobileClose}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 flex flex-col bg-[#07008A] text-white z-50 transition-all duration-300 ease-in-out",
+          // Mobile: slide-in drawer
+          "tablet:z-30",
+          // Width
+          isMobileOpen
+            ? "w-[280px] translate-x-0"
+            : isCollapsed
+              ? "w-[72px] -translate-x-full tablet:translate-x-0"
+              : "w-[260px] -translate-x-full tablet:translate-x-0",
+        )}
+        style={{
+          boxShadow: isMobileOpen ? '4px 0 24px rgba(0,0,0,0.3)' : undefined,
+        }}
+      >
+        {sidebarContent}
+      </aside>
+    </>
   );
 }

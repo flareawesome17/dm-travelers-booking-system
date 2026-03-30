@@ -61,7 +61,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     };
     if (earlyFee > 0) {
       updateData.early_checkin_fee_applied = earlyFee;
-      updateData.total_amount = Number(booking.total_amount || 0) + earlyFee;
       updateData.balance_due = Number(booking.balance_due || 0) + earlyFee;
     }
 

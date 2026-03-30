@@ -6,7 +6,8 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   CalendarDays, TrendingUp, Clock, CheckCircle2, ArrowRight, Inbox,
-  Plus, Utensils, Banknote, LogIn, LogOut, BedDouble, AlertCircle, ShoppingBag
+  Plus, Utensils, Banknote, LogIn, LogOut, BedDouble, AlertCircle, ShoppingBag,
+  Activity, Zap, PackageSearch, KeyRound
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -61,6 +62,8 @@ export default function AdminDashboardPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [orders, setOrders] = useState<RestaurantOrder[]>([]);
   const [revenue, setRevenue] = useState(0);
+  const [lowStockObjects, setLowStockObjects] = useState<any[]>([]);
+  const [activeShift, setActiveShift] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [welcome, setWelcome] = useState<{ name: string | null; roleLabel: string | null } | null>(null);
   const router = useRouter();
@@ -75,38 +78,83 @@ export default function AdminDashboardPage() {
     const roleLabel =
       roleId === 1 ? "Super Admin" : roleId === 2 ? "Manager" : roleId === 3 ? "Staff" : roleId === 4 ? "Housekeeping" : null;
     setWelcome({ name, roleLabel });
-    
+
+    let active = true;
     const fetchData = async () => {
       try {
         const headers = { Authorization: `Bearer ${token}` };
-        const [bRes, rRes, oRes, revRes] = await Promise.all([
+        const [bRes, rRes, oRes, revRes, invRes, shiftRes] = await Promise.all([
           fetch("/api/bookings", { headers }),
           fetch("/api/rooms", { headers }),
           fetch("/api/restaurant/orders", { headers }),
-          fetch("/api/reports/revenue?startDate=" + new Date().toISOString().split("T")[0], { headers })
+          fetch("/api/reports/revenue?startDate=" + new Date().toISOString().split("T")[0], { headers }),
+          fetch("/api/inventory", { headers }),
+          fetch("/api/shifts/current", { headers })
         ]);
 
-        const [bData, rData, oData, revData] = await Promise.all([
-          bRes.json(), rRes.json(), oRes.json(), revRes.json()
+        const [bData, rData, oData, revData, invData, shiftData] = await Promise.all([
+          bRes.json(), rRes.json(), oRes.json(), revRes.json(),
+          invRes.ok ? invRes.json() : Promise.resolve([]),
+          shiftRes.ok ? shiftRes.json() : Promise.resolve(null)
         ]);
+
+        if (!active) return;
 
         setBookings(Array.isArray(bData) ? bData : []);
         setRooms(Array.isArray(rData) ? rData : []);
         setOrders(Array.isArray(oData) ? oData : []);
         setRevenue(revData?.total_revenue || 0);
+
+        if (Array.isArray(invData)) {
+          setLowStockObjects(invData.filter((i: any) => Number(i.current_stock) <= Number(i.min_stock_alert)));
+        }
+        if (shiftData && shiftData.shift && shiftData.shift_log?.status !== "CLOSED") {
+          setActiveShift(shiftData);
+        } else {
+          setActiveShift(null);
+        }
       } catch (error) {
         console.error("Dashboard fetch error:", error);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     fetchData();
+    const interval = setInterval(fetchData, 60000);
+    const handleFocus = () => { void fetchData(); };
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+    };
   }, [router]);
 
-  const today = new Date().toISOString().split("T")[0];
-  const arrivalsToday = bookings.filter(b => b.check_in_date?.startsWith(today) && b.status !== "Cancelled");
-  const departuresToday = bookings.filter(b => b.check_out_date?.startsWith(today) && b.status === "Checked-In");
+  const [nowData, setNowData] = useState({
+    today: "",
+    timeOfDay: "Good day",
+    localizedDate: "Today",
+  });
+
+  useEffect(() => {
+    setNowData({
+      today: new Date().toISOString().split("T")[0],
+      timeOfDay: (() => {
+        const h = new Date().getHours();
+        if (h < 12) return "Good morning";
+        if (h < 18) return "Good afternoon";
+        return "Good evening";
+      })(),
+      localizedDate: new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
+    });
+  }, []);
+
+  const arrivalsToday = bookings.filter(b => b.check_in_date?.startsWith(nowData.today) && b.status !== "Cancelled");
+  const departuresToday = bookings.filter(b => b.check_out_date?.startsWith(nowData.today) && b.status === "Checked-In");
   
   const roomStats = {
     available: rooms.filter(r => r.status === "Clean").length,
@@ -124,12 +172,7 @@ export default function AdminDashboardPage() {
 
   const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } };
   const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } };
-  const timeOfDay = (() => {
-    const h = new Date().getHours();
-    if (h < 12) return "Good morning";
-    if (h < 18) return "Good afternoon";
-    return "Good evening";
-  })();
+  
   const initials = (() => {
     const n = welcome?.name?.trim();
     if (!n) return "A";
@@ -139,41 +182,51 @@ export default function AdminDashboardPage() {
     return (a + (b || "")).toUpperCase();
   })();
 
+  // Total rooms and occupancy
+  const totalRooms = rooms.length;
+  const occupancyPct = totalRooms > 0 ? Math.round((roomStats.occupied / totalRooms) * 100) : 0;
+
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 tablet:space-y-8 pb-12">
+      {/* Page Title */}
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+        <div className="flex items-center gap-2 mb-1">
+          <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse-soft" />
+          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-600">Live</span>
+        </div>
         <h1 className="text-2xl lg:text-3xl font-bold text-[#07008A] tracking-tight">Dashboard Overview</h1>
-        <p className="text-muted-foreground mt-1">Live updates from D&M Travelers Inn</p>
+        <p className="text-muted-foreground mt-1 text-sm">Live updates from D&M Travelers Inn</p>
       </motion.div>
 
+      {/* Welcome Banner */}
       {welcome?.name || welcome?.roleLabel ? (
-        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
-          <Card className="border-0 shadow-md bg-gradient-to-br from-[#07008A]/12 via-white to-[#FED501]/16 overflow-hidden">
+        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
+          <Card className="border border-[#07008A]/8 shadow-elevation-2 bg-gradient-to-br from-[#07008A]/[0.06] via-white to-[#FED501]/[0.08] overflow-hidden">
             <CardContent className="relative p-5 sm:p-6">
               {/* Decorative accents */}
-              <div className="pointer-events-none absolute -top-20 -right-24 h-56 w-56 rounded-full bg-[#FED501]/20 blur-2xl" />
-              <div className="pointer-events-none absolute -bottom-24 -left-28 h-64 w-64 rounded-full bg-[#07008A]/15 blur-2xl" />
-              <div className="pointer-events-none absolute inset-0 opacity-[0.08]" style={{
+              <div className="pointer-events-none absolute -top-20 -right-24 h-56 w-56 rounded-full bg-[#FED501]/15 blur-3xl" />
+              <div className="pointer-events-none absolute -bottom-24 -left-28 h-64 w-64 rounded-full bg-[#07008A]/10 blur-3xl" />
+              <div className="pointer-events-none absolute inset-0 opacity-[0.04]" style={{
                 backgroundImage:
-                  "radial-gradient(circle at 1px 1px, rgba(7,0,138,0.35) 1px, transparent 0)",
-                backgroundSize: "18px 18px",
+                  "radial-gradient(circle at 1px 1px, rgba(7,0,138,0.25) 1px, transparent 0)",
+                backgroundSize: "20px 20px",
               }} />
 
               <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-2xl bg-[#07008A] text-white flex items-center justify-center shadow-lg shadow-[#07008A]/25 ring-1 ring-white/70">
+                  <div className="h-12 w-12 rounded-2xl bg-[#07008A] text-white flex items-center justify-center shadow-lg shadow-[#07008A]/20 ring-2 ring-white/80">
                     <span className="text-sm font-extrabold tracking-wide">{initials}</span>
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[#07008A]/70">
-                      {timeOfDay}
+                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#07008A]/60">
+                      {nowData.timeOfDay}
                     </p>
                     <p className="text-base sm:text-lg font-bold text-slate-900 truncate">
                       {welcome?.name ? `Welcome back, ${welcome.name}.` : "Welcome back."}
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
-                      <span className="text-xs text-slate-500">Signed in as</span>
-                      <span className="inline-flex items-center rounded-full border border-[#07008A]/15 bg-white/70 px-2.5 py-0.5 text-xs font-semibold text-[#07008A] shadow-sm">
+                      <span className="text-[11px] text-slate-500">Signed in as</span>
+                      <span className="inline-flex items-center rounded-full border border-[#07008A]/12 bg-white/80 px-2.5 py-0.5 text-[11px] font-semibold text-[#07008A] shadow-xs">
                         {welcome?.roleLabel || "Staff"}
                       </span>
                     </div>
@@ -182,7 +235,7 @@ export default function AdminDashboardPage() {
 
                 <div className="flex items-center gap-2">
                   <Link href="/admin/account">
-                    <Button size="sm" className="h-10 bg-[#07008A] hover:bg-[#05006a] text-white shadow-sm">
+                    <Button size="sm" className="h-10 bg-[#07008A] hover:bg-[#05006a] text-white shadow-md shadow-[#07008A]/15 transition-all hover:shadow-lg">
                       Manage my account
                       <ArrowRight className="h-4 w-4 ml-2" />
                     </Button>
@@ -195,22 +248,65 @@ export default function AdminDashboardPage() {
       ) : null}
 
       {/* Quick Stats Grid */}
-      <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+      <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-4 gap-3 tablet:gap-4 lg:gap-5">
         {[
-          { icon: Banknote, value: `₱${revenue.toLocaleString()}`, label: "Revenue Today", color: "bg-emerald-500/10 text-emerald-600" },
-          { icon: CalendarDays, value: bookings.length, label: "Total Bookings", color: "bg-[#07008A]/10 text-[#07008A]" },
-          { icon: BedDouble, value: roomStats.available, label: "Rooms Available", color: "bg-blue-500/10 text-blue-600" },
-          { icon: AlertCircle, value: roomStats.dirty, label: "Dirty Rooms", color: "bg-red-500/10 text-red-600" },
-        ].map(({ icon: Icon, value, label, color }) => (
+          {
+            icon: Banknote,
+            value: `₱${revenue.toLocaleString()}`,
+            label: "Revenue Today",
+            color: "text-emerald-600",
+            bgColor: "bg-emerald-50",
+            ringColor: "ring-emerald-100",
+          },
+          {
+            icon: CalendarDays,
+            value: bookings.length,
+            label: "Total Bookings",
+            color: "text-[#07008A]",
+            bgColor: "bg-[#07008A]/[0.06]",
+            ringColor: "ring-[#07008A]/10",
+          },
+          {
+            icon: BedDouble,
+            value: roomStats.available,
+            label: "Rooms Available",
+            color: "text-blue-600",
+            bgColor: "bg-blue-50",
+            ringColor: "ring-blue-100",
+            subtitle: `${occupancyPct}% occupied`,
+          },
+          {
+            icon: AlertCircle,
+            value: roomStats.dirty,
+            label: "Dirty Rooms",
+            color: "text-red-600",
+            bgColor: "bg-red-50",
+            ringColor: "ring-red-100",
+            urgent: roomStats.dirty > 0,
+          },
+        ].map(({ icon: Icon, value, label, color, bgColor, ringColor, subtitle, urgent }) => (
           <motion.div key={label} variants={item}>
-            <Card className="border-0 shadow-sm bg-white hover:shadow-md transition-shadow cursor-default group">
-              <CardContent className="p-6 flex items-center gap-4">
-                <div className={cn("flex h-12 w-12 items-center justify-center rounded-2xl group-hover:scale-110 transition-transform", color)}>
-                  <Icon className="h-6 w-6" />
+            <Card className={cn(
+              "border border-slate-100 shadow-xs hover:shadow-elevation-2 transition-all duration-200 cursor-default group bg-white",
+              urgent && "border-red-200/60"
+            )}>
+              <CardContent className="p-4 tablet:p-5 flex items-start gap-3 tablet:gap-4">
+                <div className={cn(
+                  "flex h-10 w-10 tablet:h-11 tablet:w-11 items-center justify-center rounded-xl ring-1 transition-transform duration-200 group-hover:scale-105 shrink-0",
+                  bgColor, color, ringColor
+                )}>
+                  <Icon className="h-5 w-5" />
                 </div>
-                <div>
-                  {loading ? <Skeleton className="h-7 w-16 mb-1" /> : <p className="text-xl font-bold text-slate-900">{value}</p>}
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{label}</p>
+                <div className="min-w-0">
+                  {loading ? (
+                    <Skeleton className="h-7 w-16 mb-1" />
+                  ) : (
+                    <p className="text-xl tablet:text-2xl font-bold text-slate-900 leading-tight">{value}</p>
+                  )}
+                  <p className="text-[10px] tablet:text-[11px] text-muted-foreground font-semibold uppercase tracking-wider mt-0.5">{label}</p>
+                  {subtitle && !loading && (
+                    <p className="text-[10px] text-slate-400 mt-0.5">{subtitle}</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -219,79 +315,85 @@ export default function AdminDashboardPage() {
       </motion.div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 tablet:grid-cols-3 gap-3 tablet:gap-4">
         <Link href="/admin/bookings" className="group">
-          <Card className="border-0 shadow-sm bg-[#07008A] text-white hover:bg-[#05006a] transition-colors cursor-pointer">
-            <CardContent className="p-6 flex items-center justify-between">
+          <Card className="border-0 shadow-md bg-[#07008A] text-white hover:bg-[#05006a] transition-all cursor-pointer hover:shadow-lg hover:-translate-y-0.5 duration-200">
+            <CardContent className="p-5 flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="bg-white/20 p-3 rounded-xl"><Plus className="h-5 w-5" /></div>
+                <div className="bg-white/15 p-2.5 rounded-xl ring-1 ring-white/10"><Plus className="h-5 w-5" /></div>
                 <div>
-                  <p className="font-bold">New Booking</p>
-                  <p className="text-xs text-white/60">Reserve a room for a guest</p>
+                  <p className="font-bold text-sm">New Booking</p>
+                  <p className="text-[11px] text-white/50">Reserve a room for a guest</p>
                 </div>
               </div>
-              <ArrowRight className="h-5 w-5 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+              <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200" />
             </CardContent>
           </Card>
         </Link>
         <Link href="/admin/restaurant" className="group">
-          <Card className="border-0 shadow-sm bg-white hover:bg-slate-50 transition-colors cursor-pointer">
-            <CardContent className="p-6 flex items-center justify-between">
+          <Card className="border border-slate-100 shadow-xs bg-white hover:shadow-elevation-2 hover:-translate-y-0.5 transition-all cursor-pointer duration-200">
+            <CardContent className="p-5 flex items-center justify-between">
               <div className="flex items-center gap-4 text-slate-900">
-                <div className="bg-orange-500/10 text-orange-600 p-3 rounded-xl"><Utensils className="h-5 w-5" /></div>
+                <div className="bg-orange-50 text-orange-600 p-2.5 rounded-xl ring-1 ring-orange-100"><Utensils className="h-5 w-5" /></div>
                 <div>
-                  <p className="font-bold">Restaurant Order</p>
-                  <p className="text-xs text-slate-400">Dine-in or Room service</p>
+                  <p className="font-bold text-sm">Restaurant Order</p>
+                  <p className="text-[11px] text-slate-400">Dine-in or Room service</p>
                 </div>
               </div>
-              <ArrowRight className="h-5 w-5 text-slate-300 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+              <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-1 transition-all duration-200" />
             </CardContent>
           </Card>
         </Link>
         <Link href="/admin/reports" className="group">
-          <Card className="border-0 shadow-sm bg-white hover:bg-slate-50 transition-colors cursor-pointer">
-            <CardContent className="p-6 flex items-center justify-between">
+          <Card className="border border-slate-100 shadow-xs bg-white hover:shadow-elevation-2 hover:-translate-y-0.5 transition-all cursor-pointer duration-200">
+            <CardContent className="p-5 flex items-center justify-between">
               <div className="flex items-center gap-4 text-slate-900">
-                <div className="bg-emerald-500/10 text-emerald-600 p-3 rounded-xl"><Plus className="h-5 w-5" /></div>
+                <div className="bg-emerald-50 text-emerald-600 p-2.5 rounded-xl ring-1 ring-emerald-100"><Plus className="h-5 w-5" /></div>
                 <div>
-                  <p className="font-bold">Add Expense</p>
-                  <p className="text-xs text-slate-400">Record a new operational cost</p>
+                  <p className="font-bold text-sm">Add Expense</p>
+                  <p className="text-[11px] text-slate-400">Record a new operational cost</p>
                 </div>
               </div>
-              <ArrowRight className="h-5 w-5 text-slate-300 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+              <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-1 transition-all duration-200" />
             </CardContent>
           </Card>
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6">
         {/* Arrivals & Departures */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="border-0 shadow-sm bg-white overflow-hidden">
-            <CardHeader className="border-b bg-slate-50/30 flex flex-row items-center justify-between">
+        <div className="lg:col-span-2 space-y-5 lg:space-y-6">
+          <Card className="border border-slate-100 shadow-xs bg-white overflow-hidden">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/40 flex flex-row items-center justify-between py-4 px-5">
               <div>
-                <CardTitle className="text-base font-bold flex items-center gap-2">
+                <CardTitle className="text-sm font-bold flex items-center gap-2 text-slate-800">
                   <Clock className="h-4 w-4 text-[#07008A]" />
-                  Today's Operations
+                  Today&apos;s Operations
                 </CardTitle>
-                <CardDescription className="text-xs">Schedule for {new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</CardDescription>
+                <CardDescription className="text-[11px] mt-0.5">Schedule for {nowData.localizedDate}</CardDescription>
               </div>
             </CardHeader>
-            <CardContent className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-600 bg-blue-50/50 px-3 py-2 rounded-lg border border-blue-100/50">
-                  <LogIn className="h-4 w-4 text-blue-500" /> Arrivals ({arrivalsToday.length})
+            <CardContent className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Arrivals */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 bg-blue-50/60 px-3 py-2 rounded-lg border border-blue-100/50">
+                  <LogIn className="h-3.5 w-3.5 text-blue-500" /> Arrivals ({arrivalsToday.length})
                 </div>
                 <div className="space-y-2">
-                  {loading ? [1,2].map(i => <Skeleton key={i} className="h-12 w-full" />) : 
-                   arrivalsToday.length === 0 ? <p className="text-xs text-slate-400 italic text-center py-4">No arrivals expected today</p> :
+                  {loading ? [1,2].map(i => <Skeleton key={i} className="h-12 w-full rounded-lg" />) : 
+                   arrivalsToday.length === 0 ? (
+                    <div className="text-center py-6">
+                      <Inbox className="h-8 w-8 text-slate-200 mx-auto mb-2" />
+                      <p className="text-xs text-slate-400">No arrivals expected today</p>
+                    </div>
+                   ) :
                    arrivalsToday.map(b => (
-                     <div key={b.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/30">
+                     <div key={b.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-white hover:bg-slate-50/50 transition-colors">
                        <div className="flex flex-col">
                          <span className="text-xs font-bold text-slate-800">{b.guests?.full_name}</span>
                          <span className="text-[10px] text-slate-500">{b.rooms?.room_number ? `Room ${b.rooms.room_number}` : 'Unassigned'}</span>
                        </div>
-                       <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-tight bg-white">
+                       <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-tight bg-white border-slate-200">
                          {b.reference_number?.slice(-6)}
                        </Badge>
                      </div>
@@ -300,20 +402,26 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-600 bg-amber-50/50 px-3 py-2 rounded-lg border border-amber-100/50">
-                  <LogOut className="h-4 w-4 text-amber-500" /> Departures ({departuresToday.length})
+              {/* Departures */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 bg-amber-50/60 px-3 py-2 rounded-lg border border-amber-100/50">
+                  <LogOut className="h-3.5 w-3.5 text-amber-500" /> Departures ({departuresToday.length})
                 </div>
                 <div className="space-y-2">
-                  {loading ? [1,2].map(i => <Skeleton key={i} className="h-12 w-full" />) : 
-                   departuresToday.length === 0 ? <p className="text-xs text-slate-400 italic text-center py-4">No departures scheduled today</p> :
+                  {loading ? [1,2].map(i => <Skeleton key={i} className="h-12 w-full rounded-lg" />) : 
+                   departuresToday.length === 0 ? (
+                    <div className="text-center py-6">
+                      <Inbox className="h-8 w-8 text-slate-200 mx-auto mb-2" />
+                      <p className="text-xs text-slate-400">No departures scheduled today</p>
+                    </div>
+                   ) :
                    departuresToday.map(b => (
-                     <div key={b.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/30">
+                     <div key={b.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-white hover:bg-slate-50/50 transition-colors">
                        <div className="flex flex-col">
                          <span className="text-xs font-bold text-slate-800">{b.guests?.full_name}</span>
                          <span className="text-[10px] text-slate-500">{b.rooms?.room_number ? `Room ${b.rooms.room_number}` : 'N/A'}</span>
                        </div>
-                       <Badge className="text-[10px] uppercase font-bold tracking-tight bg-amber-50 text-amber-700 border-amber-100">
+                       <Badge className="text-[10px] uppercase font-bold tracking-tight bg-amber-50 text-amber-700 border-amber-100" variant="outline">
                          Due Today
                        </Badge>
                      </div>
@@ -324,46 +432,63 @@ export default function AdminDashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Recent Bookings Table (Smaller) */}
-          <Card className="border-0 shadow-sm bg-white overflow-hidden">
-            <CardHeader className="border-b bg-slate-50/30 flex flex-row items-center justify-between">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
+          {/* Recent Bookings Table */}
+          <Card className="border border-slate-100 shadow-xs bg-white overflow-hidden">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/40 flex flex-row items-center justify-between py-4 px-5">
+              <CardTitle className="text-sm font-bold flex items-center gap-2 text-slate-800">
                 <TrendingUp className="h-4 w-4 text-[#07008A]" /> Recent Bookings
               </CardTitle>
               <Link href="/admin/bookings">
-                <Button variant="ghost" size="sm" className="h-8 text-xs text-[#07008A] hover:bg-[#07008A]/10">View All</Button>
+                <Button variant="ghost" size="sm" className="h-8 text-xs text-[#07008A] hover:bg-[#07008A]/5">View All</Button>
               </Link>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              <div className="responsive-table-wrapper">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b bg-slate-50/50">
-                      <th className="text-left py-3 px-6 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Ref / Guest</th>
-                      <th className="text-left py-3 px-6 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                      <th className="text-right py-3 px-6 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Check-in</th>
+                    <tr className="border-b border-slate-100 bg-slate-50/30">
+                      <th className="text-left py-3 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ref / Guest</th>
+                      <th className="text-left py-3 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status</th>
+                      <th className="text-right py-3 px-5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Check-in</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {bookings.slice(0, 5).map((b, idx) => (
-                      <tr key={b.id} className="border-b last:border-0 hover:bg-slate-50/50 transition-colors">
-                        <td className="py-3 px-6">
-                          <div className="flex flex-col">
-                            <span className="text-xs font-bold text-slate-800 font-mono tracking-tight">{b.reference_number}</span>
-                            <span className="text-[10px] text-slate-500">{b.guests?.full_name}</span>
-                          </div>
+                    {loading ? (
+                      [1,2,3].map(i => (
+                        <tr key={i} className="border-b border-slate-50">
+                          <td className="py-3 px-5"><Skeleton className="h-8 w-32" /></td>
+                          <td className="py-3 px-5"><Skeleton className="h-5 w-20" /></td>
+                          <td className="py-3 px-5"><Skeleton className="h-5 w-24 ml-auto" /></td>
+                        </tr>
+                      ))
+                    ) : bookings.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="py-8 text-center">
+                          <Inbox className="h-8 w-8 text-slate-200 mx-auto mb-2" />
+                          <p className="text-xs text-slate-400">No bookings yet</p>
                         </td>
-                        <td className="py-3 px-6">
-                          <span className={cn(
-                            "inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase border",
-                            statusVariant[String(b.status || "").toLowerCase()] || "bg-slate-100 text-slate-700 border-slate-200"
-                          )}>
-                            {b.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-6 text-right text-xs text-slate-600">{b.check_in_date ? new Date(b.check_in_date).toLocaleDateString() : '—'}</td>
                       </tr>
-                    ))}
+                    ) : (
+                      bookings.slice(0, 5).map((b) => (
+                        <tr key={b.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
+                          <td className="py-3 px-5">
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-slate-800 font-mono tracking-tight">{b.reference_number}</span>
+                              <span className="text-[10px] text-slate-500">{b.guests?.full_name}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-5">
+                            <span className={cn(
+                              "inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase border",
+                              statusVariant[String(b.status || "").toLowerCase()] || "bg-slate-100 text-slate-700 border-slate-200"
+                            )}>
+                              {b.status}
+                            </span>
+                          </td>
+                          <td className="py-3 px-5 text-right text-xs text-slate-600">{b.check_in_date ? new Date(b.check_in_date).toLocaleDateString() : '—'}</td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -371,21 +496,88 @@ export default function AdminDashboardPage() {
           </Card>
         </div>
 
-        {/* Right Sidebar: Restaurant Activity */}
-        <div className="space-y-6">
-          <Card className="border-0 shadow-sm bg-white overflow-hidden">
-            <CardHeader className="border-b bg-slate-50/30">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
+        {/* Right Sidebar */}
+        <div className="space-y-5 lg:space-y-6">
+          {/* Active Shift Card */}
+          {activeShift && (
+            <Card className="border border-slate-100 shadow-xs bg-[#07008A] text-white overflow-hidden">
+              <CardHeader className="py-4 px-5 pb-2">
+                <CardTitle className="text-sm font-bold flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-[#FED501]" /> Active Shift
+                  </div>
+                  <Badge className="bg-[#FED501] text-[#07008A] uppercase font-bold text-[10px] hover:bg-[#FED501]">{activeShift.shift.name}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-5 pt-2">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-white/70">Time Remaining:</span>
+                    <span className="font-bold">{activeShift.time.minutes_remaining} mins</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-white/70">Net Income:</span>
+                    <span className="font-bold text-[#FED501]">₱{(activeShift.totals.net_total || 0).toFixed(2)}</span>
+                  </div>
+                </div>
+                <Link href="/admin/shifts" className="mt-4 block">
+                  <Button variant="secondary" size="sm" className="w-full h-8 text-xs font-bold bg-white/10 hover:bg-white/15 text-white border-0">
+                    <KeyRound className="mr-2 h-3.5 w-3.5" /> Manage Ledger
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Low Stock Alerts */}
+          {lowStockObjects.length > 0 && (
+            <Card className="border border-red-200/60 shadow-xs bg-white overflow-hidden">
+              <CardHeader className="border-b border-red-50 bg-red-50/40 py-3 px-5">
+                <CardTitle className="text-sm font-bold flex items-center gap-2 text-red-700">
+                  <PackageSearch className="h-4 w-4" /> Low Stock Alerts
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y divide-red-50">
+                  {lowStockObjects.slice(0, 3).map((item: any) => (
+                    <div key={item.id} className="p-3 px-5 flex justify-between items-center">
+                      <span className="text-xs font-semibold text-slate-800">{item.name}</span>
+                      <Badge variant="destructive" className="text-[10px] bg-red-100 text-red-700 hover:bg-red-200 border-0">
+                        {item.current_stock} {item.unit} left
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+                {lowStockObjects.length > 3 && (
+                  <div className="p-2 border-t border-red-50 bg-red-50/20 text-center">
+                    <Link href="/admin/inventory" className="text-[10px] font-bold text-red-600 hover:underline">
+                      +{lowStockObjects.length - 3} more items low on stock
+                    </Link>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Restaurant Activity */}
+          <Card className="border border-slate-100 shadow-xs bg-white overflow-hidden">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/40 py-4 px-5">
+              <CardTitle className="text-sm font-bold flex items-center gap-2 text-slate-800">
                 <ShoppingBag className="h-4 w-4 text-orange-500" /> Restaurant Activity
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-4 space-y-4">
-              {loading ? [1,2,3].map(i => <Skeleton key={i} className="h-16 w-full" />) :
-               orders.length === 0 ? <p className="text-xs text-slate-400 italic text-center py-8">No recent orders</p> :
+            <CardContent className="p-4 space-y-3">
+              {loading ? [1,2,3].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />) :
+               orders.length === 0 ? (
+                <div className="text-center py-8">
+                  <Utensils className="h-8 w-8 text-slate-200 mx-auto mb-2" />
+                  <p className="text-xs text-slate-400">No recent orders</p>
+                </div>
+               ) :
                orders.slice(0, 4).map(o => (
-                 <div key={o.id} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-orange-200 transition-colors">
-                   <div className="h-10 w-10 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
-                     <Utensils className="h-5 w-5" />
+                 <div key={o.id} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-orange-200/60 hover:bg-orange-50/20 transition-all duration-200">
+                   <div className="h-9 w-9 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center shrink-0 ring-1 ring-orange-100">
+                     <Utensils className="h-4 w-4" />
                    </div>
                    <div className="flex-1 min-w-0">
                      <div className="flex justify-between items-start mb-0.5">
@@ -406,33 +598,48 @@ export default function AdminDashboardPage() {
                ))
               }
               <Link href="/admin/restaurant" className="block">
-                <Button variant="outline" size="sm" className="w-full h-9 text-xs text-slate-600 hover:text-orange-600 hover:border-orange-200">
+                <Button variant="outline" size="sm" className="w-full h-9 text-xs text-slate-500 hover:text-orange-600 hover:border-orange-200 transition-colors">
                   Manage Restaurant
                 </Button>
               </Link>
             </CardContent>
           </Card>
 
-          {/* Room Cleaning Status */}
-          <Card className="border-0 shadow-sm bg-[#07008A] text-white">
-            <CardHeader className="pb-2">
+          {/* Housekeeping Summary */}
+          <Card className="border-0 shadow-md bg-[#07008A] text-white overflow-hidden">
+            <CardHeader className="pb-2 pt-4 px-5">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4" /> Housekeeping Summary
+                <CheckCircle2 className="h-4 w-4 text-[#FED501]" /> Housekeeping Summary
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-4 space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-white/10 p-3 rounded-xl">
-                  <p className="text-[10px] text-white/60 font-bold uppercase tracking-wider">Clean Rooms</p>
-                  <p className="text-xl font-bold">{roomStats.available}</p>
+            <CardContent className="px-5 pb-5 space-y-4">
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="bg-white/8 p-3.5 rounded-xl border border-white/5">
+                  <p className="text-[10px] text-white/45 font-bold uppercase tracking-wider">Clean Rooms</p>
+                  <p className="text-2xl font-bold mt-1">{roomStats.available}</p>
                 </div>
-                <div className="bg-red-500/20 p-3 rounded-xl">
-                  <p className="text-[10px] text-white/60 font-bold uppercase tracking-wider">Dirty Rooms</p>
-                  <p className="text-xl font-bold">{roomStats.dirty}</p>
+                <div className="bg-red-500/15 p-3.5 rounded-xl border border-red-400/10">
+                  <p className="text-[10px] text-white/45 font-bold uppercase tracking-wider">Dirty Rooms</p>
+                  <p className="text-2xl font-bold mt-1">{roomStats.dirty}</p>
                 </div>
               </div>
+              {/* Occupancy progress */}
+              {totalRooms > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-white/45 font-bold uppercase tracking-wider">Occupancy</span>
+                    <span className="text-[11px] font-bold text-[#FED501]">{occupancyPct}%</span>
+                  </div>
+                  <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#FED501] rounded-full transition-all duration-500"
+                      style={{ width: `${occupancyPct}%` }}
+                    />
+                  </div>
+                </div>
+              )}
               <Link href="/admin/housekeeping" className="block">
-                <Button variant="secondary" size="sm" className="w-full h-9 text-xs font-bold">
+                <Button variant="secondary" size="sm" className="w-full h-9 text-xs font-bold bg-white/10 hover:bg-white/15 text-white border-0">
                   View Cleaning List
                 </Button>
               </Link>

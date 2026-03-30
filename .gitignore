@@ -44,4 +44,9 @@ skills-lock.json
 Thumbs.db
 
 # testing
-/coverage
+/coverage
+
+# local scratch / debug artifacts
+fix-toasts.cjs
+missed.txt
+screnshots/

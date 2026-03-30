@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { 
   Settings as SettingsIcon, Save, Building2, Clock, 
-  Banknote, Share2, Info, Loader2, Globe, Phone, Mail, MapPin, ShieldAlert
+  Banknote, Share2, Info, Loader2, Globe, Phone, Mail, MapPin, ShieldAlert, Package
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,10 +16,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
+
+type ShiftConfig = {
+  id: string;
+  name: string;
+  start_time: string;
+  end_time: string;
+  sort_order: number;
+  is_active: boolean;
+};
 
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<Record<string, string>>({});
+  const [shifts, setShifts] = useState<ShiftConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pwCurrent, setPwCurrent] = useState("");
@@ -27,32 +40,79 @@ export default function AdminSettingsPage() {
   const [pwSaving, setPwSaving] = useState(false);
   const router = useRouter();
 
-  useEffect(() => {
-    fetchSettings();
-  }, [router]);
-
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     const token = localStorage.getItem("admin_token");
     if (!token) { router.replace("/admin/login"); return; }
     try {
-      const res = await fetch("/api/settings", { headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json();
-      setSettings(typeof data === "object" ? data : {});
-    } catch {
-      toast.error("Failed to load settings");
+      const [settingsRes, shiftsRes] = await Promise.all([
+        fetch("/api/settings", { headers: { Authorization: `Bearer ${token}` } }),
+        fetch("/api/settings/shifts", { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+
+      const settingsData = await settingsRes.json().catch(() => ({}));
+      const shiftsData = await shiftsRes.json().catch(() => ([]));
+
+      if (!settingsRes.ok) {
+        throw new Error(getErrorMessage(settingsData) || "Failed to load settings");
+      }
+      if (!shiftsRes.ok) {
+        throw new Error(getErrorMessage(shiftsData) || "Failed to load shift schedules");
+      }
+
+      setSettings(typeof settingsData === "object" ? settingsData : {});
+      setShifts(Array.isArray(shiftsData) ? shiftsData : []);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to load settings");
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
 
   const handleUpdate = (key: string, value: string) => {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
+  const handleShiftUpdate = (id: string, field: keyof ShiftConfig, value: string | boolean) => {
+    setShifts((prev) => prev.map((shift) => (
+      shift.id === id ? { ...shift, [field]: value } : shift
+    )));
+  };
+
   const handleSave = async () => {
+    if (!shifts.some((shift) => shift.is_active)) {
+      toast.error("At least one shift must remain active.");
+      return;
+    }
+
     setSaving(true);
     try {
       const token = localStorage.getItem("admin_token");
+      const shiftPayload = shifts
+        .slice()
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((shift) => ({
+          ...shift,
+          start_time: shift.start_time.slice(0, 5),
+          end_time: shift.end_time.slice(0, 5),
+        }));
+
+      const shiftRes = await fetch("/api/settings/shifts", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(shiftPayload),
+      });
+      const shiftPayloadResponse = await shiftRes.json().catch(() => ({}));
+      if (!shiftRes.ok) {
+        throw new Error(getErrorMessage(shiftPayloadResponse) || "Failed to save shift schedule");
+      }
+
       const res = await fetch("/api/settings", {
         method: "POST",
         headers: { 
@@ -61,13 +121,14 @@ export default function AdminSettingsPage() {
         },
         body: JSON.stringify(settings),
       });
-      if (res.ok) {
-        toast.success("Settings saved successfully");
-      } else {
-        toast.error("Failed to save settings");
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(getErrorMessage(payload) || "Failed to save settings");
       }
-    } catch {
-      toast.error("An error occurred while saving");
+      await fetchSettings();
+      toast.success("Settings saved successfully");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "An error occurred while saving");
     } finally {
       setSaving(false);
     }
@@ -99,7 +160,8 @@ export default function AdminSettingsPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error((data as { error?: string }).error || "Failed to change password.");
+        const errMsg = getErrorMessage(data);
+        toast.error(errMsg || "Failed to change password.");
         return;
       }
       toast.success("Password updated.");
@@ -157,6 +219,9 @@ export default function AdminSettingsPage() {
           </TabsTrigger>
           <TabsTrigger value="social" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <Share2 className="h-4 w-4 mr-2" /> Social
+          </TabsTrigger>
+          <TabsTrigger value="extras" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            <Package className="h-4 w-4 mr-2" /> Extras
           </TabsTrigger>
           <TabsTrigger value="security" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <SettingsIcon className="h-4 w-4 mr-2" /> Security
@@ -292,56 +357,114 @@ export default function AdminSettingsPage() {
 
         {/* Operations Settings */}
         <TabsContent value="operations">
-          <Card className="border-0 shadow-sm max-w-3xl mx-auto">
-            <CardHeader className="border-b bg-slate-50/30">
-              <CardTitle className="text-base font-bold">Stay Preferences</CardTitle>
-              <CardDescription>Configure check-in times and policies</CardDescription>
-            </CardHeader>
-            <CardContent className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="check_in_time">Default Check-in Time</Label>
-                  <Input 
-                    id="check_in_time" 
-                    type="time"
-                    value={settings.check_in_time || "14:00"} 
-                    onChange={e => handleUpdate("check_in_time", e.target.value)} 
-                  />
+          <div className="mx-auto max-w-4xl space-y-6">
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="border-b bg-slate-50/30">
+                <CardTitle className="text-base font-bold">Stay Preferences</CardTitle>
+                <CardDescription>Configure check-in times and guest-facing policies</CardDescription>
+              </CardHeader>
+              <CardContent className="p-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="check_in_time">Default Check-in Time</Label>
+                    <Input 
+                      id="check_in_time" 
+                      type="time"
+                      value={settings.check_in_time || "14:00"} 
+                      onChange={e => handleUpdate("check_in_time", e.target.value)} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="check_out_time">Default Check-out Time</Label>
+                    <Input 
+                      id="check_out_time" 
+                      type="time"
+                      value={settings.check_out_time || "12:00"} 
+                      onChange={e => handleUpdate("check_out_time", e.target.value)} 
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="check_out_time">Default Check-out Time</Label>
-                  <Input 
-                    id="check_out_time" 
-                    type="time"
-                    value={settings.check_out_time || "12:00"} 
-                    onChange={e => handleUpdate("check_out_time", e.target.value)} 
+                  <Label htmlFor="late_checkout_grace_period">Late Check-out Grace Period (Minutes)</Label>
+                  <div className="flex items-center gap-3">
+                    <Input 
+                      id="late_checkout_grace_period" 
+                      type="number"
+                      value={settings.late_checkout_grace_period || "30"} 
+                      onChange={e => handleUpdate("late_checkout_grace_period", e.target.value)} 
+                      className="max-w-[120px]"
+                    />
+                    <span className="text-xs text-muted-foreground">Minutes allowed after checkout time before fees apply.</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cancellation_policy">Cancellation Policy</Label>
+                  <Textarea 
+                    id="cancellation_policy" 
+                    value={settings.cancellation_policy || ""} 
+                    onChange={e => handleUpdate("cancellation_policy", e.target.value)} 
+                    className="min-h-[100px]"
                   />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="late_checkout_grace_period">Late Check-out Grace Period (Minutes)</Label>
-                <div className="flex items-center gap-3">
-                  <Input 
-                    id="late_checkout_grace_period" 
-                    type="number"
-                    value={settings.late_checkout_grace_period || "30"} 
-                    onChange={e => handleUpdate("late_checkout_grace_period", e.target.value)} 
-                    className="max-w-[120px]"
-                  />
-                  <span className="text-xs text-muted-foreground">Minutes allowed after checkout time before fees apply.</span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cancellation_policy">Cancellation Policy</Label>
-                <Textarea 
-                  id="cancellation_policy" 
-                  value={settings.cancellation_policy || ""} 
-                  onChange={e => handleUpdate("cancellation_policy", e.target.value)} 
-                  className="min-h-[100px]"
-                />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="border-b bg-slate-50/30">
+                <CardTitle className="text-base font-bold">Shift Schedule</CardTitle>
+                <CardDescription>Set the exact time window for each shift. These values drive active-shift detection and ledger close timing on the Shifts page.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4">
+                {shifts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No shift definitions found. Create shift rows first, then return here to configure their schedule.</p>
+                ) : (
+                  shifts
+                    .slice()
+                    .sort((a, b) => a.sort_order - b.sort_order)
+                    .map((shift, index) => (
+                      <div key={shift.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-semibold text-slate-900">{shift.name}</p>
+                              <Badge variant="outline" className="text-[10px] uppercase tracking-wider">Shift {index + 1}</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">Use 24-hour time. Overnight shifts are supported automatically.</p>
+                          </div>
+                          <div className="flex items-center gap-3 rounded-full border border-slate-200 bg-slate-50 px-3 py-2">
+                            <span className="text-xs font-medium text-slate-600">Active</span>
+                            <Switch
+                              checked={shift.is_active}
+                              onCheckedChange={(checked) => handleShiftUpdate(shift.id, "is_active", checked)}
+                            />
+                          </div>
+                        </div>
+                        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label htmlFor={`shift-start-${shift.id}`}>Start time</Label>
+                            <Input
+                              id={`shift-start-${shift.id}`}
+                              type="time"
+                              value={shift.start_time?.slice(0, 5) || ""}
+                              onChange={(e) => handleShiftUpdate(shift.id, "start_time", e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor={`shift-end-${shift.id}`}>End time</Label>
+                            <Input
+                              id={`shift-end-${shift.id}`}
+                              type="time"
+                              value={shift.end_time?.slice(0, 5) || ""}
+                              onChange={(e) => handleShiftUpdate(shift.id, "end_time", e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* Financial Settings */}
@@ -429,6 +552,67 @@ export default function AdminSettingsPage() {
                   onChange={e => handleUpdate("instagram_url", e.target.value)} 
                   placeholder="https://instagram.com/..."
                 />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Extras Settings */}
+        <TabsContent value="extras">
+          <Card className="border-0 shadow-sm max-w-3xl mx-auto">
+            <CardHeader className="border-b bg-slate-50/30">
+              <CardTitle className="text-base font-bold">Extras Pricing</CardTitle>
+              <CardDescription>Configure standard pricing for predefined booking extras items</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="extra_bed_price">Extra Bed Price (₱)</Label>
+                  <Input 
+                    id="extra_bed_price" 
+                    type="number"
+                    value={settings.extra_bed_price || "0"} 
+                    onChange={e => handleUpdate("extra_bed_price", e.target.value)} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="extra_person_price">Extra Person Price (₱)</Label>
+                  <Input 
+                    id="extra_person_price" 
+                    type="number"
+                    value={settings.extra_person_price || "0"} 
+                    onChange={e => handleUpdate("extra_person_price", e.target.value)} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="extra_pillow_price">Extra Pillow Price (₱)</Label>
+                  <Input 
+                    id="extra_pillow_price" 
+                    type="number"
+                    value={settings.extra_pillow_price || "0"} 
+                    onChange={e => handleUpdate("extra_pillow_price", e.target.value)} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="extra_blanket_price">Extra Blanket Price (₱)</Label>
+                  <Input 
+                    id="extra_blanket_price" 
+                    type="number"
+                    value={settings.extra_blanket_price || "0"} 
+                    onChange={e => handleUpdate("extra_blanket_price", e.target.value)} 
+                  />
+                </div>
+                <div className="space-y-2  md:col-span-2">
+                  <Label htmlFor="extra_towel_price">Extra Towel Price (₱)</Label>
+                  <div className="max-w-[calc(50%-12px)]">
+                    <Input 
+                      id="extra_towel_price" 
+                      type="number"
+                      value={settings.extra_towel_price || "0"} 
+                      onChange={e => handleUpdate("extra_towel_price", e.target.value)} 
+                    />
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

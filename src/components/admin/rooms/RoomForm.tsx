@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/sonner";
+import { getErrorMessage } from "@/lib/utils";
 
 type RoomFormProps = {
   apiUrl: string;
@@ -104,6 +105,14 @@ export function RoomForm({ apiUrl, token, room, onSuccess, onClose }: RoomFormPr
       ? String((planPerGuest as any).price_12h)
       : "",
   );
+
+  // LGU Rates (Feature 2)
+  const anyRoom = room as any;
+  const [lguRateEnabled, setLguRateEnabled] = useState(Boolean(anyRoom?.lgu_rate_enabled));
+  const [lguRate24Price, setLguRate24Price] = useState(anyRoom?.lgu_rate_24h_price != null ? String(anyRoom.lgu_rate_24h_price) : "");
+  const [lguRate12Price, setLguRate12Price] = useState(anyRoom?.lgu_rate_12h_price != null ? String(anyRoom.lgu_rate_12h_price) : "");
+  const [lguRate5Price, setLguRate5Price] = useState(anyRoom?.lgu_rate_5h_price != null ? String(anyRoom.lgu_rate_5h_price) : "");
+  const [lguRate3Price, setLguRate3Price] = useState(anyRoom?.lgu_rate_3h_price != null ? String(anyRoom.lgu_rate_3h_price) : "");
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -273,6 +282,13 @@ export function RoomForm({ apiUrl, token, room, onSuccess, onClose }: RoomFormPr
         rate_3h_enabled: enable3h,
         rate_3h_price: enable3h && rate3Price ? Number(rate3Price) : null,
         rate_3h_late_checkout_fee: enable3h && rate3LateFee ? Number(rate3LateFee) : null,
+
+        // LGU Rates
+        lgu_rate_enabled: lguRateEnabled,
+        lgu_rate_24h_price: lguRateEnabled && lguRate24Price ? Number(lguRate24Price) : null,
+        lgu_rate_12h_price: lguRateEnabled && lguRate12Price ? Number(lguRate12Price) : null,
+        lgu_rate_5h_price: lguRateEnabled && lguRate5Price ? Number(lguRate5Price) : null,
+        lgu_rate_3h_price: lguRateEnabled && lguRate3Price ? Number(lguRate3Price) : null,
       };
 
       if (!isEdit) {
@@ -328,8 +344,7 @@ export function RoomForm({ apiUrl, token, room, onSuccess, onClose }: RoomFormPr
       }
 
       if (!res.ok) {
-        const err = (data as { error?: string } | undefined)?.error;
-        toast.error(err || "Failed to create room.");
+        toast.error(getErrorMessage(data) || "Failed to create room.");
         return;
       }
 
@@ -631,6 +646,75 @@ export function RoomForm({ apiUrl, token, room, onSuccess, onClose }: RoomFormPr
             </div>
           )}
         </div>
+
+        {/* LGU Pricing Override */}
+        <div className="space-y-3 rounded-md border border-[#07008A]/30 p-4 bg-[#07008A]/[0.02]">
+          <label className="flex items-center gap-2 text-sm font-semibold text-[#07008A]">
+            <input
+              type="checkbox"
+              checked={lguRateEnabled}
+              onChange={(e) => setLguRateEnabled(e.target.checked)}
+              className="rounded border-[#07008A] text-[#07008A] focus:ring-[#07008A]"
+            />
+            LGU Rates Support
+          </label>
+          <p className="text-xs text-slate-500">
+            Define specific rates applied automatically when a booking is marked as an LGU booking.
+          </p>
+          {lguRateEnabled && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
+              <div className="space-y-1">
+                <Label htmlFor="lgu-24-price">24h Rate (₱)</Label>
+                <Input
+                  id="lgu-24-price"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={lguRate24Price}
+                  onChange={(e) => setLguRate24Price(e.target.value)}
+                  placeholder={rate24Price || "0"}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="lgu-12-price">12h Rate (₱)</Label>
+                <Input
+                  id="lgu-12-price"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={lguRate12Price}
+                  onChange={(e) => setLguRate12Price(e.target.value)}
+                  placeholder={rate12Price || "0"}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="lgu-5-price">5h Rate (₱)</Label>
+                <Input
+                  id="lgu-5-price"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={lguRate5Price}
+                  onChange={(e) => setLguRate5Price(e.target.value)}
+                  placeholder={rate5Price || "0"}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="lgu-3-price">3h Rate (₱)</Label>
+                <Input
+                  id="lgu-3-price"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={lguRate3Price}
+                  onChange={(e) => setLguRate3Price(e.target.value)}
+                  placeholder={rate3Price || "0"}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
       </div>
 
       <div className="space-y-2 border-t pt-4">

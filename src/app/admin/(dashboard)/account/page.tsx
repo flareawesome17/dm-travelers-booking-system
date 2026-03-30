@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
@@ -91,7 +92,8 @@ export default function AdminAccountPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error((data as { error?: string }).error || "Failed to change password.");
+        const errMsg = getErrorMessage(data);
+        toast.error(errMsg || "Failed to change password.");
         return;
       }
       toast.success("Password updated.");

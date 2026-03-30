@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { requirePermission } from "@/lib/rbac";
 import { findNextOpenLedgerDate, manilaDateString } from "@/lib/ledgerDate";
+import { parseAndValidate, dbError, internalError } from "@/lib/api-security";
+import { createBookingSchema } from "@/lib/validation-schemas";
+import { syncReceivableForBooking } from "@/lib/receivables";
 
 export async function GET(req: NextRequest) {
   const auth = await requirePermission(req, "bookings.read");
@@ -14,14 +17,10 @@ export async function GET(req: NextRequest) {
       .select("*, guests(*), rooms(*), restaurant_orders:restaurant_orders(*)")
       .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error("GET Bookings Supabase Error:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    if (error) return dbError(error, "Failed to load bookings");
     return NextResponse.json(data ?? []);
-  } catch (err) {
-    console.error("GET Bookings Catch Error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  } catch {
+    return internalError();
   }
 }
 
@@ -29,8 +28,11 @@ export async function POST(req: NextRequest) {
   const auth = await requirePermission(req, "bookings.create");
   if ("error" in auth) return auth.error;
 
+  const parsed = await parseAndValidate(req, createBookingSchema);
+  if (parsed.success === false) return parsed.error;
+
   try {
-    const body = await req.json();
+    const body = parsed.data;
     const supabase = getSupabaseAdmin();
 
     // Create guest first if guest info is provided
@@ -41,7 +43,7 @@ export async function POST(req: NextRequest) {
         .insert(body.guest)
         .select()
         .single();
-      if (guestError) return NextResponse.json({ error: guestError.message }, { status: 400 });
+      if (guestError) return dbError(guestError, "Failed to create guest record");
       guestId = guest.id;
     }
 
@@ -56,18 +58,25 @@ export async function POST(req: NextRequest) {
           : "Pending Payment";
 
     const bookingData = {
-      ...body,
       guest_id: guestId,
+      room_id: body.room_id,
       reference_number: body.reference_number || `REF-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
       total_amount: totalAmount,
       deposit_paid: depositPaid,
       balance_due: computedBalance,
       status: computedStatus,
       room_type_requested: body.room_type_requested || "Standard",
+      check_in_date: body.check_in_date,
+      check_out_date: body.check_out_date,
+      num_adults: body.num_adults,
+      num_children: body.num_children,
+      special_requests: body.special_requests,
+      rate_plan_kind: body.rate_plan_kind,
+      // Enterprise features
+      is_lgu_booking: body.is_lgu_booking ?? false,
+      is_special_booking: body.is_special_booking ?? false,
+      special_booking_label: body.is_special_booking ? (body.special_booking_label || null) : null,
     };
-    delete bookingData.guest;
-    const depositMethodRaw = typeof body.deposit_method === "string" ? body.deposit_method : null;
-    delete bookingData.deposit_method;
 
     const { data, error } = await supabase
       .from("bookings")
@@ -75,13 +84,39 @@ export async function POST(req: NextRequest) {
       .select("*, guests(*), rooms(*)")
       .single();
 
-    if (error) {
-      console.error("Booking creation error:", error);
-      return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return dbError(error, "Failed to create booking");
+
+    // Auto-create receivable for LGU or special bookings
+    if (data?.id && (body.is_lgu_booking || body.is_special_booking)) {
+      try {
+        await syncReceivableForBooking(supabase, {
+          id: data.id,
+          balance_due: computedBalance,
+          is_lgu_booking: body.is_lgu_booking,
+          is_special_booking: body.is_special_booking,
+          special_booking_label: body.special_booking_label,
+        });
+      } catch (recError) {
+        console.error("[RECEIVABLE_CREATE_ERROR]", recError);
+      }
+    }
+
+    // Insert Bookings Extras if included
+    if (data?.id && body.extras && body.extras.length > 0) {
+      const extrasToInsert = body.extras.map((extra: any) => ({
+        booking_id: data.id,
+        extra_type: extra.extra_type,
+        quantity: extra.quantity,
+        unit_price: extra.unit_price,
+        total_price: extra.quantity * extra.unit_price,
+      }));
+      
+      const { error: extrasError } = await supabase.from("booking_extras").insert(extrasToInsert);
+      if (extrasError) console.error("[EXTRAS_CREATE_ERROR]", extrasError);
     }
 
     if (depositPaid > 0 && data?.id) {
-      const method = depositMethodRaw && ["Cash", "GCash", "Card", "Stripe", "PayPal"].includes(depositMethodRaw) ? depositMethodRaw : "Cash";
+      const method = body.deposit_method && ["Cash", "GCash", "Card", "Stripe", "PayPal"].includes(body.deposit_method) ? body.deposit_method : "Cash";
       const today = manilaDateString();
       const accountingDate = await findNextOpenLedgerDate(supabase, today);
       const transactionId = `DEP-${Date.now()}-${Math.floor(Math.random() * 1000)}-${String(data.reference_number || "REF").replace(/[^A-Z0-9_-]/gi, "")}`;
@@ -96,13 +131,13 @@ export async function POST(req: NextRequest) {
         accounting_date: accountingDate,
       });
       if (pErr) {
-        console.error("Deposit payment insert error:", pErr);
+        console.error("[DEPOSIT_ERROR]", pErr);
       }
     }
 
     return NextResponse.json(data, { status: 201 });
   } catch (err) {
-    console.error("Internal Server Error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("[BOOKING_ERROR]", err);
+    return internalError();
   }
 }

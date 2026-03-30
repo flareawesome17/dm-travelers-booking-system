@@ -2,9 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { signAdminToken } from "@/lib/auth";
 import crypto from "crypto";
+import {
+  parseAndValidate,
+  checkRateLimit,
+  rateLimitResponse,
+  timingSafeCompare,
+  apiError,
+  internalError,
+  requireEnvSecret,
+} from "@/lib/api-security";
+import { verifyOtpSchema } from "@/lib/validation-schemas";
 
 function hashOtp(args: { otpId: string; adminId: string; otp: string }) {
-  const secret = process.env.ADMIN_LOGIN_OTP_SECRET || process.env.LEDGER_OTP_SECRET || process.env.JWT_SECRET || "changeme";
+  const secret = process.env.ADMIN_LOGIN_OTP_SECRET || requireEnvSecret("JWT_SECRET");
   return crypto
     .createHash("sha256")
     .update(`${secret}:${args.otpId}:${args.adminId}:${args.otp}`)
@@ -12,17 +22,19 @@ function hashOtp(args: { otpId: string; adminId: string; otp: string }) {
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json().catch(() => ({}));
-    const otpId = typeof body.otp_id === "string" ? body.otp_id : "";
-    const otp = typeof body.otp === "string" ? body.otp.trim().toUpperCase() : "";
-    const email = typeof body.email === "string" ? body.email.toLowerCase().trim() : "";
+  // Rate limit: 10 OTP verification attempts per IP per 15 minutes
+  const rl = checkRateLimit(req, {
+    key: "otp_verify",
+    maxRequests: 10,
+    windowMs: 15 * 60 * 1000,
+  });
+  if (!rl.allowed) return rateLimitResponse(rl.resetAt);
 
-    if (!otpId || !/^[0-9a-fA-F-]{36}$/.test(otpId)) {
-      return NextResponse.json({ error: "Invalid OTP request." }, { status: 400 });
-    }
-    if (!email) return NextResponse.json({ error: "Email is required." }, { status: 400 });
-    if (!/^[A-Z0-9]{6}$/.test(otp)) return NextResponse.json({ error: "OTP must be 6 characters." }, { status: 400 });
+  const parsed = await parseAndValidate(req, verifyOtpSchema);
+  if (parsed.success === false) return parsed.error;
+
+  try {
+    const { otp_id: otpId, otp, email } = parsed.data;
 
     const supabase = getSupabaseAdmin();
 
@@ -32,7 +44,7 @@ export async function POST(req: NextRequest) {
       .eq("email", email)
       .eq("is_active", true)
       .single();
-    if (uErr || !user) return NextResponse.json({ error: "Invalid OTP." }, { status: 401 });
+    if (uErr || !user) return apiError("invalid_otp", "Invalid OTP.", 401);
 
     const { data: otpRow, error: oErr } = await supabase
       .from("admin_login_otps")
@@ -40,21 +52,23 @@ export async function POST(req: NextRequest) {
       .eq("id", otpId)
       .eq("admin_id", user.id)
       .maybeSingle();
-    if (oErr) return NextResponse.json({ error: oErr.message }, { status: 500 });
-    if (!otpRow) return NextResponse.json({ error: "Invalid OTP." }, { status: 401 });
-    if (otpRow.used_at) return NextResponse.json({ error: "OTP already used. Please login again." }, { status: 400 });
-    if (otpRow.attempts >= 5) return NextResponse.json({ error: "Too many attempts. Please login again." }, { status: 400 });
+    if (oErr) return internalError();
+    if (!otpRow) return apiError("invalid_otp", "Invalid OTP.", 401);
+    if (otpRow.used_at) return apiError("otp_used", "OTP already used. Please login again.", 400);
+    if (otpRow.attempts >= 5) return apiError("too_many_attempts", "Too many attempts. Please login again.", 400);
     if (new Date(otpRow.expires_at).getTime() <= Date.now()) {
-      return NextResponse.json({ error: "OTP expired. Please login again." }, { status: 400 });
+      return apiError("otp_expired", "OTP expired. Please login again.", 400);
     }
 
     const expectedHash = hashOtp({ otpId: otpRow.id, adminId: user.id, otp });
-    if (expectedHash !== otpRow.otp_hash) {
+
+    // Use timing-safe comparison to prevent timing attacks
+    if (!timingSafeCompare(expectedHash, otpRow.otp_hash)) {
       await supabase
         .from("admin_login_otps")
         .update({ attempts: Number(otpRow.attempts || 0) + 1, updated_at: new Date().toISOString() })
         .eq("id", otpRow.id);
-      return NextResponse.json({ error: "Invalid OTP." }, { status: 401 });
+      return apiError("invalid_otp", "Invalid OTP.", 401);
     }
 
     const usedAt = new Date().toISOString();
@@ -62,12 +76,11 @@ export async function POST(req: NextRequest) {
       .from("admin_login_otps")
       .update({ used_at: usedAt, updated_at: usedAt })
       .eq("id", otpRow.id);
-    if (useErr) return NextResponse.json({ error: useErr.message }, { status: 500 });
+    if (useErr) return internalError();
 
     const token = signAdminToken({ sub: user.id, name: user.name ?? null, email: user.email, role_id: user.role_id });
     return NextResponse.json({ token, user: { id: user.id, name: user.name ?? null, email: user.email, role_id: user.role_id } });
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return internalError();
   }
 }
-

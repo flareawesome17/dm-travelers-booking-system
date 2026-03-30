@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendMail } from "@/lib/mailer";
 import crypto from "crypto";
+import { checkRateLimit, rateLimitResponse, apiError, internalError } from "@/lib/api-security";
 
 function isYmd(s: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(s);
@@ -38,6 +39,14 @@ async function cancelExpiredPendingVerifications(supabase: ReturnType<typeof get
 }
 
 export async function POST(req: NextRequest) {
+  // Rate limit: 3 public booking attempts per IP per 10 minutes
+  const rl = checkRateLimit(req, {
+    key: "public_booking",
+    maxRequests: 3,
+    windowMs: 10 * 60 * 1000,
+  });
+  if (!rl.allowed) return rateLimitResponse(rl.resetAt);
+
   try {
     const body = await req.json().catch(() => ({}));
     const fullName = typeof body.full_name === "string" ? body.full_name.trim() : "";
@@ -219,7 +228,8 @@ export async function POST(req: NextRequest) {
       email,
       expires_at: expiresAt,
     });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Internal server error" }, { status: 500 });
+  } catch (e) {
+    console.error("[PUBLIC_BOOKING_ERROR]", e);
+    return internalError();
   }
 }

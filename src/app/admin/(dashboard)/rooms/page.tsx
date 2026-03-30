@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { EmptyState } from "@/components/ui/empty-state";
 import { RoomForm } from "@/components/admin/rooms/RoomForm";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -105,12 +106,12 @@ export default function AdminRoomsPage() {
 
   return (
     <>
-      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <h1 className="text-2xl lg:text-3xl font-bold text-[#07008A] tracking-tight">Rooms</h1>
-        <p className="text-muted-foreground mt-1">Room inventory and pricing</p>
+        <p className="text-muted-foreground mt-1 text-sm">Room inventory and pricing</p>
       </motion.div>
-      <Card className="border-0 shadow-lg bg-white/95 backdrop-blur-sm overflow-hidden">
-        <CardHeader className="border-b bg-slate-50/50 px-6 py-4">
+      <Card className="border border-slate-200/80 shadow-xs bg-white overflow-hidden">
+        <CardHeader className="border-b border-slate-100 bg-slate-50/40 px-5 py-4">
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-4">
               <CardTitle className="text-lg font-semibold text-[#07008A] flex items-center gap-2">
@@ -124,7 +125,7 @@ export default function AdminRoomsPage() {
                 <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={() => { setEditingRoom(null); setOpen(true); }}>
                   <Plus className="h-4 w-4 mr-1" /> Add room
                 </Button>
-                <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="admin-modal-responsive [--admin-modal-width:76rem] max-h-[92vh] overflow-y-auto modal-scrollbar p-5 sm:p-6">
                   <DialogHeader><DialogTitle>{editingRoom ? "Edit room" : "Add new room"}</DialogTitle></DialogHeader>
                   <RoomForm apiUrl="" token={adminToken || ""} room={editingRoom ?? undefined}
                     onSuccess={(room) => { setRooms((prev) => { if (!room || typeof room !== "object") return prev; const u = room as RoomRow; if (!u.id) return prev; const idx = prev.findIndex((r) => r.id === u.id); if (idx === -1) return [...prev, u]; const n = [...prev]; n[idx] = u; return n; }); }}
@@ -210,18 +211,42 @@ export default function AdminRoomsPage() {
           {loading ? (
             <div className="p-6 space-y-4">{[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="responsive-table-wrapper">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b bg-slate-50/80">
+                  <tr className="border-b border-slate-100 bg-slate-50/30">
                     {["Room #", "Type", "Floor", "Capacity", "Rates", "Status", "Price/night", "24h fees", "Amenities", "Media", "Updated", "Actions"].map((h) => (
-                      <th key={h} className={`${h === "Actions" ? "text-right pr-6" : "text-left"} py-3 px-4 text-[11px] font-semibold text-slate-600 uppercase tracking-wider ${h === "Room #" || h === "Type" ? "pl-6" : ""}`}>{h}</th>
+                      <th key={h} className={`${h === "Actions" ? "text-right pr-6" : "text-left"} py-3 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider ${h === "Room #" || h === "Type" ? "pl-6" : ""}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredRooms.map((r) => (
-                    <tr key={r.id} className="border-b last:border-0 hover:bg-slate-50/70 transition-colors">
+                  {filteredRooms.length === 0 ? (
+                    <tr>
+                      <td colSpan={12} className="py-12 bg-white">
+                        <EmptyState 
+                          icon={BedDouble} 
+                          title="No rooms found" 
+                          description={
+                            query || statusFilter !== "all" || typeFilter !== "all" || floorFilter !== "all" || !activeOnly 
+                              ? "We couldn't find any rooms matching your current filters." 
+                              : "Your inventory is currently empty. Add a new room to get started."} 
+                          action={
+                            query || statusFilter !== "all" || typeFilter !== "all" || floorFilter !== "all" || !activeOnly ? (
+                              <Button type="button" variant="outline" onClick={clearFilters}><FilterX className="h-4 w-4 mr-2" /> Reset Filters</Button>
+                            ) : (
+                              <Button type="button" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-6" onClick={() => { setEditingRoom(null); setOpen(true); }}>
+                                <Plus className="h-4 w-4 mr-1" /> Add room
+                              </Button>
+                            )
+                          } 
+                          borderless 
+                        />
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRooms.map((r) => (
+                      <tr key={r.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
                       <td className="py-4 px-6 font-mono font-medium text-[#07008A]">{r.room_number ?? "—"}</td>
                       <td className="py-4 px-6"><span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">{r.room_type ?? "—"}</span></td>
                       <td className="py-4 px-4 text-xs text-slate-700">{r.floor ?? "—"}</td>
@@ -250,7 +275,8 @@ export default function AdminRoomsPage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  ))
+                  )}
                 </tbody>
               </table>
             </div>

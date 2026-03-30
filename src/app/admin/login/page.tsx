@@ -9,7 +9,7 @@ import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { cn, getErrorMessage } from "@/lib/utils";
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
@@ -56,7 +56,7 @@ export default function AdminLoginPage() {
         // Non-JSON response
       }
       if (!res.ok) {
-        toast.error(data.error || "Invalid email or password");
+        toast.error(getErrorMessage(data) || "Invalid email or password");
         return;
       }
       if (data.requires_otp && data.otp_id) {
@@ -87,7 +87,7 @@ export default function AdminLoginPage() {
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error((payload as { error?: string }).error || "Invalid OTP.");
+        toast.error(getErrorMessage(payload) || "Invalid OTP.");
         return;
       }
       const token = (payload as { token?: string }).token;

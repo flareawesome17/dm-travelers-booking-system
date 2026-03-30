@@ -11,7 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "@/components/ui/sonner";
+import { getErrorMessage } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 
@@ -73,7 +75,8 @@ export default function AdminUsersPage() {
         body: JSON.stringify({ name: name.trim(), email: email.trim(), password, role_id: Number(roleId) || 3, is_active: isActive }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { toast.error((data as { error?: string }).error || "Failed to create admin user."); return; }
+      const errMsg = getErrorMessage(data);
+      if (!res.ok) { toast.error(errMsg || "Failed to create admin user."); return; }
       setUsers((prev) => { const c = data as AdminUser; if (!c.id) return prev; return [c, ...prev]; });
       toast.success("Admin user created.");
       setOpen(false); setName(""); setEmail(""); setPassword(""); setRoleId("3"); setIsActive(true); setShowPassword(false);
@@ -111,7 +114,8 @@ export default function AdminUsersPage() {
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { toast.error((data as { error?: string }).error || "Failed to update admin user."); return; }
+      const errMsg = getErrorMessage(data);
+      if (!res.ok) { toast.error(errMsg || "Failed to update admin user."); return; }
       setUsers((prev) => prev.map(u => u.id === editingUser.id ? { ...u, ...data } : u));
       toast.success("Admin user updated.");
       setEditOpen(false);
@@ -127,7 +131,8 @@ export default function AdminUsersPage() {
       const res = await fetch(`/api/admin/users/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        toast.error((data as { error?: string }).error || "Failed to delete user."); return;
+        const errMsg = getErrorMessage(data);
+        toast.error(errMsg || "Failed to delete user."); return;
       }
       setUsers((prev) => prev.filter(u => u.id !== id));
       toast.success("Admin user deleted.");
@@ -147,12 +152,12 @@ export default function AdminUsersPage() {
 
   return (
     <>
-      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <h1 className="text-2xl lg:text-3xl font-bold text-[#07008A] tracking-tight">Admin Users</h1>
-        <p className="text-muted-foreground mt-1">Manage admin accounts and roles</p>
+        <p className="text-muted-foreground mt-1 text-sm">Manage admin accounts and roles</p>
       </motion.div>
-      <Card className="border-0 shadow-lg bg-white overflow-hidden">
-        <CardHeader className="border-b bg-slate-50/50 px-6 py-4 flex items-center justify-between">
+      <Card className="border border-slate-200/80 shadow-xs bg-white overflow-hidden">
+        <CardHeader className="border-b border-slate-100 bg-slate-50/40 px-5 py-4 flex items-center justify-between">
           <CardTitle className="text-lg font-semibold text-[#07008A] flex items-center gap-2"><UsersIcon className="h-5 w-5" /> All Users</CardTitle>
           <Dialog open={open} onOpenChange={setOpen}>
             <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1" /> Add user</Button>
@@ -202,9 +207,33 @@ export default function AdminUsersPage() {
           </div>
           {loading ? <div className="p-6 space-y-4">{[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}</div> : (
             <>
-              <div className="overflow-x-auto">
-                <table className="w-full"><thead><tr className="border-b bg-slate-50/80"><th className="text-left py-3 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Name</th><th className="text-left py-3 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Email</th><th className="text-left py-3 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Role</th><th className="text-left py-3 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Active</th><th className="text-right py-3 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Actions</th></tr></thead>
-                  <tbody>{paginatedUsers.map((u) => <tr key={u.id} className="border-b last:border-0 hover:bg-slate-50/50 transition-colors"><td className="py-4 px-6 font-medium text-slate-800">{u.name ?? "—"}</td><td className="py-4 px-6 font-medium text-[#07008A]">{u.email ?? "—"}</td><td className="py-4 px-6 text-sm text-slate-600">{u.role_id != null ? ROLE_LABELS[u.role_id] ?? u.role_id : "—"}</td><td className="py-4 px-6"><Badge variant={u.is_active ? "default" : "secondary"}>{u.is_active ? "Yes" : "No"}</Badge></td><td className="py-4 px-6 text-right"><div className="flex items-center justify-end gap-2"><TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-[#07008A]" onClick={() => openEditModal(u)}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Edit user</p></TooltipContent></Tooltip><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-red-600" onClick={() => handleDelete(u.id)} disabled={deletingId === u.id}>{deletingId === u.id ? <Skeleton className="h-4 w-4 rounded-full" /> : <Trash2 className="h-4 w-4" />}</Button></TooltipTrigger><TooltipContent><p>Delete user</p></TooltipContent></Tooltip></TooltipProvider></div></td></tr>)}</tbody>
+              <div className="responsive-table-wrapper">
+                <table className="w-full"><thead><tr className="border-b border-slate-100 bg-slate-50/30"><th className="text-left py-3 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Name</th><th className="text-left py-3 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Email</th><th className="text-left py-3 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Role</th><th className="text-left py-3 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active</th><th className="text-right py-3 px-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Actions</th></tr></thead>
+                  <tbody>
+                    {paginatedUsers.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-12 bg-white">
+                          <EmptyState 
+                            icon={UsersIcon} 
+                            title="No admin users found" 
+                            description={search || statusFilter !== "all" ? "We couldn't find any staff members matching your current filters." : "Your staff list is currently empty."}
+                            action={
+                              search || statusFilter !== "all" ? (
+                                <Button variant="outline" onClick={() => { setSearch(""); setStatusFilter("all"); setCurrentPage(1); }}>Reset Filters</Button>
+                              ) : (
+                                <Button className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={() => setOpen(true)}>
+                                  <Plus className="h-4 w-4 mr-1" /> Add user
+                                </Button>
+                              )
+                            }
+                            borderless
+                          />
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedUsers.map((u) => <tr key={u.id} className="border-b last:border-0 hover:bg-slate-50/50 transition-colors"><td className="py-4 px-6 font-medium text-slate-800">{u.name ?? "—"}</td><td className="py-4 px-6 font-medium text-[#07008A]">{u.email ?? "—"}</td><td className="py-4 px-6 text-sm text-slate-600">{u.role_id != null ? ROLE_LABELS[u.role_id] ?? u.role_id : "—"}</td><td className="py-4 px-6"><Badge variant={u.is_active ? "default" : "secondary"}>{u.is_active ? "Yes" : "No"}</Badge></td><td className="py-4 px-6 text-right"><div className="flex items-center justify-end gap-2"><TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-[#07008A]" onClick={() => openEditModal(u)}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Edit user</p></TooltipContent></Tooltip><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-red-600" onClick={() => handleDelete(u.id)} disabled={deletingId === u.id}>{deletingId === u.id ? <Skeleton className="h-4 w-4 rounded-full" /> : <Trash2 className="h-4 w-4" />}</Button></TooltipTrigger><TooltipContent><p>Delete user</p></TooltipContent></Tooltip></TooltipProvider></div></td></tr>)
+                    )}
+                  </tbody>
                 </table>
               </div>
               {totalPages > 1 && (

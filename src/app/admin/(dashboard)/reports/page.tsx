@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type ReportData = {
   total_revenue: number;
@@ -124,7 +125,7 @@ export default function AdminReportsPage() {
   const COLORS = ["#07008A", "#3b82f6", "#10b981", "#f59e0b"];
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 tablet:space-y-8 pb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
           <h1 className="text-2xl lg:text-3xl font-bold text-[#07008A] tracking-tight">Financial Reports</h1>
@@ -155,7 +156,7 @@ export default function AdminReportsPage() {
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-              <Card className="border-0 shadow-sm bg-white overflow-hidden group">
+              <Card className="border border-slate-100 shadow-xs bg-white overflow-hidden group hover:shadow-elevation-2 transition-all">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-2 rounded-lg bg-[#07008A]/10 text-[#07008A] group-hover:scale-110 transition-transform"><TrendingUp className="h-5 w-5" /></div>
@@ -171,7 +172,7 @@ export default function AdminReportsPage() {
             </motion.div>
 
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-              <Card className="border-0 shadow-sm bg-white overflow-hidden group">
+              <Card className="border border-slate-100 shadow-xs bg-white overflow-hidden group hover:shadow-elevation-2 transition-all">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-2 rounded-lg bg-red-50 text-red-600 group-hover:scale-110 transition-transform"><TrendingDown className="h-5 w-5" /></div>
@@ -187,7 +188,7 @@ export default function AdminReportsPage() {
             </motion.div>
 
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-              <Card className="border-0 shadow-sm bg-[#07008A] text-white overflow-hidden group">
+              <Card className="border-0 shadow-md bg-[#07008A] text-white overflow-hidden group hover:shadow-lg transition-all">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-2 rounded-lg bg-white/20 text-white group-hover:scale-110 transition-transform"><Wallet className="h-5 w-5" /></div>
@@ -205,8 +206,8 @@ export default function AdminReportsPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Main Comparison Chart */}
-            <Card className="border-0 shadow-sm bg-white overflow-hidden">
-              <CardHeader className="border-b bg-slate-50/30">
+            <Card className="border border-slate-100 shadow-xs bg-white overflow-hidden">
+              <CardHeader className="border-b border-slate-100 bg-slate-50/40 py-4 px-5">
                 <CardTitle className="text-base font-bold flex items-center gap-2">
                   <BarChart3 className="h-4 w-4 text-[#07008A]" />
                   Financial Overview
@@ -233,8 +234,8 @@ export default function AdminReportsPage() {
             </Card>
 
             {/* Revenue by Source */}
-            <Card className="border-0 shadow-sm bg-white overflow-hidden">
-              <CardHeader className="border-b bg-slate-50/30">
+            <Card className="border border-slate-100 shadow-xs bg-white overflow-hidden">
+              <CardHeader className="border-b border-slate-100 bg-slate-50/40 py-4 px-5">
                 <CardTitle className="text-base font-bold flex items-center gap-2">
                   <PieChart className="h-4 w-4 text-[#07008A]" />
                   Revenue by Source
@@ -267,8 +268,8 @@ export default function AdminReportsPage() {
           </div>
 
           {/* Expense Management */}
-          <Card className="border-0 shadow-sm bg-white overflow-hidden">
-            <CardHeader className="border-b bg-slate-50/30 flex flex-row items-center justify-between">
+          <Card className="border border-slate-100 shadow-xs bg-white overflow-hidden">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/40 py-4 px-5 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base font-bold">Recent Expenses</CardTitle>
                 <CardDescription className="text-xs">Manage your operational costs</CardDescription>
@@ -333,9 +334,23 @@ export default function AdminReportsPage() {
                       <th className="py-3 px-6 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider">Amount</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
+                  <tbody className="divide-y divide-slate-50">
                     {!data.expenses_list || data.expenses_list.length === 0 ? (
-                      <tr><td colSpan={4} className="py-12 text-center text-slate-400 text-xs italic">No expenses recorded for this period.</td></tr>
+                      <tr>
+                        <td colSpan={4} className="py-12 bg-white">
+                          <EmptyState 
+                            icon={Banknote} 
+                            title="No expenses recorded" 
+                            description="There are no operational costs recorded for this period." 
+                            action={
+                              <Button className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={() => setIsAddExpenseOpen(true)}>
+                                <Plus className="mr-1 h-4 w-4"/> Add Expense
+                              </Button>
+                            } 
+                            borderless 
+                          />
+                        </td>
+                      </tr>
                     ) : (
                       data.expenses_list.map((exp: any) => (
                         <tr key={exp.id} className="hover:bg-slate-50/50 transition-colors">

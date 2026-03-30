@@ -3,6 +3,15 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import bcrypt from "bcryptjs";
 import { sendMail } from "@/lib/mailer";
 import crypto from "crypto";
+import {
+  parseAndValidate,
+  checkRateLimit,
+  rateLimitResponse,
+  apiError,
+  internalError,
+  requireEnvSecret,
+} from "@/lib/api-security";
+import { loginSchema } from "@/lib/validation-schemas";
 
 function randomOtp(): string {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -13,7 +22,7 @@ function randomOtp(): string {
 }
 
 function hashOtp(args: { otpId: string; adminId: string; otp: string }) {
-  const secret = process.env.ADMIN_LOGIN_OTP_SECRET || process.env.LEDGER_OTP_SECRET || process.env.JWT_SECRET || "changeme";
+  const secret = process.env.ADMIN_LOGIN_OTP_SECRET || requireEnvSecret("JWT_SECRET");
   return crypto
     .createHash("sha256")
     .update(`${secret}:${args.otpId}:${args.adminId}:${args.otp}`)
@@ -21,28 +30,35 @@ function hashOtp(args: { otpId: string; adminId: string; otp: string }) {
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const { email, password } = await req.json();
+  // Rate limit: 5 login attempts per IP per 15 minutes
+  const rl = checkRateLimit(req, {
+    key: "admin_login",
+    maxRequests: 5,
+    windowMs: 15 * 60 * 1000,
+  });
+  if (!rl.allowed) return rateLimitResponse(rl.resetAt);
 
-    if (!email || !password) {
-      return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
-    }
+  const parsed = await parseAndValidate(req, loginSchema);
+  if (parsed.success === false) return parsed.error;
+
+  try {
+    const { email, password } = parsed.data;
 
     const supabase = getSupabaseAdmin();
     const { data: user, error } = await supabase
       .from("admin_users")
       .select("*")
-      .eq("email", email.toLowerCase().trim())
+      .eq("email", email)
       .eq("is_active", true)
       .single();
 
     if (error || !user) {
-      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+      return apiError("invalid_credentials", "Invalid email or password", 401);
     }
 
     const passwordMatch = await bcrypt.compare(password, user.password_hash);
     if (!passwordMatch) {
-      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+      return apiError("invalid_credentials", "Invalid email or password", 401);
     }
 
     const otp = randomOtp();
@@ -53,14 +69,14 @@ export async function POST(req: NextRequest) {
       .insert({ admin_id: user.id, otp_hash: "pending", expires_at: expiresAt, attempts: 0 })
       .select("id")
       .single();
-    if (otpErr || !otpRow) return NextResponse.json({ error: "Failed to start OTP login." }, { status: 500 });
+    if (otpErr || !otpRow) return internalError();
 
     const otpHash = hashOtp({ otpId: otpRow.id, adminId: user.id, otp });
     const { error: upErr } = await supabase
       .from("admin_login_otps")
       .update({ otp_hash: otpHash, updated_at: new Date().toISOString() })
       .eq("id", otpRow.id);
-    if (upErr) return NextResponse.json({ error: "Failed to start OTP login." }, { status: 500 });
+    if (upErr) return internalError();
 
     await sendMail({
       to: user.email,
@@ -76,6 +92,6 @@ export async function POST(req: NextRequest) {
       expires_at: expiresAt,
     });
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return internalError();
   }
 }

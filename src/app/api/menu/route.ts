@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { verifyAdminToken } from "@/lib/auth";
+import { parseAndValidate, dbError, internalError } from "@/lib/api-security";
+import { createMenuItemSchema } from "@/lib/validation-schemas";
 
 export async function GET(req: NextRequest) {
   const auth = verifyAdminToken(req);
@@ -8,19 +10,22 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase.from("restaurant_menu").select("*").order("name");
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return dbError(error, "Failed to load menu");
     return NextResponse.json(data ?? []);
-  } catch { return NextResponse.json({ error: "Internal server error" }, { status: 500 }); }
+  } catch { return internalError(); }
 }
 
 export async function POST(req: NextRequest) {
   const auth = verifyAdminToken(req);
   if ("error" in auth) return auth.error;
+
+  const parsed = await parseAndValidate(req, createMenuItemSchema);
+  if (parsed.success === false) return parsed.error;
+
   try {
-    const body = await req.json();
     const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase.from("restaurant_menu").insert(body).select().single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    const { data, error } = await supabase.from("restaurant_menu").insert(parsed.data).select().single();
+    if (error) return dbError(error, "Failed to create menu item");
     return NextResponse.json(data, { status: 201 });
-  } catch { return NextResponse.json({ error: "Internal server error" }, { status: 500 }); }
+  } catch { return internalError(); }
 }

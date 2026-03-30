@@ -1,9 +1,12 @@
 import { useState } from "react";
+import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/sonner";
+import { getErrorMessage } from "@/lib/utils";
+import { getBookingChargeBreakdown } from "@/lib/bookingTotals";
 
 type BookingRow = {
   id: string;
@@ -14,6 +17,11 @@ type BookingRow = {
   deposit_paid?: number;
   total_amount?: number;
   balance_due?: number;
+  restaurant_charges_total?: number;
+  extras_total?: number;
+  extensions_total?: number;
+  early_checkin_fee_applied?: number;
+  late_checkout_fee_applied?: number;
   is_lgu_booking?: boolean;
 };
 
@@ -44,9 +52,9 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
   const [isLguBooking, setIsLguBooking] = useState(booking.is_lgu_booking ?? false);
   const [submitting, setSubmitting] = useState(false);
 
-  const totalAmount = Number(booking.total_amount ?? 0);
+  const { grandTotal } = getBookingChargeBreakdown(booking);
   const deposit = Number(depositPaid) || 0;
-  const balanceDue = Math.max(0, totalAmount - deposit);
+  const balanceDue = Math.max(0, grandTotal - deposit);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,11 +88,30 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error((data as { error?: string }).error || "Failed to update booking.");
+        toast.error(getErrorMessage(data) || "Failed to update booking.");
         return;
       }
 
-      toast.success("Booking updated.");
+      const receivableSync = (data as { receivable_sync?: { action?: string } }).receivable_sync;
+      const createdOrSyncedReceivable =
+        isLguBooking &&
+        receivableSync &&
+        receivableSync.action !== "none" &&
+        receivableSync.action !== "deleted" &&
+        receivableSync.action !== "archived";
+
+      if (createdOrSyncedReceivable) {
+        toast.success(
+          <span>
+            Receivable created.{" "}
+            <Link href="/admin/receivables" className="font-semibold text-[#07008A] underline underline-offset-2">
+              View in Ledger -&gt;
+            </Link>
+          </span>,
+        );
+      } else {
+        toast.success("Booking updated.");
+      }
       onSuccess(data);
       onClose();
     } catch {
@@ -146,7 +173,7 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
         />
       </div>
       <div className="space-y-2">
-        <Label>Deposit paid (₱)</Label>
+        <Label>Deposit paid (PHP)</Label>
         <Input
           type="number"
           min={0}
@@ -155,7 +182,7 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
           onChange={(e) => setDepositPaid(e.target.value)}
         />
         <p className="text-xs text-slate-500">
-          Total ₱{totalAmount.toFixed(0)} — Balance due ₱{balanceDue.toFixed(0)}
+          Total PHP {grandTotal.toFixed(0)} - Balance due PHP {balanceDue.toFixed(0)}
         </p>
       </div>
       <DialogFooter className="pt-4">

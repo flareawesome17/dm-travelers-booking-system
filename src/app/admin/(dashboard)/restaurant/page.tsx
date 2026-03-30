@@ -24,14 +24,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
+import { getErrorMessage } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RestaurantOrderForm } from "@/components/admin/restaurant/RestaurantOrderForm";
 import { RestaurantReceiptModal } from "@/components/admin/restaurant/RestaurantReceiptModal";
 import { ChevronLeft, ChevronRight, Search, Receipt } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 
-type MenuItem = { id: string; name?: string; description?: string | null; category?: string | null; price?: number | null; is_available?: boolean | null; image_url?: string | null };
+type MenuItem = { id: string; name?: string; description?: string | null; category?: string | null; price?: number | null; is_available?: boolean | null; image_url?: string | null; lgu_markup_percentage?: number | null };
 type RestaurantCategory = { id: string; name: string; sort_order?: number | null };
-type BookingOption = { id: string; reference_number?: string; check_in_date?: string; check_out_date?: string; status?: string; guests?: { full_name?: string | null }; rooms?: { room_number?: string | null } };
+type BookingOption = { id: string; reference_number?: string; check_in_date?: string; check_out_date?: string; status?: string; is_lgu_booking?: boolean; guests?: { full_name?: string | null }; rooms?: { room_number?: string | null } };
 type RestaurantOrder = { id: string; booking_id?: string | null; room_id?: string | null; order_source?: string | null; customer_name?: string | null; payment_method?: string | null; status?: string | null; subtotal?: number | null; service_charge?: number | null; total_amount?: number | null; created_at?: string | null; notes?: string | null };
 
 export default function AdminRestaurantPage() {
@@ -54,6 +56,7 @@ export default function AdminRestaurantPage() {
   const [category, setCategory] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
+  const [lguMarkup, setLguMarkup] = useState("");
   const [isAvailable, setIsAvailable] = useState(true);
   const [saving, setSaving] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -108,9 +111,9 @@ export default function AdminRestaurantPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
-  const resetForm = () => { setName(""); setCategory(categories[0]?.name ?? ""); setPrice(""); setDescription(""); setIsAvailable(true); setEditingItem(null); setImageFile(null); setImagePreview(null); };
+  const resetForm = () => { setName(""); setCategory(categories[0]?.name ?? ""); setPrice(""); setDescription(""); setLguMarkup(""); setIsAvailable(true); setEditingItem(null); setImageFile(null); setImagePreview(null); };
   const openForCreate = () => { resetForm(); setOpen(true); };
-  const openForEdit = (item: MenuItem) => { setEditingItem(item); setName(item.name ?? ""); setCategory(item.category ?? categories[0]?.name ?? ""); setPrice(item.price != null ? String(item.price) : ""); setDescription(item.description ?? ""); setIsAvailable(item.is_available ?? true); setImageFile(null); setImagePreview(item.image_url ?? null); setOpen(true); };
+  const openForEdit = (item: MenuItem) => { setEditingItem(item); setName(item.name ?? ""); setCategory(item.category ?? categories[0]?.name ?? ""); setPrice(item.price != null ? String(item.price) : ""); setDescription(item.description ?? ""); setLguMarkup(item.lgu_markup_percentage != null ? String(item.lgu_markup_percentage) : ""); setIsAvailable(item.is_available ?? true); setImageFile(null); setImagePreview(item.image_url ?? null); setOpen(true); };
 
   const updateOrderStatus = async (orderId: string, updates: Partial<RestaurantOrder>) => {
     const token = localStorage.getItem("admin_token");
@@ -123,7 +126,8 @@ export default function AdminRestaurantPage() {
       });
       if (!res.ok) {
         const d = await res.json();
-        toast.error(d.error || "Failed to update order.");
+        const errMsg = getErrorMessage(d);
+        toast.error(errMsg || "Failed to update order.");
         return;
       }
       toast.success("Order updated.");
@@ -168,13 +172,19 @@ export default function AdminRestaurantPage() {
       if (imageFile) {
         const filePayload = await new Promise<{ name: string; type: string; data: string }>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve({ name: imageFile.name, type: imageFile.type || "image/jpeg", data: String(reader.result ?? "") }); reader.onerror = () => reject(new Error("Failed to read file")); reader.readAsDataURL(imageFile); });
         const uploadRes = await fetch("/api/menu/upload-image", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ file: filePayload }) });
-        const uploadData = (await uploadRes.json().catch(() => ({}))) as { url?: string; error?: string };
-        if (!uploadRes.ok || !uploadData.url) { toast.error(uploadData.error || "Failed to upload image."); setSaving(false); return; }
+        const uploadData = (await uploadRes.json().catch(() => ({}))) as any;
+        if (!uploadRes.ok || !uploadData.url) { 
+          const errMsg = getErrorMessage(uploadData);
+          toast.error(errMsg || "Failed to upload image."); 
+          setSaving(false); return; 
+        }
         imageUrlToUse = uploadData.url;
       }
-      const res = await fetch(endpoint, { method, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: name.trim(), description: description.trim() || null, price: numericPrice, category, is_available: isAvailable, image_url: imageUrlToUse }) });
+      const numericLguMarkup = lguMarkup ? Number(lguMarkup) : undefined;
+      const res = await fetch(endpoint, { method, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: name.trim(), description: description.trim() || null, price: numericPrice, category, is_available: isAvailable, image_url: imageUrlToUse, lgu_markup_percentage: numericLguMarkup }) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { toast.error((data as { error?: string }).error || "Failed to save."); return; }
+      const errMsg = getErrorMessage(data);
+      if (!res.ok) { toast.error(errMsg || "Failed to save."); return; }
       setItems((prev) => { const u = data as MenuItem; if (!u.id) return prev; const idx = prev.findIndex((i) => i.id === u.id); if (idx === -1) return [...prev, u]; const c = [...prev]; c[idx] = u; return c; });
       toast.success(isEdit ? "Menu item updated." : "Menu item added.");
       setOpen(false); resetForm();
@@ -183,10 +193,10 @@ export default function AdminRestaurantPage() {
 
   return (
     <>
-      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl lg:text-3xl font-bold text-[#07008A] tracking-tight">Restaurant Menu</h1>
-          <p className="text-muted-foreground mt-1">Manage menu items and pricing</p>
+          <p className="text-muted-foreground mt-1 text-sm">Manage menu items and pricing</p>
         </div>
       </motion.div>
 
@@ -203,8 +213,8 @@ export default function AdminRestaurantPage() {
         </TabsList>
 
         <TabsContent value="menu" className="mt-0 outline-none">
-      <Card className="border-0 shadow-lg bg-white overflow-hidden">
-        <CardHeader className="border-b bg-slate-50/50 px-6 py-4 flex items-center justify-between">
+      <Card className="border border-slate-200/80 shadow-xs bg-white overflow-hidden">
+        <CardHeader className="border-b border-slate-100 bg-slate-50/40 px-5 py-4 flex items-center justify-between">
           <CardTitle className="text-lg font-semibold text-[#07008A] flex items-center gap-2">
             <UtensilsCrossed className="h-5 w-5" /> 
             Menu Items
@@ -212,11 +222,12 @@ export default function AdminRestaurantPage() {
           <div className="flex items-center gap-2">
             <Dialog open={open} onOpenChange={setOpen}>
               <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={openForCreate}><Plus className="h-4 w-4 mr-1" /> Add item</Button>
-              <DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>{editingItem ? "Edit menu item" : "Add menu item"}</DialogTitle></DialogHeader>
+              <DialogContent className="admin-modal-responsive [--admin-modal-width:40rem] max-h-[90vh] overflow-y-auto modal-scrollbar p-5 sm:p-6"><DialogHeader><DialogTitle>{editingItem ? "Edit menu item" : "Add menu item"}</DialogTitle></DialogHeader>
                 <form className="space-y-4" onSubmit={handleSave}>
                   <div className="space-y-2"><Label htmlFor="menu-name">Name</Label><Input id="menu-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Tapsilog" required /></div>
                   <div className="space-y-2"><Label htmlFor="menu-category">Category</Label><select id="menu-category" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={category} onChange={(e) => setCategory(e.target.value)} disabled={categoriesLoading || categories.length === 0}>{categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></div>
                   <div className="space-y-2"><Label htmlFor="menu-price">Price (₱)</Label><Input id="menu-price" type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="150" required /></div>
+                  <div className="space-y-2"><Label htmlFor="menu-lgu-markup">LGU Markup % (optional)</Label><Input id="menu-lgu-markup" type="number" min={0} max={100} step="1" value={lguMarkup} onChange={(e) => setLguMarkup(e.target.value)} placeholder="0" /></div>
                   <div className="space-y-2"><Label htmlFor="menu-description">Description (optional)</Label><Input id="menu-description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Short description..." /></div>
                   <div className="space-y-2"><Label htmlFor="menu-image">Image (optional)</Label><Input id="menu-image" type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0] ?? null; setImageFile(file); if (file) { setImagePreview(URL.createObjectURL(file)); } else { setImagePreview(editingItem?.image_url ?? null); } }} />{(imagePreview || editingItem?.image_url) && <div className="mt-2"><img src={imagePreview || editingItem?.image_url || ""} className="h-24 w-24 rounded-md object-cover border border-slate-200 bg-slate-100" alt="" /></div>}</div>
                   <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={isAvailable} onChange={(e) => setIsAvailable(e.target.checked)} /><span>Available</span></label>
@@ -228,7 +239,7 @@ export default function AdminRestaurantPage() {
         </CardHeader>
         <CardContent className="p-0">
           {loading ? <div className="p-6 space-y-4">{[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}</div> : (
-            <div className="overflow-x-auto">
+            <div className="responsive-table-wrapper">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 py-4 border-b bg-slate-50/60 gap-4">
                 <div className="relative w-full sm:max-w-xs">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
@@ -243,7 +254,7 @@ export default function AdminRestaurantPage() {
                 </div>
               </div>
               <table className="w-full text-sm">
-                <thead><tr className="border-b bg-slate-50/80">{["Name", "Category", "Price", "Media", "Status", "Actions"].map((h) => <th key={h} className={`${h === "Actions" ? "text-right pr-6" : "text-left"} py-3 px-4 text-[11px] font-semibold text-slate-600 uppercase tracking-wider ${h === "Name" ? "pl-6" : ""}`}>{h}</th>)}</tr></thead>
+                <thead><tr className="border-b border-slate-100 bg-slate-50/30">{["Name", "Category", "Price", "Media", "Status", "Actions"].map((h) => <th key={h} className={`${h === "Actions" ? "text-right pr-6" : "text-left"} py-3 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider ${h === "Name" ? "pl-6" : ""}`}>{h}</th>)}</tr></thead>
                 <tbody>
                   {(() => {
                     const filtered = items.filter((item) => {
@@ -254,7 +265,27 @@ export default function AdminRestaurantPage() {
                     const startIndex = (menuPage - 1) * itemsPerPage;
                     const paginated = filtered.slice(startIndex, startIndex + itemsPerPage);
                     
-                    if (filtered.length === 0) return <tr><td colSpan={6} className="py-8 text-center text-slate-500">No items found.</td></tr>;
+                    if (filtered.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={6} className="py-12 bg-white">
+                            <EmptyState 
+                              icon={UtensilsCrossed} 
+                              title="No menu items found" 
+                              description={menuSearch || filterCategory !== "all" ? "No items matching your current filters." : "Your menu is empty."}
+                              action={
+                                menuSearch || filterCategory !== "all" ? (
+                                  <Button variant="outline" onClick={() => { setMenuSearch(""); setFilterCategory("all"); setMenuPage(1); }}>Reset Filters</Button>
+                                ) : (
+                                  <Button className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={openForCreate}><Plus className="mr-1 h-4 w-4"/> Add item</Button>
+                                )
+                              }
+                              borderless
+                            />
+                          </td>
+                        </tr>
+                      );
+                    }
                     
                     return paginated.map((item) => (
                       <tr key={item.id} className="border-b last:border-0 hover:bg-slate-50/50 transition-colors">
@@ -279,7 +310,7 @@ export default function AdminRestaurantPage() {
           
           {/* Menu Pagination Controls */}
           {!loading && items.length > 0 && (
-            <div className="flex items-center justify-between px-6 py-3 border-t bg-slate-50/60 text-xs text-slate-600 rounded-b-lg">
+            <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/30 text-xs text-slate-500">
               {(() => {
                 const filtered = items.filter((item) => (filterCategory === "all" || item.category === filterCategory) && (!menuSearch || item.name?.toLowerCase().includes(menuSearch.toLowerCase())));
                 const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
@@ -303,8 +334,8 @@ export default function AdminRestaurantPage() {
 
       <TabsContent value="orders" className="mt-0 outline-none">
       {/* Recent Orders */}
-      <Card className="border-0 shadow-lg bg-white overflow-hidden">
-        <CardHeader className="border-b bg-slate-50/50 px-6 py-4 flex flex-row items-center justify-between">
+      <Card className="border border-slate-200/80 shadow-xs bg-white overflow-hidden">
+        <CardHeader className="border-b border-slate-100 bg-slate-50/40 px-5 py-4 flex flex-row items-center justify-between">
           <CardTitle className="text-lg font-semibold text-[#07008A] flex items-center gap-2">
             <Receipt className="h-5 w-5" />
             Recent Orders
@@ -312,11 +343,11 @@ export default function AdminRestaurantPage() {
           
           <Dialog open={orderOpen} onOpenChange={setOrderOpen}>
             <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={() => { setOrderOpen(true); }}><Plus className="h-4 w-4 mr-1" /> New Order</Button>
-            <DialogContent className="sm:max-w-4xl max-h-[95vh] gap-0 p-6 pt-5">
+            <DialogContent className="admin-modal-responsive [--admin-modal-width:90rem] flex h-[min(94vh,58rem)] flex-col gap-0 overflow-hidden p-5 sm:p-6">
               <DialogHeader className="mb-4">
                 <DialogTitle className="text-[#07008A] text-xl">Add Restaurant Order</DialogTitle>
               </DialogHeader>
-              <div className="flex-1 overflow-hidden min-h-[500px]">
+              <div className="min-h-0 flex-1 overflow-hidden">
                 <RestaurantOrderForm items={items} bookings={bookings} onSuccess={() => { setOrderOpen(false); loadOrders(); }} onCancel={() => setOrderOpen(false)} />
               </div>
             </DialogContent>
@@ -345,11 +376,21 @@ export default function AdminRestaurantPage() {
               </select>
             </div>
           </div>
-          {orders.length === 0 ? <div className="p-6 text-sm text-slate-500 text-center">No restaurant orders yet.</div> : (
+          {orders.length === 0 ? (
+            <div className="py-16">
+              <EmptyState 
+                icon={Receipt} 
+                title="No restaurant orders" 
+                description="There are currently no active restaurant or room service orders." 
+                action={<Button className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={() => setOrderOpen(true)}><Plus className="h-4 w-4 mr-1" /> New Order</Button>}
+                borderless 
+              />
+            </div>
+          ) : (
             <>
-              <div className="overflow-x-auto">
+              <div className="responsive-table-wrapper">
                 <table className="w-full text-sm">
-                  <thead><tr className="border-b bg-slate-50/80">{["Source", "Customer / Booking", "Status", "Payment", "Created", "Total", "Actions"].map((h) => <th key={h} className={`${h === "Total" || h === "Actions" ? "text-right pr-6" : "text-left"} py-3 px-4 text-[11px] font-semibold text-slate-600 uppercase tracking-wider ${h === "Source" ? "pl-6" : ""}`}>{h}</th>)}</tr></thead>
+                  <thead><tr className="border-b border-slate-100 bg-slate-50/30">{["Source", "Customer / Booking", "Status", "Payment", "Created", "Total", "Actions"].map((h) => <th key={h} className={`${h === "Total" || h === "Actions" ? "text-right pr-6" : "text-left"} py-3 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider ${h === "Source" ? "pl-6" : ""}`}>{h}</th>)}</tr></thead>
                   <tbody>
                     {(() => {
                       const filteredOrders = orders.filter((o) => {
@@ -369,7 +410,21 @@ export default function AdminRestaurantPage() {
                       const startIndex = (orderPage - 1) * itemsPerPage;
                       const paginatedOrders = filteredOrders.slice(startIndex, startIndex + itemsPerPage);
                       
-                      if (filteredOrders.length === 0) return <tr><td colSpan={7} className="py-8 text-center text-slate-500">No orders match your search.</td></tr>;
+                      if (filteredOrders.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={7} className="py-12 bg-white">
+                              <EmptyState 
+                                icon={Receipt} 
+                                title="No orders found" 
+                                description="No orders match your current filters." 
+                                action={<Button variant="outline" onClick={() => { setOrderSearch(""); setOrderStatusFilter("all"); setOrderSourceFilter("all"); setOrderPage(1); }}>Reset Filters</Button>}
+                                borderless 
+                              />
+                            </td>
+                          </tr>
+                        );
+                      }
 
                       return paginatedOrders.map((o) => {
                         const booking = o.booking_id ? bookings.find((b) => b.id === o.booking_id) : undefined;
@@ -497,7 +552,7 @@ export default function AdminRestaurantPage() {
               </div>
               
               {/* Orders Pagination Controls */}
-              <div className="flex items-center justify-between px-6 py-3 border-t bg-slate-50/60 text-xs text-slate-600 rounded-b-lg">
+              <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/30 text-xs text-slate-500">
                 {(() => {
                   const filteredOrders = orders.filter((o) => !orderSearch || o.order_source?.toLowerCase().includes(orderSearch.toLowerCase()) || o.status?.toLowerCase().includes(orderSearch.toLowerCase()));
                   const totalPages = Math.max(1, Math.ceil(filteredOrders.length / itemsPerPage));

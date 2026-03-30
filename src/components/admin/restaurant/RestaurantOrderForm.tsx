@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
+import { getErrorMessage } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 
-type MenuItem = { id: string; name?: string; category?: string | null; price?: number | null; image_url?: string | null };
-type BookingOption = { id: string; reference_number?: string; status?: string; payment_status?: string; guests?: { full_name?: string | null }; rooms?: { room_number?: string | null } };
+type MenuItem = { id: string; name?: string; category?: string | null; price?: number | null; image_url?: string | null; lgu_markup_percentage?: number | null };
+type BookingOption = { id: string; reference_number?: string; status?: string; payment_status?: string; guests?: { full_name?: string | null }; rooms?: { room_number?: string | null }; is_lgu_booking?: boolean };
 
 type OrderFormProps = {
   items: MenuItem[];
@@ -26,7 +27,17 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
   const [orderNotes, setOrderNotes] = useState("");
   const [orderItemSearch, setOrderItemSearch] = useState("");
   const [orderLines, setOrderLines] = useState<{ menu_item_id: string; quantity: number }[]>([]);
+  const [isLguOrder, setIsLguOrder] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const getItemPrice = (item: MenuItem | undefined) => {
+    if (!item) return 0;
+    const basePrice = Number(item.price || 0);
+    if (isLguOrder && item.lgu_markup_percentage) {
+      return basePrice + (basePrice * (item.lgu_markup_percentage / 100));
+    }
+    return basePrice;
+  };
 
   // Filter items that are not yet added
   const availableItems = useMemo(() => {
@@ -77,9 +88,9 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
   const subtotal = useMemo(() => {
     return orderLines.reduce((sum, line) => {
       const item = items.find((i) => i.id === line.menu_item_id);
-      return sum + (Number(item?.price || 0) * line.quantity);
+      return sum + (getItemPrice(item) * line.quantity);
     }, 0);
-  }, [orderLines, items]);
+  }, [orderLines, items, isLguOrder]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,28 +110,29 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
           customer_name: customerName.trim() || null,
           payment_method: orderSource === "Room Service" ? "Charged to Room" : paymentMethod,
           booking_reference: orderSource === "Room Service" ? orderBookingRef.trim() || null : null,
+          is_lgu_order: isLguOrder,
           notes: orderNotes.trim() || null,
           items: orderLines,
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { throw new Error(data.error || "Failed to create order."); }
+      if (!res.ok) { throw new Error(getErrorMessage(data) || "Failed to create order."); }
       
       toast.success(orderSource === "Room Service" ? "Order created and charged to room." : "Restaurant order created successfully.");
       onSuccess();
     } catch (err: any) {
-      toast.error(err.message || "Something went wrong.");
+      toast.error(getErrorMessage(err) || "Something went wrong.");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col h-full max-h-[85vh]">
-      <ScrollArea className="flex-1 pr-4 pl-1 pb-4">
+    <form onSubmit={handleSubmit} className="flex h-full min-h-0 flex-col overflow-hidden">
+      <ScrollArea className="modal-scrollbar min-h-0 flex-1 pr-4 pl-1 pb-4">
         <div className="space-y-6">
           {/* Order Configuration */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
             <div className="space-y-2">
               <Label htmlFor="order-source" className="text-xs font-bold uppercase text-slate-500">Order source</Label>
               <select 
@@ -172,6 +184,19 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
                 className="h-10 border-slate-200 focus:border-[#07008A] transition-all shadow-sm"
               />
             </div>
+            
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase text-slate-500">Pricing Tier</Label>
+              <label className="flex items-center gap-2 h-10 px-3 border border-slate-200 rounded-md bg-white shadow-sm hover:border-[#07008A]/20 cursor-pointer transition-all active:scale-[0.98]">
+                <input 
+                  type="checkbox" 
+                  className="rounded border-slate-300 text-[#07008A] focus:ring-[#07008A]" 
+                  checked={isLguOrder} 
+                  onChange={(e) => setIsLguOrder(e.target.checked)} 
+                />
+                <span className="text-sm font-medium text-slate-700">LGU Sponsored</span>
+              </label>
+            </div>
           </div>
 
           {/* Room Service Link Section */}
@@ -202,8 +227,11 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
                       const ref = e.target.value;
                       setOrderBookingRef(ref);
                       const b = activeRoomServiceBookings.find((x) => x.reference_number === ref);
-                      if (b && b.guests?.full_name) {
-                        setCustomerName(b.guests.full_name);
+                      if (b) {
+                        if (b.guests?.full_name) {
+                          setCustomerName(b.guests.full_name);
+                        }
+                        setIsLguOrder(!!b.is_lgu_booking);
                       }
                     }} 
                   >
@@ -249,7 +277,7 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
                 </div>
               </div>
               
-              <ScrollArea className="h-64 rounded-md border bg-slate-50/50 p-2">
+              <ScrollArea className="modal-scrollbar h-64 rounded-md border bg-slate-50/50 p-2">
                 {availableItems.length === 0 ? (
                   <div className="p-4 text-center text-sm text-slate-500">No menu items found.</div>
                 ) : (
@@ -266,7 +294,7 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
                           <span className="text-xs text-slate-400">{item.category}</span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="font-semibold text-sm text-slate-600">₱{Number(item.price ?? 0).toFixed(0)}</span>
+                          <span className="font-semibold text-sm text-slate-600">₱{getItemPrice(item).toFixed(0)}</span>
                           <div className="h-6 w-6 rounded-full bg-white border shadow-sm flex items-center justify-center text-[#07008A] group-hover:bg-[#07008A] group-hover:text-white transition-colors">
                             <Plus className="h-3 w-3" />
                           </div>
@@ -282,7 +310,7 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
             <div className="lg:col-span-3 space-y-4 flex flex-col">
               <Label>Order Summary</Label>
               <Card className="flex-1 border-slate-200 overflow-hidden flex flex-col bg-white">
-                <ScrollArea className="h-64 p-0">
+                <ScrollArea className="modal-scrollbar h-64 p-0">
                   {orderLines.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full p-8 text-center text-slate-400">
                       <UtensilsCrossed className="h-10 w-10 mb-3 opacity-20" />
@@ -303,12 +331,13 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
                         {orderLines.map((line) => {
                           const item = items.find((i) => i.id === line.menu_item_id);
                           if (!item) return null;
-                          const lineTotal = Number(item.price || 0) * line.quantity;
+                          const currentPrice = getItemPrice(item);
+                          const lineTotal = currentPrice * line.quantity;
                           return (
                             <tr key={line.menu_item_id} className="border-b last:border-0 hover:bg-slate-50/40">
                               <td className="py-3 px-4">
                                 <div className="font-medium text-slate-700">{item.name}</div>
-                                <div className="text-xs text-slate-400">₱{Number(item.price ?? 0).toFixed(0)}</div>
+                                <div className="text-xs text-slate-400">₱{currentPrice.toFixed(0)}</div>
                               </td>
                               <td className="py-3 px-4">
                                 <div className="flex items-center justify-center gap-2">
@@ -346,7 +375,7 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
         </div>
       </ScrollArea>
       
-      <div className="flex justify-end gap-3 pt-5 mt-auto border-t">
+      <div className="mt-auto flex shrink-0 justify-end gap-3 border-t bg-background pt-5">
         <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
         <Button type="submit" className="bg-[#07008A] hover:bg-[#05006a] text-white px-8" disabled={saving || orderLines.length === 0}>
           {saving ? "Processing..." : `Confirm Order (₱${subtotal.toFixed(0)})`}

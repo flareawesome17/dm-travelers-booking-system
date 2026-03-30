@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
+import { getErrorMessage } from "@/lib/utils";
+import { getBookingChargeBreakdown, getBookingTotalPaid } from "@/lib/bookingTotals";
 
 type BookingType = {
   id: string;
@@ -11,6 +13,10 @@ type BookingType = {
   deposit_paid?: string | number | null;
   balance_due?: string | number | null;
   restaurant_charges_total?: string | number | null;
+  extras_total?: string | number | null;
+  extensions_total?: string | number | null;
+  early_checkin_fee_applied?: string | number | null;
+  late_checkout_fee_applied?: string | number | null;
   status?: string;
   guests?: { full_name?: string | null };
 };
@@ -28,8 +34,8 @@ export function RecordPaymentModal({ booking, onSuccess, onClose }: Props) {
   const [transactionId, setTransactionId] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Grand Total = Room Booking + Restaurant Charges
-  const grandTotal = Number(booking.total_amount || 0) + Number(booking.restaurant_charges_total || 0);
+  const breakdown = getBookingChargeBreakdown(booking);
+  const totalPaidSoFar = getBookingTotalPaid(booking);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,12 +69,12 @@ export function RecordPaymentModal({ booking, onSuccess, onClose }: Props) {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to record payment");
+      if (!res.ok) throw new Error(getErrorMessage(data) || "Failed to record payment");
 
       toast.success("Payment recorded successfully.");
       onSuccess();
     } catch (err: any) {
-      toast.error(err.message || "An unexpected error occurred.");
+      toast.error(getErrorMessage(err) || "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
@@ -85,46 +91,70 @@ export function RecordPaymentModal({ booking, onSuccess, onClose }: Props) {
           <span className="text-slate-500">Guest Name:</span>
           <span className="font-medium">{booking.guests?.full_name || "Unknown"}</span>
         </div>
-        
+
         <hr className="border-slate-200 my-3" />
-        
+
         <div className="space-y-2.5">
           <div className="flex justify-between text-sm text-slate-600">
             <span>Room Total:</span>
-            <span>₱{Number(booking.total_amount || 0).toFixed(0)}</span>
+            <span>PHP {breakdown.roomTotal.toFixed(0)}</span>
           </div>
-          {Number(booking.restaurant_charges_total) > 0 && (
+          {breakdown.restaurantTotal > 0 && (
             <div className="flex justify-between text-sm text-amber-600 font-medium">
               <span>Restaurant Orders:</span>
-              <span>+ ₱{Number(booking.restaurant_charges_total).toFixed(0)}</span>
+              <span>+ PHP {breakdown.restaurantTotal.toFixed(0)}</span>
+            </div>
+          )}
+          {breakdown.extrasTotal > 0 && (
+            <div className="flex justify-between text-sm text-blue-600 font-medium">
+              <span>Extras:</span>
+              <span>+ PHP {breakdown.extrasTotal.toFixed(0)}</span>
+            </div>
+          )}
+          {breakdown.extensionsTotal > 0 && (
+            <div className="flex justify-between text-sm text-violet-600 font-medium">
+              <span>Extensions:</span>
+              <span>+ PHP {breakdown.extensionsTotal.toFixed(0)}</span>
+            </div>
+          )}
+          {breakdown.earlyCheckInFee > 0 && (
+            <div className="flex justify-between text-sm text-slate-600 font-medium">
+              <span>Early Check-in Fee:</span>
+              <span>+ PHP {breakdown.earlyCheckInFee.toFixed(0)}</span>
+            </div>
+          )}
+          {breakdown.lateCheckOutFee > 0 && (
+            <div className="flex justify-between text-sm text-slate-600 font-medium">
+              <span>Late Check-out Fee:</span>
+              <span>+ PHP {breakdown.lateCheckOutFee.toFixed(0)}</span>
             </div>
           )}
         </div>
 
         <hr className="border-slate-200 my-3" />
-        
+
         <div className="space-y-2.5">
           <div className="flex justify-between text-sm font-semibold text-slate-800">
             <span>Grand Total:</span>
-            <span>₱{grandTotal.toFixed(0)}</span>
+            <span>PHP {breakdown.grandTotal.toFixed(0)}</span>
           </div>
-          {Number(booking.deposit_paid) > 0 && (
+          {totalPaidSoFar > 0 && (
             <div className="flex justify-between text-sm text-emerald-600 font-medium pt-1">
               <span>Total Paid So Far:</span>
-              <span>- ₱{Number(booking.deposit_paid).toFixed(0)}</span>
+              <span>- PHP {totalPaidSoFar.toFixed(0)}</span>
             </div>
           )}
           <div className="flex justify-between items-center text-base font-bold text-[#07008A] bg-blue-50/50 -mx-5 -mb-5 p-5 border-t border-blue-100 rounded-b-xl mt-4">
             <span>Current Balance Due:</span>
-            <span className="text-lg">₱{Number(booking.balance_due || 0).toFixed(0)}</span>
+            <span className="text-lg">PHP {Number(booking.balance_due || 0).toFixed(0)}</span>
           </div>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="pay-amount">Amount (₱)</Label>
-          <Input 
+          <Label htmlFor="pay-amount">Amount (PHP)</Label>
+          <Input
             id="pay-amount"
             type="number"
             min="1"
@@ -139,7 +169,7 @@ export function RecordPaymentModal({ booking, onSuccess, onClose }: Props) {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="pay-type">Payment Type</Label>
-            <select 
+            <select
               id="pay-type"
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-[#07008A]/20"
               value={type}
@@ -152,7 +182,7 @@ export function RecordPaymentModal({ booking, onSuccess, onClose }: Props) {
 
           <div className="space-y-2">
             <Label htmlFor="pay-method">Payment Method</Label>
-            <select 
+            <select
               id="pay-method"
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-[#07008A]/20"
               value={method}
@@ -169,7 +199,7 @@ export function RecordPaymentModal({ booking, onSuccess, onClose }: Props) {
 
         <div className="space-y-2">
           <Label htmlFor="pay-txn">Transaction ID (Optional)</Label>
-          <Input 
+          <Input
             id="pay-txn"
             value={transactionId}
             onChange={(e) => setTransactionId(e.target.value)}
@@ -183,7 +213,7 @@ export function RecordPaymentModal({ booking, onSuccess, onClose }: Props) {
             Cancel
           </Button>
           <Button type="submit" className="bg-[#07008A] hover:bg-[#05006a]" disabled={loading || !amount}>
-            {loading ? "Recording..." : `Record ₱${amount ? Number(amount).toFixed(0) : "0"}`}
+            {loading ? "Recording..." : `Record PHP ${amount ? Number(amount).toFixed(0) : "0"}`}
           </Button>
         </div>
       </form>

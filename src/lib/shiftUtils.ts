@@ -1,0 +1,263 @@
+import { getSupabaseAdmin } from "@/lib/supabase";
+
+/**
+ * Get the current Manila time as HH:MM:SS string.
+ */
+export function manilaTimeString(d: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Manila",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(d);
+}
+
+/**
+ * Get the current Manila date as YYYY-MM-DD string.
+ */
+export function manilaDateString(d: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+/**
+ * Parse a time string "HH:MM:SS" to minutes since midnight.
+ */
+export function timeToMinutes(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+export type ShiftDefinition = {
+  id: string;
+  name: string;
+  start_time: string;
+  end_time: string;
+  sort_order: number;
+  is_active: boolean;
+};
+
+/**
+ * Determine which shift a given Manila time falls into.
+ * Handles overnight shifts (e.g., Night 22:00–06:00).
+ */
+export function detectShift(
+  shifts: ShiftDefinition[],
+  currentTime: string
+): ShiftDefinition | null {
+  const now = timeToMinutes(currentTime);
+
+  for (const shift of shifts) {
+    const start = timeToMinutes(shift.start_time);
+    const end = timeToMinutes(shift.end_time);
+
+    if (start < end) {
+      // Normal shift (e.g., 06:00–14:00)
+      if (now >= start && now < end) return shift;
+    } else {
+      // Overnight shift (e.g., 22:00–06:00)
+      if (now >= start || now < end) return shift;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Calculate minutes remaining until a shift ends.
+ */
+export function minutesUntilShiftEnd(
+  shift: ShiftDefinition,
+  currentTime: string
+): number {
+  const now = timeToMinutes(currentTime);
+  const end = timeToMinutes(shift.end_time);
+  const start = timeToMinutes(shift.start_time);
+
+  if (start < end) {
+    // Normal shift
+    return Math.max(0, end - now);
+  } else {
+    // Overnight shift
+    if (now >= start) {
+      // Before midnight portion
+      return (1440 - now) + end;
+    } else {
+      // After midnight portion
+      return Math.max(0, end - now);
+    }
+  }
+}
+
+/**
+ * Get the date to use for a shift_log entry.
+ * For overnight shifts past midnight, use yesterday's date.
+ */
+export function getShiftDate(
+  shift: ShiftDefinition,
+  manilaDate: string,
+  manilaTime: string
+): string {
+  const start = timeToMinutes(shift.start_time);
+  const end = timeToMinutes(shift.end_time);
+  const now = timeToMinutes(manilaTime);
+
+  // Overnight shift and we're in the after-midnight portion
+  if (start > end && now < end) {
+    const d = new Date(`${manilaDate}T00:00:00+08:00`);
+    d.setDate(d.getDate() - 1);
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Manila",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(d);
+  }
+
+  return manilaDate;
+}
+
+/**
+ * Server-side: Get or create the shift_log for the current active shift.
+ * Returns the shift definition + shift_log row.
+ */
+export async function getOrCreateActiveShiftLog(adminId?: string) {
+  const supabase = getSupabaseAdmin();
+
+  // 1. Load active shift definitions
+  const { data: shifts, error: sErr } = await supabase
+    .from("shifts")
+    .select("*")
+    .eq("is_active", true)
+    .order("sort_order");
+
+  if (sErr) throw sErr;
+  if (!shifts || shifts.length === 0) throw new Error("No active shifts configured.");
+
+  // 2. Detect current shift
+  const now = new Date();
+  const currentTime = manilaTimeString(now);
+  const currentDate = manilaDateString(now);
+
+  const currentShift = detectShift(shifts as ShiftDefinition[], currentTime);
+  if (!currentShift) throw new Error("No shift matches the current time.");
+
+  // 3. Determine the correct date for this shift log
+  const shiftDate = getShiftDate(currentShift, currentDate, currentTime);
+
+  // 4. Get or create shift_log
+  const { data: existing, error: eErr } = await supabase
+    .from("shift_logs")
+    .select("*")
+    .eq("shift_id", currentShift.id)
+    .eq("date", shiftDate)
+    .maybeSingle();
+
+  if (eErr) throw eErr;
+
+  if (existing) {
+    return { shift: currentShift, shiftLog: existing, shifts: shifts as ShiftDefinition[] };
+  }
+
+  // Create new shift log
+  const { data: created, error: cErr } = await supabase
+    .from("shift_logs")
+    .insert({
+      shift_id: currentShift.id,
+      date: shiftDate,
+      opened_by: adminId || null,
+      status: "OPEN",
+    })
+    .select("*")
+    .single();
+
+  if (cErr) throw cErr;
+
+  return { shift: currentShift, shiftLog: created, shifts: shifts as ShiftDefinition[] };
+}
+
+/**
+ * Server-side: Insert a transaction into the current active shift.
+ * Non-blocking — if no shift is found, silently skips.
+ */
+type AddShiftTransactionParams = {
+  source: "booking" | "restaurant" | "expense" | "manual";
+  referenceId?: string;
+  description: string;
+  amount: number;
+  type: "INCOME" | "EXPENSE";
+  category?: string;
+  performedBy?: string | null;
+  onFailure?: "silent" | "throw";
+};
+
+function isMissingShiftTransactionPerformedByColumn(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+
+  const code = "code" in error ? error.code : null;
+  const message = "message" in error ? error.message : null;
+
+  return (
+    code === "PGRST204" &&
+    typeof message === "string" &&
+    message.includes("'performed_by'") &&
+    message.includes("'shift_transactions'")
+  );
+}
+
+export async function addShiftTransaction(params: AddShiftTransactionParams) {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { shiftLog } = await getOrCreateActiveShiftLog(params.performedBy || undefined);
+
+    if (shiftLog.status === "CLOSED") {
+      if (params.onFailure === "throw") {
+        throw new Error("Active shift ledger is already closed.");
+      }
+      return null;
+    }
+
+    const insertPayload = {
+      shift_log_id: shiftLog.id,
+      source: params.source,
+      reference_id: params.referenceId || null,
+      description: params.description,
+      amount: params.amount,
+      type: params.type,
+      category: params.category || null,
+    };
+
+    const insertTransaction = async (payload: typeof insertPayload & { performed_by?: string | null }) =>
+      supabase
+        .from("shift_transactions")
+        .insert(payload)
+        .select("*")
+        .single();
+
+    let { data, error } = await insertTransaction({
+      ...insertPayload,
+      ...(params.performedBy ? { performed_by: params.performedBy } : {}),
+    });
+
+    // Backward compatibility for environments where the DB migration has not been applied yet.
+    if (error && params.performedBy && isMissingShiftTransactionPerformedByColumn(error)) {
+      ({ data, error } = await insertTransaction(insertPayload));
+    }
+
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    if (params.onFailure === "throw") {
+      throw err;
+    }
+
+    // Non-blocking: log error but don't fail the parent operation
+    console.error("[ShiftTransaction] Failed to record:", err);
+    return null;
+  }
+}

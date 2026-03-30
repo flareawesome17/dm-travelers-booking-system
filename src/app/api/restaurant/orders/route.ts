@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { requirePermission } from "@/lib/rbac";
 import { findNextOpenLedgerDate, manilaDateString } from "@/lib/ledgerDate";
+import { addShiftTransaction } from "@/lib/shiftUtils";
 
 export async function GET(req: NextRequest) {
   const auth = await requirePermission(req, "restaurant.read");
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
   
   try {
     const body = await req.json();
-    const { order_source, customer_name, payment_method, booking_reference, notes, items } = body;
+    const { order_source, customer_name, payment_method, booking_reference, notes, items, is_lgu_order } = body;
     const supabase = getSupabaseAdmin();
 
     const today = manilaDateString();
@@ -73,7 +74,13 @@ export async function POST(req: NextRequest) {
     let subtotal = 0;
     const lineItems = items.map((clientItem: any) => {
       const mItem = menuData.find((m) => m.id === clientItem.menu_item_id);
-      const price = Number(mItem.price || 0);
+      let price = Number(mItem.price || 0);
+
+      // Feature 5 - LGU Markup
+      if (is_lgu_order && mItem.lgu_markup_percentage) {
+        price = price + (price * (mItem.lgu_markup_percentage / 100));
+      }
+
       const qty = Number(clientItem.quantity || 1);
       const lineTotal = price * qty;
       subtotal += lineTotal;
@@ -107,6 +114,7 @@ export async function POST(req: NextRequest) {
         accounting_date: accountingDate,
         payment_method: order_source === "Room Service" ? "Charged to Room" : (payment_method || "Pending Payment"),
         notes,
+        is_lgu_order,
         status: initialStatus,
         subtotal,
         service_charge: 0,
@@ -147,7 +155,69 @@ export async function POST(req: NextRequest) {
          .eq("id", booking_id);
     }
 
-    return NextResponse.json(orderData, { status: 201 });
+    // 4. Auto-deduct inventory based on recipes (non-blocking)
+    const stockWarnings: string[] = [];
+    try {
+      for (const li of lineItems) {
+        const { data: ingredients } = await supabase
+          .from("menu_item_ingredients")
+          .select("inventory_item_id, quantity_required, inventory_items(id, name, current_stock, min_stock_alert, unit)")
+          .eq("menu_item_id", li.menu_item_id);
+
+        if (ingredients && ingredients.length > 0) {
+          for (const ing of ingredients) {
+            const deductQty = Number(ing.quantity_required) * Number(li.quantity);
+            const invItem = ing.inventory_items as any;
+            if (!invItem) continue;
+
+            const prevStock = Number(invItem.current_stock);
+            const newStock = prevStock - deductQty;
+
+            await supabase
+              .from("inventory_items")
+              .update({ current_stock: newStock, updated_at: new Date().toISOString() })
+              .eq("id", ing.inventory_item_id);
+
+            await supabase.from("inventory_movements").insert({
+              item_id: ing.inventory_item_id,
+              type: "OUT",
+              quantity: deductQty,
+              previous_stock: prevStock,
+              new_stock: newStock,
+              source: "order",
+              reference_id: orderData.id,
+              notes: `Auto-deducted for order (${li.name} x${li.quantity})`,
+              performed_by: auth.payload.sub || null,
+            });
+
+            if (newStock <= Number(invItem.min_stock_alert)) {
+              stockWarnings.push(
+                `"${invItem.name}" is at ${newStock} ${invItem.unit || "units"} (threshold: ${invItem.min_stock_alert})`
+              );
+            }
+          }
+        }
+      }
+    } catch (invErr) {
+      console.error("[Inventory Deduction] Non-blocking error:", invErr);
+    }
+
+    // 5. Record shift transaction (non-blocking)
+    if (orderData.status === "Paid") {
+      addShiftTransaction({
+        source: "restaurant",
+        referenceId: orderData.id,
+        description: `Restaurant order - ${customer_name || "Walk-in"} (${payment_method || "Cash"})`,
+        amount: subtotal,
+        type: "INCOME",
+        category: "Restaurant",
+      });
+    }
+
+    return NextResponse.json({
+      ...orderData,
+      stock_warnings: stockWarnings.length > 0 ? stockWarnings : undefined,
+    }, { status: 201 });
 
   } catch (err: any) { 
     return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 }); 

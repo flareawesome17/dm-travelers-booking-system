@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { requirePermission } from "@/lib/rbac";
+import { parseAndValidate, dbError, internalError } from "@/lib/api-security";
+import { createAdminUserSchema } from "@/lib/validation-schemas";
 import bcrypt from "bcryptjs";
 
 export async function GET(req: NextRequest) {
@@ -13,10 +15,10 @@ export async function GET(req: NextRequest) {
       .from("admin_users")
       .select("id, name, email, role_id, is_active, created_at")
       .order("created_at", { ascending: false });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return dbError(error, "Failed to load users");
     return NextResponse.json(data ?? []);
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return internalError();
   }
 }
 
@@ -24,30 +26,27 @@ export async function POST(req: NextRequest) {
   const auth = await requirePermission(req, "users.manage");
   if ("error" in auth) return auth.error;
 
-  try {
-    const { name, email, password, role_id, is_active } = await req.json();
-    if (!name || typeof name !== "string" || !name.trim()) {
-      return NextResponse.json({ error: "Name is required" }, { status: 400 });
-    }
-    if (!email || !password) return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
-    if (password.length < 8) return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
+  const parsed = await parseAndValidate(req, createAdminUserSchema);
+  if (parsed.success === false) return parsed.error;
 
+  try {
+    const { name, email, password, role_id, is_active } = parsed.data;
     const passwordHash = await bcrypt.hash(password, 12);
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from("admin_users")
       .insert({
-        name: name.trim(),
-        email: email.toLowerCase().trim(),
+        name,
+        email,
         password_hash: passwordHash,
-        role_id: role_id ?? 3,
-        is_active: is_active ?? true,
+        role_id,
+        is_active,
       })
       .select("id, name, email, role_id, is_active, created_at")
       .single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return dbError(error, "Failed to create user");
     return NextResponse.json(data, { status: 201 });
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return internalError();
   }
 }

@@ -4,10 +4,20 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/sonner";
-import { cn } from "@/lib/utils";
+import { cn, getErrorMessage } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarDays } from "lucide-react";
+
+const EXTRA_TYPES = ["Extra Bed", "Extra Pillow", "Extra Blanket", "Extra Towel", "Extra Person"] as const;
+type ExtraType = (typeof EXTRA_TYPES)[number];
+const TYPE_TO_KEY: Record<ExtraType, string> = {
+  "Extra Bed": "extra_bed_price",
+  "Extra Pillow": "extra_pillow_price",
+  "Extra Blanket": "extra_blanket_price",
+  "Extra Towel": "extra_towel_price",
+  "Extra Person": "extra_person_price",
+};
 
 type RoomOption = {
   id: string;
@@ -21,6 +31,12 @@ type RoomOption = {
   rate_5h_price?: number | null;
   rate_3h_enabled?: boolean;
   rate_3h_price?: number | null;
+  // LGU rate overrides
+  lgu_rate_enabled?: boolean;
+  lgu_rate_24h_price?: number | null;
+  lgu_rate_12h_price?: number | null;
+  lgu_rate_5h_price?: number | null;
+  lgu_rate_3h_price?: number | null;
   // raw rate_plans jsonb from backend (for per-guest rate, etc.)
   rate_plans?: unknown;
 };
@@ -52,7 +68,17 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
     { check_in_date: string; check_out_date: string; status: string; rate_plan_kind?: string | null }[]
   >([]);
   const [isLguBooking, setIsLguBooking] = useState(false);
+  const [isSpecialBooking, setIsSpecialBooking] = useState(false);
+  const [specialBookingLabel, setSpecialBookingLabel] = useState("");
   const [usePerGuestRate, setUsePerGuestRate] = useState(false);
+  const [defaultPrices, setDefaultPrices] = useState<Record<string, number>>({});
+  const [selectedExtras, setSelectedExtras] = useState<Record<ExtraType, { checked: boolean; quantity: number }>>({
+    "Extra Bed": { checked: false, quantity: 1 },
+    "Extra Pillow": { checked: false, quantity: 1 },
+    "Extra Blanket": { checked: false, quantity: 1 },
+    "Extra Towel": { checked: false, quantity: 1 },
+    "Extra Person": { checked: false, quantity: 1 },
+  });
 
   const toDateOnly = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const parseYmd = (s: string) => {
@@ -119,6 +145,25 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
       .then((data) => setRooms(Array.isArray(data) ? data : []))
       .catch(() => setRooms([]))
       .finally(() => setLoadingRooms(false));
+      
+    fetch(`/api/settings`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((data) => {
+        const prices: Record<string, number> = {};
+        if (data && typeof data === "object") {
+          for (const type of EXTRA_TYPES) {
+            const key = TYPE_TO_KEY[type];
+            if (Array.isArray(data)) {
+              const row = data.find((s: { key: string }) => s.key === key);
+              prices[type] = row ? Number(row.value) || 0 : 0;
+            } else if (data[key]) {
+              prices[type] = Number(data[key]) || 0;
+            }
+          }
+        }
+        setDefaultPrices(prices);
+      })
+      .catch(() => {});
   }, [apiUrl, token]);
 
   useEffect(() => {
@@ -137,14 +182,20 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
   const selectedRoom = rooms.find((r) => r.id === roomId);
   const availableRatesForRoom: { kind: "24h" | "12h" | "5h" | "3h"; label: string; price: number }[] = [];
   if (selectedRoom) {
-    if (selectedRoom.rate_24h_enabled && selectedRoom.rate_24h_price != null)
-      availableRatesForRoom.push({ kind: "24h", label: "24-hour", price: Number(selectedRoom.rate_24h_price) });
-    if (selectedRoom.rate_12h_enabled && selectedRoom.rate_12h_price != null)
-      availableRatesForRoom.push({ kind: "12h", label: "12-hour", price: Number(selectedRoom.rate_12h_price) });
-    if (selectedRoom.rate_5h_enabled && selectedRoom.rate_5h_price != null)
-      availableRatesForRoom.push({ kind: "5h", label: "5-hour", price: Number(selectedRoom.rate_5h_price) });
-    if (selectedRoom.rate_3h_enabled && selectedRoom.rate_3h_price != null)
-      availableRatesForRoom.push({ kind: "3h", label: "3-hour", price: Number(selectedRoom.rate_3h_price) });
+    const useLgu = isLguBooking && selectedRoom.lgu_rate_enabled;
+    const p24 = useLgu && selectedRoom.lgu_rate_24h_price != null ? selectedRoom.lgu_rate_24h_price : selectedRoom.rate_24h_price;
+    const p12 = useLgu && selectedRoom.lgu_rate_12h_price != null ? selectedRoom.lgu_rate_12h_price : selectedRoom.rate_12h_price;
+    const p5 = useLgu && selectedRoom.lgu_rate_5h_price != null ? selectedRoom.lgu_rate_5h_price : selectedRoom.rate_5h_price;
+    const p3 = useLgu && selectedRoom.lgu_rate_3h_price != null ? selectedRoom.lgu_rate_3h_price : selectedRoom.rate_3h_price;
+
+    if (selectedRoom.rate_24h_enabled && p24 != null)
+      availableRatesForRoom.push({ kind: "24h", label: "24-hour", price: Number(p24) });
+    if (selectedRoom.rate_12h_enabled && p12 != null)
+      availableRatesForRoom.push({ kind: "12h", label: "12-hour", price: Number(p12) });
+    if (selectedRoom.rate_5h_enabled && p5 != null)
+      availableRatesForRoom.push({ kind: "5h", label: "5-hour", price: Number(p5) });
+    if (selectedRoom.rate_3h_enabled && p3 != null)
+      availableRatesForRoom.push({ kind: "3h", label: "3-hour", price: Number(p3) });
   }
 
   const availableRates = availableRatesForRoom;
@@ -185,6 +236,13 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
   else if (ratePlan === "5h") blocks = Math.max(1, Math.ceil(hours / 5));
   else if (ratePlan === "3h") blocks = Math.max(1, Math.ceil(hours / 3));
 
+  const extrasTotal = EXTRA_TYPES.reduce((sum, type) => {
+    const active = selectedExtras[type];
+    if (!active.checked) return sum;
+    const price = defaultPrices[type] || 0;
+    return sum + (price * active.quantity);
+  }, 0);
+
   const baseAmount = selectedRate ? selectedRate.price * blocks : 0;
   const totalGuests = (Number(numAdults) || 0) + (Number(numChildren) || 0);
   let totalAmount = baseAmount;
@@ -192,6 +250,7 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
     const guests = totalGuests || 0;
     totalAmount = perGuestPrice * guests;
   }
+  totalAmount += extrasTotal;
   const deposit = Number(depositPaid) || 0;
   const balanceDue = Math.max(0, totalAmount - deposit);
 
@@ -269,14 +328,21 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
           num_children: Number(numChildren) || 0,
           total_amount: totalAmount,
           deposit_paid: deposit,
-          deposit_method: deposit > 0 ? depositMethod : null,
+           deposit_method: deposit > 0 ? depositMethod : null,
           is_lgu_booking: isLguBooking,
+          is_special_booking: isSpecialBooking,
+          special_booking_label: isSpecialBooking ? specialBookingLabel.trim() || null : null,
+          extras: EXTRA_TYPES.filter(t => selectedExtras[t].checked).map(t => ({
+            extra_type: t,
+            quantity: selectedExtras[t].quantity,
+            unit_price: defaultPrices[t] || 0
+          })),
         }),
       });
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error((data as { error?: string }).error || "Failed to create booking.");
+        toast.error(getErrorMessage(data) || "Failed to create booking.");
         return;
       }
 
@@ -364,8 +430,40 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
             Mark as LGU booking
           </Label>
           <p className="text-xs text-slate-500">
-            Use this for local government unit / LGU-sponsored stays so they can be reported separately.
+            Use this for local government unit / LGU-sponsored stays. Will use predefined LGU rates if available and delay payment collection.
           </p>
+        </div>
+      </div>
+
+      <div className="flex items-start gap-2 border rounded-md px-3 py-2 bg-slate-50/70">
+        <input
+          id="is_special_booking"
+          type="checkbox"
+          checked={isSpecialBooking}
+          onChange={(e) => setIsSpecialBooking(e.target.checked)}
+          className="h-4 w-4 rounded border-slate-300 mt-1"
+        />
+        <div className="space-y-2 flex-1">
+          <div>
+            <Label htmlFor="is_special_booking" className="text-sm font-medium text-slate-800">
+              Special Booking (Delayed Payment)
+            </Label>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Select this for bookings requiring delayed payments, x-deals, or specific agency agreements.
+            </p>
+          </div>
+          {isSpecialBooking && (
+            <div className="pt-1">
+              <Label htmlFor="special_booking_label" className="text-xs mb-1 block">Special Label / Organization</Label>
+              <Input
+                id="special_booking_label"
+                value={specialBookingLabel}
+                onChange={(e) => setSpecialBookingLabel(e.target.value)}
+                placeholder="e.g., DOT Promo, VIP Deal"
+                className="h-8 text-sm max-w-sm"
+              />
+            </div>
+          )}
         </div>
       </div>
       <div className="space-y-2">
@@ -587,8 +685,57 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
           id="special_requests"
           value={specialRequests}
           onChange={(e) => setSpecialRequests(e.target.value)}
-          placeholder="Late check-in, extra pillows..."
+          placeholder="Late check-in, late check-out..."
         />
+      </div>
+
+      <div className="space-y-3">
+        <Label>Booking Extras</Label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 border rounded-md p-3 bg-slate-50/50">
+          {EXTRA_TYPES.map((type) => {
+            const isChecked = selectedExtras[type].checked;
+            const price = defaultPrices[type] || 0;
+            return (
+              <div key={type} className={cn("flex items-center justify-between p-2 rounded border ring-1 ring-transparent transition-colors", isChecked ? "bg-white border-[#07008A]/30 ring-[#07008A]/10 shadow-sm" : "bg-transparent border-slate-200")}>
+                <label className="flex items-center gap-2 cursor-pointer pr-2">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300 text-[#07008A] focus:ring-[#07008A]"
+                    checked={isChecked}
+                    onChange={(e) => {
+                      setSelectedExtras(prev => ({
+                        ...prev,
+                        [type]: { ...prev[type], checked: e.target.checked }
+                      }));
+                    }}
+                  />
+                  <div className="space-y-0.5">
+                    <div className="text-sm font-medium text-slate-700 leading-none">{type}</div>
+                    <div className="text-[10px] text-slate-400">₱{price.toFixed(0)}</div>
+                  </div>
+                </label>
+                {isChecked && (
+                  <div className="flex items-center gap-2">
+                    <Input 
+                      type="number" 
+                      min={1} 
+                      max={20}
+                      className="h-7 w-14 text-xs px-2" 
+                      value={selectedExtras[type].quantity}
+                      onChange={(e) => {
+                        const val = Math.max(1, Number(e.target.value) || 1);
+                        setSelectedExtras(prev => ({
+                          ...prev,
+                          [type]: { ...prev[type], quantity: val }
+                        }));
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div className="rounded-lg border bg-slate-50/50 p-4 space-y-2">
@@ -607,7 +754,12 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
           ) : (
             <p>
               {ratePlan === "24h" ? `${nights} night(s)` : `${blocks} block(s)`} × ₱
-              {selectedRate?.price.toFixed(0) ?? "0"} = ₱{totalAmount.toFixed(0)}
+              {selectedRate?.price.toFixed(0) ?? "0"} = ₱{baseAmount.toFixed(0)}
+            </p>
+          )}
+          {extrasTotal > 0 && (
+            <p className="text-slate-500">
+              Booking extras = ₱{extrasTotal.toFixed(0)}
             </p>
           )}
           <div className="space-y-2 mt-2">

@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
+import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "@/components/ui/sonner";
 
 type Role = { id: number; name: string; description?: string | null };
@@ -225,13 +226,13 @@ export default function AdminRolesPage() {
 
   return (
     <>
-      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <h1 className="text-2xl lg:text-3xl font-bold text-[#07008A] tracking-tight">Roles & Permissions</h1>
-        <p className="text-muted-foreground mt-1">Customizable access control (RBAC)</p>
+        <p className="text-muted-foreground mt-1 text-sm">Customizable access control (RBAC)</p>
       </motion.div>
 
-      <Card className="border-0 shadow-lg bg-white/95 backdrop-blur-sm overflow-hidden">
-        <CardHeader className="border-b bg-slate-50/50 px-6 py-4">
+      <Card className="border border-slate-200/80 shadow-xs bg-white overflow-hidden">
+        <CardHeader className="border-b border-slate-100 bg-slate-50/40 px-5 py-4">
           <CardTitle className="text-lg font-semibold text-[#07008A] flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#07008A]/10 text-[#07008A]">
               <KeyRound className="h-5 w-5" />
@@ -292,9 +293,17 @@ export default function AdminRolesPage() {
                     </div>
                   </div>
 
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 flex flex-col">
                     {!selectedRole ? (
-                      <div className="rounded-lg border p-6 text-sm text-slate-600">Select a role to manage permissions.</div>
+                      <div className="flex-1 flex flex-col justify-center border rounded-xl overflow-hidden bg-white">
+                        <EmptyState 
+                          icon={KeyRound}
+                          title="No Role Selected"
+                          description="Select a role from the sidebar to view and manage its permissions."
+                          borderless
+                          className="py-20"
+                        />
+                      </div>
                     ) : (
                       <div className="rounded-lg border p-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

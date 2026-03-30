@@ -7,7 +7,9 @@ import { Banknote, Building2, Search, CalendarCheck, FileText, Download } from "
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type BookingRow = {
   id: string;
@@ -182,14 +184,14 @@ export default function LguMonitoringPage() {
                   <tbody>
                     {paginatedLguBookings.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-16 text-center bg-white">
-                          <div className="flex flex-col items-center justify-center gap-3">
-                            <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-2">
-                              <FileText className="h-6 w-6" />
-                            </div>
-                            <p className="text-base font-semibold text-slate-700">No active LGU bookings</p>
-                            <p className="text-sm text-slate-500 max-w-sm mx-auto">There are currently no active LGU bookings with outstanding balances to display.</p>
-                          </div>
+                        <td colSpan={6} className="py-16 bg-white">
+                          <EmptyState 
+                            icon={FileText} 
+                            title="No active LGU bookings" 
+                            description={search ? "No LGU bookings match your search." : "There are currently no active LGU bookings with outstanding balances to display."}
+                            action={search ? <Button variant="outline" onClick={() => { setSearch(""); setCurrentPage(1); }}>Clear Search</Button> : undefined}
+                            borderless 
+                          />
                         </td>
                       </tr>
                     ) : (

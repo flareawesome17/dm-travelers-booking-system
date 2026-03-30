@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
-  CalendarCheck, Plus, Pencil, Trash2, LogIn, LogOut, XCircle, Search, ChevronLeft, ChevronRight, Banknote, MoreHorizontal
+  CalendarCheck, Plus, Pencil, Trash2, LogIn, LogOut, XCircle, Search, ChevronLeft, ChevronRight, Banknote, MoreHorizontal, CalendarPlus, Package
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -18,7 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, getErrorMessage } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -30,7 +30,11 @@ import { EditBookingForm } from "@/components/admin/bookings/EditBookingForm";
 import { RecordPaymentModal } from "@/components/admin/bookings/RecordPaymentModal";
 import { ReceiptModal } from "@/components/admin/bookings/ReceiptModal";
 import { CountdownTimer } from "@/components/admin/bookings/CountdownTimer";
+import { ExtendStayModal } from "@/components/admin/bookings/ExtendStayModal";
+import { ManageExtrasModal } from "@/components/admin/bookings/ManageExtrasModal";
+import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "@/components/ui/sonner";
+import { getBookingChargeBreakdown } from "@/lib/bookingTotals";
 
 const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   confirmed: "default", "pending payment": "secondary", "pending verification": "secondary",
@@ -46,6 +50,7 @@ type BookingRow = {
   id?: string; reference_number?: string; status?: string;
   check_in_date?: string; check_out_date?: string; actual_check_in_at?: string;
   total_amount?: number; deposit_paid?: number; balance_due?: number; restaurant_charges_total?: number;
+  extras_total?: number; extensions_total?: number;
   rate_plan_kind?: string; special_requests?: string | null;
   early_checkin_fee_applied?: number; late_checkout_fee_applied?: number; is_lgu_booking?: boolean;
   guests?: { full_name?: string; email?: string; phone_number?: string };
@@ -64,6 +69,8 @@ export default function AdminBookingsPage() {
   const [editBooking, setEditBooking] = useState<BookingRow | null>(null);
   const [paymentBooking, setPaymentBooking] = useState<BookingRow | null>(null);
   const [receiptBooking, setReceiptBooking] = useState<BookingRow | null>(null);
+  const [extendBooking, setExtendBooking] = useState<BookingRow | null>(null);
+  const [extrasBooking, setExtrasBooking] = useState<BookingRow | null>(null);
   const [checkInBooking, setCheckInBooking] = useState<BookingRow | null>(null);
   const [checkInAt, setCheckInAt] = useState<string>("");
   const [checkOutBooking, setCheckOutBooking] = useState<BookingRow | null>(null);
@@ -197,12 +204,12 @@ export default function AdminBookingsPage() {
 
   return (
     <>
-      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <h1 className="text-2xl lg:text-3xl font-bold text-[#07008A] tracking-tight">Bookings</h1>
-        <p className="text-muted-foreground mt-1">Manage reservations and check-in dates</p>
+        <p className="text-muted-foreground mt-1 text-sm">Manage reservations and check-in dates</p>
       </motion.div>
-      <Card className="border-0 shadow-lg bg-white overflow-hidden">
-        <CardHeader className="border-b bg-slate-50/50 px-6 py-4 flex flex-row items-center justify-between">
+      <Card className="border border-slate-200/80 shadow-xs bg-white overflow-hidden">
+        <CardHeader className="border-b border-slate-100 bg-slate-50/40 px-5 py-4 flex flex-row items-center justify-between">
           <div className="flex items-center gap-3">
             <CardTitle className="text-lg font-semibold text-[#07008A] flex items-center gap-2">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#07008A]/10 text-[#07008A]"><CalendarCheck className="h-5 w-5" /></div>
@@ -214,7 +221,7 @@ export default function AdminBookingsPage() {
             <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={() => setOpen(true)}>
               <Plus className="h-4 w-4 mr-1" /> New booking
             </Button>
-            <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="admin-modal-responsive [--admin-modal-width:68rem] max-h-[92vh] overflow-y-auto modal-scrollbar p-5 sm:p-6">
               <DialogHeader><DialogTitle>Add new booking</DialogTitle></DialogHeader>
               <BookingForm apiUrl="" token={typeof window !== "undefined" ? localStorage.getItem("admin_token") || "" : ""} onSuccess={() => { setLoading(true); fetchBookings(); }} onClose={() => setOpen(false)} />
             </DialogContent>
@@ -243,29 +250,39 @@ export default function AdminBookingsPage() {
             <div className="p-6 space-y-4">{[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
           ) : (
             <>
-              <div className="overflow-x-auto">
+              <div className="responsive-table-wrapper">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b bg-slate-50/80">
+                  <tr className="border-b border-slate-100 bg-slate-50/30">
                     {["Guest & Reference", "Room & Rate", "Stay Dates", "Billing", "Status", "Actions"].map((h) => (
-                      <th key={h} className={`${h === "Actions" ? "text-right pr-6 w-16" : "text-left"} py-3 px-4 text-[11px] font-semibold text-slate-600 uppercase tracking-wider ${h === "Guest & Reference" ? "pl-6" : ""}`}>{h}</th>
+                      <th key={h} className={`${h === "Actions" ? "text-right pr-6 w-16" : "text-left"} py-3 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider ${h === "Guest & Reference" ? "pl-6" : ""}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {pageItems.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center text-slate-500 bg-white">
-                        <div className="flex flex-col items-center justify-center gap-2">
-                          <Search className="h-8 w-8 text-slate-300 mb-2" />
-                          <p className="text-base font-medium text-slate-600">No bookings found</p>
-                          <p className="text-sm">We couldn't find any bookings matching your current filters.</p>
-                        </div>
+                      <td colSpan={6} className="py-12 bg-white">
+                        <EmptyState 
+                          icon={CalendarCheck} 
+                          title="No bookings found" 
+                          description={search || statusFilter !== "all" ? "We couldn't find any bookings matching your current filters." : "You have no bookings yet. Add one to get started."}
+                          action={
+                            search || statusFilter !== "all" ? (
+                              <Button variant="outline" onClick={() => { setSearch(""); setStatusFilter("all"); setPage(1); }}>Reset Filters</Button>
+                            ) : (
+                              <Button className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={() => setOpen(true)}>
+                                <Plus className="h-4 w-4 mr-1" /> New booking
+                              </Button>
+                            )
+                          }
+                          borderless
+                        />
                       </td>
                     </tr>
                   ) : (
                     pageItems.map((b) => (
-                      <tr key={b.reference_number ?? b.id ?? Math.random()} className="border-b last:border-0 hover:bg-slate-50/50 transition-colors">
+                      <tr key={b.reference_number ?? b.id ?? Math.random()} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
                       <td className="py-4 px-6 align-top">
                         <div className="flex flex-col">
                           <span className="font-semibold text-slate-800 text-sm">{b.guests?.full_name ?? "—"}</span>
@@ -298,9 +315,7 @@ export default function AdminBookingsPage() {
                          <div className="flex flex-col gap-1.5 w-max">
                            <div className="flex items-center gap-2">
                              {(() => {
-                               const room = Number(b.total_amount ?? 0);
-                               const resto = Number(b.restaurant_charges_total ?? 0);
-                               const total = room + resto;
+                               const total = getBookingChargeBreakdown(b).grandTotal;
                                const deposit = Number(b.deposit_paid ?? 0);
                                const balance = Number(b.balance_due ?? 0);
                                return (
@@ -319,6 +334,12 @@ export default function AdminBookingsPage() {
                            </div>
                            {Number(b.restaurant_charges_total || 0) > 0 && (
                              <span className="text-[10px] text-amber-700 font-medium">+ ₱{Number(b.restaurant_charges_total || 0).toFixed(0)} Restaurant</span>
+                           )}
+                           {Number(b.extras_total || 0) > 0 && (
+                             <span className="text-[10px] text-blue-700 font-medium">+ PHP {Number(b.extras_total || 0).toFixed(0)} Extras</span>
+                           )}
+                           {Number(b.extensions_total || 0) > 0 && (
+                             <span className="text-[10px] text-violet-700 font-medium">+ PHP {Number(b.extensions_total || 0).toFixed(0)} Extension</span>
                            )}
                            {(Number(b.balance_due) > 0 || Number(b.deposit_paid) > 0) && (
                              <div className="flex flex-col gap-0.5 text-[10px] text-slate-500">
@@ -388,8 +409,24 @@ export default function AdminBookingsPage() {
                                   <LogOut className="mr-2 h-4 w-4" /> Check Out Guest
                                 </DropdownMenuItem>
                               )}
+                              
+                              <DropdownMenuSeparator />
+
+                              {/* NEW ENTERPRISE FEATURES */}
+                              {b.status === "Checked-In" && (
+                                <DropdownMenuItem onClick={() => setExtendBooking(b)} className="text-violet-600 focus:text-violet-700 focus:bg-violet-50 cursor-pointer text-sm">
+                                  <CalendarPlus className="mr-2 h-4 w-4" /> Extend Stay
+                                </DropdownMenuItem>
+                              )}
+                              {b.status !== "Cancelled" && (
+                                <DropdownMenuItem onClick={() => setExtrasBooking(b)} className="text-blue-600 focus:text-blue-700 focus:bg-blue-50 cursor-pointer text-sm">
+                                  <Package className="mr-2 h-4 w-4" /> Manage Extras
+                                </DropdownMenuItem>
+                              )}
+                              
+                              <DropdownMenuSeparator />
                               {b.status !== "Checked-In" && b.status !== "Checked-Out" && b.status !== "Cancelled" && (
-                                <DropdownMenuItem onClick={async () => { if (!b.id) return; try { const res = await api(`/api/bookings/${b.id}`, { method: "PATCH", body: JSON.stringify({ status: "Cancelled" }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error((data as { error?: string }).error || "Failed to cancel."); return; } toast.success("Cancelled."); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }} className="text-red-500 focus:text-red-500 focus:bg-red-50 cursor-pointer text-sm">
+                                <DropdownMenuItem onClick={async () => { if (!b.id) return; try { const res = await api(`/api/bookings/${b.id}`, { method: "PATCH", body: JSON.stringify({ status: "Cancelled" }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Failed to cancel."); return; } toast.success("Cancelled."); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }} className="text-red-500 focus:text-red-500 focus:bg-red-50 cursor-pointer text-sm">
                                   <XCircle className="mr-2 h-4 w-4" /> Cancel Booking
                                 </DropdownMenuItem>
                               )}
@@ -401,7 +438,7 @@ export default function AdminBookingsPage() {
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
                                   <AlertDialogHeader><AlertDialogTitle>Delete this booking?</AlertDialogTitle><AlertDialogDescription>This will permanently delete booking <span className="font-semibold">{b.reference_number}</span>. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                                  <AlertDialogFooter><AlertDialogCancel>Keep Booking</AlertDialogCancel><AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={async () => { if (!b.id) return; try { const res = await api(`/api/bookings/${b.id}`, { method: "DELETE" }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error((data as { error?: string }).error || "Failed."); return; } toast.success("Deleted."); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }}>Delete booking</AlertDialogAction></AlertDialogFooter>
+                                  <AlertDialogFooter><AlertDialogCancel>Keep Booking</AlertDialogCancel><AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={async () => { if (!b.id) return; try { const res = await api(`/api/bookings/${b.id}`, { method: "DELETE" }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Failed."); return; } toast.success("Deleted."); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }}>Delete booking</AlertDialogAction></AlertDialogFooter>
                                 </AlertDialogContent>
                               </AlertDialog>
                            </DropdownMenuContent>
@@ -414,7 +451,7 @@ export default function AdminBookingsPage() {
               </table>
             </div>
             {filtered.length > 0 && (
-              <div className="flex items-center justify-between px-6 py-3 border-t bg-slate-50/60 text-xs text-slate-600 rounded-b-lg">
+              <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/30 text-xs text-slate-500">
                 <div>Showing <span className="font-semibold">{filtered.length === 0 ? 0 : startIndex + 1}–{Math.min(endIndex, filtered.length)}</span> of <span className="font-semibold">{filtered.length}</span> booking{filtered.length !== 1 ? "s" : ""}</div>
                 <div className="inline-flex items-center gap-1">
                   <Button type="button" variant="outline" size="icon" className="h-7 w-7 rounded-full" disabled={currentPage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}><ChevronLeft className="h-3 w-3" /></Button>
@@ -431,7 +468,7 @@ export default function AdminBookingsPage() {
       {/* Edit dialog */}
       <Dialog open={!!editBooking} onOpenChange={(o) => !o && setEditBooking(null)}>
         <DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Edit booking</DialogTitle></DialogHeader>
-          {editBooking?.id && <EditBookingForm apiUrl="" token={token()} booking={{ id: editBooking.id, status: editBooking.status, check_in_date: editBooking.check_in_date, check_out_date: editBooking.check_out_date, special_requests: editBooking.special_requests, deposit_paid: editBooking.deposit_paid, total_amount: editBooking.total_amount, balance_due: editBooking.balance_due, is_lgu_booking: editBooking.is_lgu_booking }} onSuccess={() => { setLoading(true); fetchBookings(); }} onClose={() => setEditBooking(null)} />}
+          {editBooking?.id && <EditBookingForm apiUrl="" token={token()} booking={{ id: editBooking.id, status: editBooking.status, check_in_date: editBooking.check_in_date, check_out_date: editBooking.check_out_date, special_requests: editBooking.special_requests, deposit_paid: editBooking.deposit_paid, total_amount: editBooking.total_amount, balance_due: editBooking.balance_due, restaurant_charges_total: editBooking.restaurant_charges_total, extras_total: editBooking.extras_total, extensions_total: editBooking.extensions_total, early_checkin_fee_applied: editBooking.early_checkin_fee_applied, late_checkout_fee_applied: editBooking.late_checkout_fee_applied, is_lgu_booking: editBooking.is_lgu_booking }} onSuccess={() => { setLoading(true); fetchBookings(); }} onClose={() => setEditBooking(null)} />}
         </DialogContent>
       </Dialog>
 
@@ -464,7 +501,7 @@ export default function AdminBookingsPage() {
             {checkInBooking?.check_in_date && <p className="text-xs text-slate-500">Reserved: <span className="font-medium">{`${String(checkInBooking.check_in_date).slice(0, 10)} 14:00`}</span></p>}
             {(() => { const p = computeEarlyCheckInPreview(); return <p className={cn("text-xs", p.fee > 0 ? "text-slate-700" : "text-slate-500")}>Breakdown: <span className="font-semibold text-[#07008A]">₱{p.fee.toFixed(0)}</span> (<span className="font-mono">₱{p.rate.toFixed(0)}</span> × <span className="font-mono">{p.hoursEarly}</span> hour{p.hoursEarly !== 1 ? "s" : ""} early) — {p.reason}</p>; })()}
           </div>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={async () => { const b = checkInBooking; if (!b?.id) return; try { const actual = checkInAt ? new Date(checkInAt).toISOString() : new Date().toISOString(); const res = await api(`/api/bookings/${b.id}/check-in`, { method: "POST", body: JSON.stringify({ actual_check_in_at: actual }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error((data as { error?: string }).error || "Check-in failed."); return; } const fee = Number((data as { early_checkin_fee_applied?: number }).early_checkin_fee_applied || 0); toast.success(fee > 0 ? `Checked in. Early fee: ₱${fee.toFixed(0)}.` : "Checked in."); setCheckInBooking(null); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }}>Confirm check-in</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={async () => { const b = checkInBooking; if (!b?.id) return; try { const actual = checkInAt ? new Date(checkInAt).toISOString() : new Date().toISOString(); const res = await api(`/api/bookings/${b.id}/check-in`, { method: "POST", body: JSON.stringify({ actual_check_in_at: actual }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Check-in failed."); return; } const fee = Number((data as { early_checkin_fee_applied?: number }).early_checkin_fee_applied || 0); toast.success(fee > 0 ? `Checked in. Early fee: ₱${fee.toFixed(0)}.` : "Checked in."); setCheckInBooking(null); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }}>Confirm check-in</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
@@ -501,7 +538,7 @@ export default function AdminBookingsPage() {
             )}
             {(() => { const p = computeLateCheckOutPreview(); return <p className={cn("text-xs", p.fee > 0 ? "text-slate-700" : "text-slate-500")}>Breakdown: <span className="font-semibold text-[#07008A]">₱{p.fee.toFixed(0)}</span> (<span className="font-mono">₱{p.rate.toFixed(0)}</span> × <span className="font-mono">{p.hoursLate}</span> hour{p.hoursLate !== 1 ? "s" : ""} late) — {p.reason}</p>; })()}
           </div>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-amber-600 hover:bg-amber-700 text-white" onClick={async () => { const b = checkOutBooking; if (!b?.id) return; try { const actual = checkOutAt ? new Date(checkOutAt).toISOString() : new Date().toISOString(); const res = await api(`/api/bookings/${b.id}/check-out`, { method: "POST", body: JSON.stringify({ actual_check_out_at: actual }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error((data as { error?: string }).error || "Check-out failed."); return; } const fee = Number((data as { late_checkout_fee_applied?: number }).late_checkout_fee_applied || 0); toast.success(fee > 0 ? `Checked out. Late fee: ₱${fee.toFixed(0)}.` : "Checked out."); setCheckOutBooking(null); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }}>Confirm check-out</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-amber-600 hover:bg-amber-700 text-white" onClick={async () => { const b = checkOutBooking; if (!b?.id) return; try { const actual = checkOutAt ? new Date(checkOutAt).toISOString() : new Date().toISOString(); const res = await api(`/api/bookings/${b.id}/check-out`, { method: "POST", body: JSON.stringify({ actual_check_out_at: actual }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Check-out failed."); return; } const fee = Number((data as { late_checkout_fee_applied?: number }).late_checkout_fee_applied || 0); toast.success(fee > 0 ? `Checked out. Late fee: ₱${fee.toFixed(0)}.` : "Checked out."); setCheckOutBooking(null); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }}>Confirm check-out</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
@@ -510,6 +547,34 @@ export default function AdminBookingsPage() {
         booking={receiptBooking} 
         onClose={() => setReceiptBooking(null)} 
       />
+
+      {/* Enterprise Feature: Extend Stay */}
+      {extendBooking?.id && (
+        <ExtendStayModal
+          open={!!extendBooking}
+          onClose={() => setExtendBooking(null)}
+          booking={extendBooking as any}
+          token={token()}
+          onSuccess={() => {
+            setLoading(true);
+            fetchBookings();
+          }}
+        />
+      )}
+
+      {/* Enterprise Feature: Manage Extras */}
+      {extrasBooking?.id && (
+        <ManageExtrasModal
+          open={!!extrasBooking}
+          onClose={() => setExtrasBooking(null)}
+          onSuccess={() => {
+            setLoading(true);
+            fetchBookings();
+          }}
+          booking={extrasBooking as any}
+          token={token()}
+        />
+      )}
 
     </>
   );
