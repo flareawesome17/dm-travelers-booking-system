@@ -49,7 +49,7 @@ const Footer = () => {
               </li>
               <li className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-primary flex-shrink-0" />
-                dmsupport@erniecodev.win
+                info@dmtravelersinn.com
               </li>
               <li className="flex items-start gap-2">
                 <Clock className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />

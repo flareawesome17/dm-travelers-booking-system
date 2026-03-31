@@ -1,10 +1,39 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { MapPin, Phone, Mail, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function ContactPage() {
+  const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
+  const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setStatus("sending");
+    setErrorMsg("");
+    try {
+      const res = await fetch("/api/public/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        setStatus("success");
+        setForm({ name: "", email: "", subject: "", message: "" });
+      } else {
+        const data = await res.json();
+        setErrorMsg(data.error || "Failed to send message. Please try again.");
+        setStatus("error");
+      }
+    } catch {
+      setErrorMsg("Network error. Please try again.");
+      setStatus("error");
+    }
+  }
+
   return (
     <div className="pt-20">
       <section className="bg-secondary py-16 lg:py-20">
@@ -45,16 +74,59 @@ export default function ContactPage() {
             </div>
 
             {/* Contact Form */}
-            <form className="bg-card rounded-xl p-6 shadow-soft space-y-4" onSubmit={(e) => e.preventDefault()}>
+            <form className="bg-card rounded-xl p-6 shadow-soft space-y-4" onSubmit={handleSubmit}>
               <h3 className="font-heading text-lg font-semibold text-foreground">Send a Message</h3>
+
+              {status === "success" && (
+                <div className="bg-success-muted text-success rounded-lg px-4 py-3 text-sm font-medium">
+                  Message sent! We&apos;ll get back to you soon.
+                </div>
+              )}
+              {status === "error" && (
+                <div className="bg-destructive/10 text-destructive rounded-lg px-4 py-3 text-sm">
+                  {errorMsg}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input placeholder="Name" className="px-4 py-2.5 bg-muted rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary" />
-                <input type="email" placeholder="Email" className="px-4 py-2.5 bg-muted rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary" />
+                <input
+                  placeholder="Name"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  required
+                  className="px-4 py-2.5 bg-muted rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  required
+                  className="px-4 py-2.5 bg-muted rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
               </div>
-              <input placeholder="Subject" className="w-full px-4 py-2.5 bg-muted rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary" />
-              <textarea placeholder="Your message..." rows={5} className="w-full px-4 py-2.5 bg-muted rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none" />
-              <Button type="submit" className="w-full bg-gradient-gold text-secondary font-semibold shadow-gold hover:opacity-90">
-                Send Message
+              <input
+                placeholder="Subject"
+                value={form.subject}
+                onChange={(e) => setForm({ ...form, subject: e.target.value })}
+                required
+                className="w-full px-4 py-2.5 bg-muted rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <textarea
+                placeholder="Your message..."
+                rows={5}
+                value={form.message}
+                onChange={(e) => setForm({ ...form, message: e.target.value })}
+                required
+                minLength={10}
+                className="w-full px-4 py-2.5 bg-muted rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+              />
+              <Button
+                type="submit"
+                disabled={status === "sending"}
+                className="w-full bg-gradient-gold text-secondary font-semibold shadow-gold hover:opacity-90 disabled:opacity-60"
+              >
+                {status === "sending" ? "Sending..." : "Send Message"}
               </Button>
             </form>
           </div>
