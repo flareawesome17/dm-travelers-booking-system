@@ -39,7 +39,7 @@ export default function Hero() {
       className={cn(
         heroDisplayFont.variable,
         heroBodyFont.variable,
-        "relative isolate h-[265vh] bg-secondary text-white sm:h-[300vh] lg:h-[420vh] xl:h-[440vh]",
+        "relative isolate h-[100dvh] md:h-screen lg:h-[420vh] xl:h-[440vh] bg-secondary text-white",
       )}
     >
         <div className="sticky top-0 z-20 h-screen overflow-hidden">

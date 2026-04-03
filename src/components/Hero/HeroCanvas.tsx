@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { useReducedMotion, type MotionValue } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -213,7 +214,7 @@ export default function HeroCanvas({
   );
 
   useEffect(() => {
-    if (typeof window === "undefined") {
+    if (typeof window === "undefined" || window.innerWidth <= 1024) {
       return undefined;
     }
 
@@ -282,7 +283,7 @@ export default function HeroCanvas({
   ]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
+    if (typeof window === "undefined" || window.innerWidth <= 1024) {
       return undefined;
     }
 
@@ -351,7 +352,7 @@ export default function HeroCanvas({
   ]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
+    if (typeof window === "undefined" || window.innerWidth <= 1024) {
       return undefined;
     }
 
@@ -381,20 +382,24 @@ export default function HeroCanvas({
   }, [drawImageToCanvas, syncCanvasSize]);
 
   return (
-    <div ref={containerRef} className={cn("absolute inset-0", className)}>
-      <div
-        aria-hidden="true"
+    <div ref={containerRef} className={cn("absolute inset-0 bg-secondary overflow-hidden", className)}>
+      <Image
+        priority
+        fetchPriority="high"
+        src={config.fallbackImagePath}
+        alt="D&M Travelers Inn - Boutique hotel arrival"
+        fill
+        sizes="100vw"
         className={cn(
-          "absolute inset-0 bg-cover bg-center transition-opacity duration-700",
+          "object-cover transition-opacity duration-700",
           framesReady ? "opacity-0" : "opacity-100",
         )}
-        style={{ backgroundImage: `url(${config.fallbackImagePath})` }}
       />
 
       <canvas
         ref={canvasRef}
         aria-label={config.ariaLabel}
-        className="absolute inset-0 h-full w-full"
+        className="absolute inset-0 h-full w-full hidden lg:block"
         role="img"
       />
     </div>
