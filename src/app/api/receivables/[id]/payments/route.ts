@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { addShiftTransaction } from "@/lib/shiftUtils";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { requirePermission } from "@/lib/rbac";
 import { parseAndValidate, dbError, internalError } from "@/lib/api-security";
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const body = parsed.data;
     const supabase = getSupabaseAdmin();
 
-    // Get current receivable
+    // Get current receivable with booking details for ledger description
     const { data: rec, error: rErr } = await supabase
       .from("receivables")
       .select("id, amount_due, amount_paid, status, booking_id")
@@ -32,6 +33,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         { error: { code: "already_settled", message: "This receivable is already fully settled" } },
         { status: 422 }
       );
+    }
+
+    // Fetch booking reference for shift ledger description
+    let refIdentifier = rec.booking_id || "Unknown";
+    if (rec.booking_id) {
+      const { data: bk } = await supabase
+        .from("bookings")
+        .select("reference_number")
+        .eq("id", rec.booking_id)
+        .maybeSingle();
+      if (bk?.reference_number) refIdentifier = bk.reference_number;
     }
 
     const today = manilaDateString();
@@ -51,7 +63,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .select()
       .single();
 
-    if (pErr) return dbError(pErr, "Failed to record payment");
+    if (pErr || !payment) return dbError(pErr, "Failed to record payment");
+
+    // Shift Transaction Sync
+    try {
+      await addShiftTransaction({
+        source: "booking",
+        referenceId: payment.id,
+        description: `Receivable Collection: ${refIdentifier}`,
+        amount: Number(body.amount),
+        type: "INCOME",
+        performedBy: typeof auth.payload?.sub === "string" ? auth.payload.sub : null,
+        onFailure: "throw",
+      });
+    } catch (shiftError) {
+      console.error("[RECEIVABLE_SHIFT_SYNC_ERROR]", shiftError);
+      
+      const { error: rollbackError } = await supabase.from("receivable_payments").delete().eq("id", payment.id);
+      if (rollbackError) {
+        console.error("[RECEIVABLE_SHIFT_SYNC_ROLLBACK_ERROR]", rollbackError);
+      }
+      return internalError();
+    }
 
     // Update receivable totals
     const newAmountPaid = toMoneyNumber(rec.amount_paid) + body.amount;

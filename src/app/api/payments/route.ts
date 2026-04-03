@@ -7,6 +7,8 @@ import { createPaymentSchema } from "@/lib/validation-schemas";
 import { getBookingChargeBreakdown, toMoneyNumber } from "@/lib/bookingTotals";
 import { findLatestReceivableForBooking, getReceivableStatus } from "@/lib/receivables";
 
+import { addShiftTransaction } from "@/lib/shiftUtils";
+
 export async function POST(req: NextRequest) {
   const auth = await requirePermission(req, "payments.create");
   if ("error" in auth) return auth.error;
@@ -25,6 +27,7 @@ export async function POST(req: NextRequest) {
     const { data: booking, error: fetchError } = await supabase
       .from("bookings")
       .select(`
+        reference_number,
         total_amount,
         deposit_paid,
         balance_due,
@@ -46,7 +49,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Insert the payment record
     const tId = transaction_id?.trim() || `TXN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    const { error: insertError } = await supabase
+    const { data: paymentRecord, error: insertError } = await supabase
       .from("payments")
       .insert({
         booking_id,
@@ -56,10 +59,33 @@ export async function POST(req: NextRequest) {
         transaction_id: tId,
         accounting_date: accountingDate,
         status: "Success",
-      });
+      })
+      .select()
+      .single();
 
-    if (insertError) {
+    if (insertError || !paymentRecord) {
       return dbError(insertError, "Failed to record payment");
+    }
+
+    // 2.5 Shift Transaction Sync
+    try {
+      await addShiftTransaction({
+        source: "booking",
+        referenceId: paymentRecord.id,
+        description: `Booking Payment: ${booking.reference_number || booking_id}`,
+        amount: Number(amount),
+        type: "INCOME",
+        performedBy: typeof auth.payload?.sub === "string" ? auth.payload.sub : null,
+        onFailure: "throw",
+      });
+    } catch (shiftError) {
+      console.error("[PAYMENT_SHIFT_SYNC_ERROR]", shiftError);
+      
+      const { error: rollbackError } = await supabase.from("payments").delete().eq("id", paymentRecord.id);
+      if (rollbackError) {
+        console.error("[PAYMENT_SHIFT_SYNC_ROLLBACK_ERROR]", rollbackError);
+      }
+      return internalError();
     }
 
     // 3. Calculate new totals

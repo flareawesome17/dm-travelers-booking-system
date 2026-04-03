@@ -18,7 +18,7 @@ export default {
         body: ['DM Sans', 'system-ui', 'sans-serif'],
       },
       screens: {
-        'tablet': '768px',
+        'tablet': '640px',
         'laptop': '1024px',
         'desktop': '1280px',
         'wide': '1536px',

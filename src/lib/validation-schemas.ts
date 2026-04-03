@@ -104,7 +104,7 @@ export const createPaymentSchema = z.object({
   method: z.enum(["Cash", "GCash", "Card", "Stripe", "PayPal"], {
     errorMap: () => ({ message: "Invalid payment method" }),
   }),
-  type: z.enum(["Deposit", "Payment", "Refund", "Adjustment"], {
+  type: z.enum(["Deposit", "Balance", "Restaurant", "Extension", "Extra", "Receivable"], {
     errorMap: () => ({ message: "Invalid payment type" }),
   }),
   transaction_id: z.string().max(100).optional(),

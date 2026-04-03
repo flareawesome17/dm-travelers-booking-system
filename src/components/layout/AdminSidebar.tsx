@@ -199,11 +199,11 @@ export default function AdminSidebar({
       {/* Brand header */}
       <div className={cn(
         "flex items-center border-b border-white/8 shrink-0",
-        isCollapsed ? "justify-center px-3 h-[72px]" : "justify-between px-5 h-[72px]"
+        (isCollapsed && !isMobileOpen) ? "justify-center px-3 h-[72px]" : "justify-between px-5 h-[72px]"
       )}>
         <div className="flex items-center gap-3 overflow-hidden">
           <Image src="/logo.png" alt="D&M Logo" width={36} height={36} className="shrink-0 object-contain" />
-          {!isCollapsed && (
+          {(!isCollapsed || isMobileOpen) && (
             <div className="whitespace-nowrap flex-1 min-w-0">
               <p className="font-bold text-white text-sm tracking-tight leading-tight">Admin</p>
               <p className="text-[11px] text-white/50 leading-tight truncate">D&M Travelers Inn</p>
@@ -238,7 +238,7 @@ export default function AdminSidebar({
       {isCollapsed && onToggle && !isMobileOpen && (
         <button
           onClick={onToggle}
-          className="absolute -right-3 top-7 bg-[#FED501] text-[#07008A] p-1 rounded-full shadow-lg z-40 hover:scale-110 transition-transform ring-2 ring-[#07008A]/20"
+          className="hidden tablet:flex items-center justify-center absolute -right-3 top-7 bg-[#FED501] text-[#07008A] p-1 rounded-full shadow-lg z-40 hover:scale-110 transition-transform ring-2 ring-[#07008A]/20"
           aria-label="Expand sidebar"
         >
           <ChevronRight className="h-3.5 w-3.5" />
@@ -249,10 +249,10 @@ export default function AdminSidebar({
       <TooltipProvider>
         <nav className={cn(
           "sidebar-scroll flex-1 overflow-y-auto overflow-x-hidden py-4",
-          isCollapsed ? "px-2" : "px-3"
+          (isCollapsed && !isMobileOpen) ? "px-2" : "px-3"
         )}>
           {/* Operations Group */}
-          {!isCollapsed && (
+          {(!isCollapsed || isMobileOpen) && (
             <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-white/30">
               Operations
             </p>
@@ -271,12 +271,12 @@ export default function AdminSidebar({
           </div>
 
           {/* Separator */}
-          <div className={cn("my-4", isCollapsed ? "mx-2" : "mx-3")}>
+          <div className={cn("my-4", (isCollapsed && !isMobileOpen) ? "mx-2" : "mx-3")}>
             <div className="h-px bg-white/8" />
           </div>
 
           {/* Management Group */}
-          {!isCollapsed && (
+          {(!isCollapsed || isMobileOpen) && (
             <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-white/30">
               Management
             </p>

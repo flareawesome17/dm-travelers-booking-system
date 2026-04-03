@@ -43,12 +43,20 @@ export async function GET(req: NextRequest) {
     const { data: expenses, error: eErr } = await eQuery;
     if (eErr) throw eErr;
 
+    // 4. Fetch Receivable Payments (LGU / Special collections)
+    let rcQuery = supabase.from("receivable_payments")
+      .select("id, amount, method, accounting_date, receivable_id");
+    if (startDay) rcQuery = rcQuery.gte("accounting_date", startDay);
+    if (endDay) rcQuery = rcQuery.lte("accounting_date", endDay);
+    const { data: receivablePayments, error: rcErr } = await rcQuery;
+    if (rcErr) throw rcErr;
+
     // --- Calculations (Actual Paid Revenue) ---
     const roomRevenue = (payments ?? []).reduce((s, p) => s + Number(p.amount || 0), 0);
-
     const restaurantRevenue = (rOrders ?? []).reduce((s, r) => s + Number(r.total_amount || 0), 0);
+    const receivableRevenue = (receivablePayments ?? []).reduce((s, rp) => s + Number(rp.amount || 0), 0);
 
-    const totalRevenue = roomRevenue + restaurantRevenue;
+    const totalRevenue = roomRevenue + restaurantRevenue + receivableRevenue;
     const totalExpenses = (expenses ?? []).reduce((s, e) => s + Number(e.amount || 0), 0);
     const netProfit = totalRevenue - totalExpenses;
 
@@ -63,17 +71,26 @@ export async function GET(req: NextRequest) {
       const paid = Number(r.total_amount || 0);
       if (paid > 0) byMethod[m] = (byMethod[m] || 0) + paid;
     });
+    (receivablePayments ?? []).forEach((rp) => {
+      const m = rp.method || "Unknown";
+      const amt = Number(rp.amount || 0);
+      if (amt > 0) byMethod[m] = (byMethod[m] || 0) + amt;
+    });
 
-    const bySource = {
+    const bySource: Record<string, number> = {
       Rooms: roomRevenue,
-      Restaurant: restaurantRevenue
+      Restaurant: restaurantRevenue,
     };
+    if (receivableRevenue > 0) {
+      bySource["Receivables"] = receivableRevenue;
+    }
 
     if (format === "csv") {
       const header = "Category,Amount\n";
       const rows = [
         `Room Revenue,${roomRevenue.toFixed(2)}`,
         `Restaurant Revenue,${restaurantRevenue.toFixed(2)}`,
+        `Receivable Collections,${receivableRevenue.toFixed(2)}`,
         `Total Revenue,${totalRevenue.toFixed(2)}`,
         `Total Expenses,${totalExpenses.toFixed(2)}`,
         `Net Profit,${netProfit.toFixed(2)}`
@@ -83,17 +100,20 @@ export async function GET(req: NextRequest) {
 
     const bookingCount = Array.from(new Set((payments ?? []).map((p) => p.booking_id).filter(Boolean))).length;
     const orderCount = (rOrders ?? []).length;
+    const receivableCollectionCount = (receivablePayments ?? []).length;
 
     return NextResponse.json({
       total_revenue: totalRevenue,
       room_revenue: roomRevenue,
       restaurant_revenue: restaurantRevenue,
+      receivable_revenue: receivableRevenue,
       total_expenses: totalExpenses,
       net_profit: netProfit,
       by_method: byMethod,
       by_source: bySource,
       booking_count: bookingCount,
       order_count: orderCount,
+      receivable_collection_count: receivableCollectionCount,
       expenses_list: expenses || []
     });
   } catch (error: any) {

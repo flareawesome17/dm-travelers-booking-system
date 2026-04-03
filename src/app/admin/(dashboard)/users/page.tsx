@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Users as UsersIcon, Plus, Eye, EyeOff, Edit, Trash2 } from "lucide-react";
+import { Users as UsersIcon, Plus, Eye, EyeOff, Edit, Trash2, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -40,6 +40,7 @@ export default function AdminUsersPage() {
   const [editRoleId, setEditRoleId] = useState<string>("3");
   const [editIsActive, setEditIsActive] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteConfirmUser, setDeleteConfirmUser] = useState<AdminUser | null>(null);
   const router = useRouter();
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -122,8 +123,9 @@ export default function AdminUsersPage() {
     } catch { toast.error("Something went wrong."); } finally { setSaving(false); }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this admin user?")) return;
+  const handleDelete = async () => {
+    if (!deleteConfirmUser) return;
+    const id = deleteConfirmUser.id;
     const token = localStorage.getItem("admin_token");
     if (!token) { router.replace("/admin/login"); return; }
     setDeletingId(id);
@@ -136,7 +138,7 @@ export default function AdminUsersPage() {
       }
       setUsers((prev) => prev.filter(u => u.id !== id));
       toast.success("Admin user deleted.");
-    } catch { toast.error("Something went wrong."); } finally { setDeletingId(null); }
+    } catch { toast.error("Something went wrong."); } finally { setDeletingId(null); setDeleteConfirmUser(null); }
   };
 
   const filteredUsers = users.filter((u) => {
@@ -231,7 +233,7 @@ export default function AdminUsersPage() {
                         </td>
                       </tr>
                     ) : (
-                      paginatedUsers.map((u) => <tr key={u.id} className="border-b last:border-0 hover:bg-slate-50/50 transition-colors"><td className="py-4 px-6 font-medium text-slate-800">{u.name ?? "—"}</td><td className="py-4 px-6 font-medium text-[#07008A]">{u.email ?? "—"}</td><td className="py-4 px-6 text-sm text-slate-600">{u.role_id != null ? ROLE_LABELS[u.role_id] ?? u.role_id : "—"}</td><td className="py-4 px-6"><Badge variant={u.is_active ? "default" : "secondary"}>{u.is_active ? "Yes" : "No"}</Badge></td><td className="py-4 px-6 text-right"><div className="flex items-center justify-end gap-2"><TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-[#07008A]" onClick={() => openEditModal(u)}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Edit user</p></TooltipContent></Tooltip><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-red-600" onClick={() => handleDelete(u.id)} disabled={deletingId === u.id}>{deletingId === u.id ? <Skeleton className="h-4 w-4 rounded-full" /> : <Trash2 className="h-4 w-4" />}</Button></TooltipTrigger><TooltipContent><p>Delete user</p></TooltipContent></Tooltip></TooltipProvider></div></td></tr>)
+                      paginatedUsers.map((u) => <tr key={u.id} className="border-b last:border-0 hover:bg-slate-50/50 transition-colors"><td className="py-4 px-6 font-medium text-slate-800">{u.name ?? "—"}</td><td className="py-4 px-6 font-medium text-[#07008A]">{u.email ?? "—"}</td><td className="py-4 px-6 text-sm text-slate-600">{u.role_id != null ? ROLE_LABELS[u.role_id] ?? u.role_id : "—"}</td><td className="py-4 px-6"><Badge variant={u.is_active ? "default" : "secondary"}>{u.is_active ? "Yes" : "No"}</Badge></td><td className="py-4 px-6 text-right"><div className="flex items-center justify-end gap-2"><TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-[#07008A]" onClick={() => openEditModal(u)}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Edit user</p></TooltipContent></Tooltip><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-red-600" onClick={() => setDeleteConfirmUser(u)} disabled={deletingId === u.id}>{deletingId === u.id ? <Skeleton className="h-4 w-4 rounded-full" /> : <Trash2 className="h-4 w-4" />}</Button></TooltipTrigger><TooltipContent><p>Delete user</p></TooltipContent></Tooltip></TooltipProvider></div></td></tr>)
                     )}
                   </tbody>
                 </table>
@@ -264,6 +266,29 @@ export default function AdminUsersPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={!!deleteConfirmUser} onOpenChange={(open) => { if (!open) setDeleteConfirmUser(null); }}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 mb-4">
+              <AlertTriangle className="h-6 w-6 text-red-600" />
+            </div>
+            <DialogTitle className="text-center">Delete Admin User</DialogTitle>
+            <DialogDescription className="text-center">
+              Are you sure you want to permanently delete <span className="font-semibold text-slate-800">{deleteConfirmUser?.name || deleteConfirmUser?.email || "this user"}</span>? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-center gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={() => setDeleteConfirmUser(null)} disabled={!!deletingId}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleDelete} disabled={!!deletingId} className="bg-red-600 hover:bg-red-700">
+              {deletingId ? "Deleting..." : "Delete User"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

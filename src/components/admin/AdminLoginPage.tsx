@@ -146,7 +146,7 @@ export default function AdminLoginPage() {
                     <Input
                       id="admin-password"
                       type={showPassword ? "text" : "password"}
-                      placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                      placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className={cn("pl-10 pr-11 h-11 rounded-lg border-[#07008A]/20 bg-muted/30", "focus-visible:ring-[#07008A] focus-visible:border-[#07008A]/40")}
@@ -175,7 +175,7 @@ export default function AdminLoginPage() {
               <form onSubmit={verifyOtp} className="space-y-5">
                 <div className="rounded-lg border bg-slate-50/60 p-4 text-sm text-slate-700">
                   OTP sent to <span className="font-semibold">{otpMaskedTo || email}</span>
-                  {otpExpiresLabel ? <span className="text-slate-500"> Â· Expires at {otpExpiresLabel}</span> : null}
+                  {otpExpiresLabel ? <span className="text-slate-500"> · Expires at {otpExpiresLabel}</span> : null}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="admin-otp" className="text-[#07008A]/90 font-medium">OTP</Label>

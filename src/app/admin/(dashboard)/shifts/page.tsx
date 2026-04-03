@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, KeyRound, ArrowUpRight, ArrowDownRight, RefreshCcw, ShieldAlert, CheckCircle2 } from "lucide-react";
+import { Clock, KeyRound, ArrowUpRight, ArrowDownRight, RefreshCcw, ShieldAlert, CheckCircle2, History } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -48,9 +48,20 @@ export default function ShiftsPage() {
           <h1 className="text-2xl lg:text-3xl font-bold text-[#07008A] tracking-tight">Shift Management</h1>
           <p className="text-muted-foreground mt-1 text-sm">Monitor current active shift ledger and closeouts</p>
         </div>
-        <Button variant="outline" onClick={fetchData} className="rounded-full">
-          <RefreshCcw className="mr-2 h-4 w-4" /> Refresh
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" onClick={() => router.push("/admin/shifts/history")} className="rounded-full text-[#07008A] border-[#07008A]/20 hover:bg-[#07008A]/5 hidden sm:flex">
+            <History className="mr-2 h-4 w-4" /> View History
+          </Button>
+          <Button variant="outline" onClick={() => router.push("/admin/shifts/history")} className="rounded-full text-[#07008A] border-[#07008A]/20 hover:bg-[#07008A]/5 sm:hidden" size="icon">
+            <History className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" onClick={fetchData} className="rounded-full hidden sm:flex">
+            <RefreshCcw className="mr-2 h-4 w-4" /> Refresh
+          </Button>
+          <Button variant="outline" onClick={fetchData} className="rounded-full sm:hidden" size="icon">
+            <RefreshCcw className="h-4 w-4" />
+          </Button>
+        </div>
       </motion.div>
 
       {loading ? (

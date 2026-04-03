@@ -1,0 +1,23 @@
+# Protected branch control owners for [ERN-93](/ERN/issues/ERN-93).
+# GitHub requires concrete usernames or teams here, so the current repository
+# owner is the enforceable repo-side owner until CTO provisions a dedicated team.
+
+* @flareawesome17
+
+# Repo governance and CI controls
+/.github/ @flareawesome17
+
+# Admin/auth surfaces
+/src/app/admin/ @flareawesome17
+/src/app/api/admin/ @flareawesome17
+/src/components/admin/ @flareawesome17
+/src/components/layout/AdminDashboardShell.tsx @flareawesome17
+/src/components/layout/AdminSidebar.tsx @flareawesome17
+
+# Route handlers and data-boundary files
+/src/app/api/ @flareawesome17
+/src/lib/auth.ts @flareawesome17
+/src/lib/admin-client.ts @flareawesome17
+/src/lib/admin-session.ts @flareawesome17
+/src/lib/api-security.ts @flareawesome17
+/src/lib/rbac.ts @flareawesome17

@@ -30,6 +30,9 @@ next-env.d.ts
 .claude/
 .cursor/
 skills-lock.json
+CLAUDE.md
+docs/
+plans/
 
 # Editor directories and files
 .vscode/*

@@ -42,7 +42,7 @@ export default function AdminDashboardShell({
 
   useEffect(() => {
     const checkWidth = () => {
-      if (window.innerWidth < 768) {
+      if (window.innerWidth < 640) {
         setIsCollapsed(true);
       } else if (window.innerWidth < 1024) {
         setIsCollapsed(true);
