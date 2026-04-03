@@ -100,11 +100,12 @@ export default function AdminDashboardShell({
       ["/admin/housekeeping", "housekeeping.read"],
       ["/admin/restaurant", "restaurant.read"],
       ["/admin/inventory", "inventory.read"],
+      ["/admin/treasury", "treasury.read"],
       ["/admin/reports", "reports.read"],
       ["/admin/shifts", "shifts.read"],
       ["/admin/users", "users.manage"],
       ["/admin/roles", "roles.manage"],
-      ["/admin/settings", "settings.manage"],
+      ["/admin/settings", "settings.read"],
     ];
 
     const permSet = new Set(permissions);

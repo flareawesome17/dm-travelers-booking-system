@@ -213,6 +213,8 @@ describe("POST /api/public/bookings", () => {
         room_type_requested: "Deluxe",
         check_in_date: "2026-04-10",
         check_out_date: "2026-04-12",
+        human_check: true,
+        agree_terms: true,
       })
     );
     const body = await response.json();
@@ -259,6 +261,8 @@ describe("POST /api/public/bookings", () => {
         room_type_requested: "Deluxe",
         check_in_date: "2026-04-10",
         check_out_date: "2026-04-12",
+        human_check: true,
+        agree_terms: true,
       })
     );
     const body = await response.json();
@@ -295,6 +299,8 @@ describe("POST /api/public/bookings", () => {
         room_type_requested: "Deluxe",
         check_in_date: "2026-04-10",
         check_out_date: "2026-04-12",
+        human_check: true,
+        agree_terms: true,
       })
     );
     const body = await response.json();

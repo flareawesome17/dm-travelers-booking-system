@@ -56,6 +56,8 @@ export async function POST(req: NextRequest) {
     const checkIn = typeof body.check_in_date === "string" ? body.check_in_date.trim() : "";
     const checkOut = typeof body.check_out_date === "string" ? body.check_out_date.trim() : "";
     const special = typeof body.special_requests === "string" ? body.special_requests.trim() : "";
+    const humanCheck = body.human_check === true;
+    const agreeTerms = body.agree_terms === true;
     const adults = Number(body.num_adults || 1);
     const children = Number(body.num_children || 0);
     const ratePlan = "24h";
@@ -67,6 +69,8 @@ export async function POST(req: NextRequest) {
     if (!checkIn || !isYmd(checkIn)) return NextResponse.json({ error: "Check-in date is required." }, { status: 400 });
     if (!checkOut || !isYmd(checkOut)) return NextResponse.json({ error: "Check-out date is required." }, { status: 400 });
     if (cmpYmd(checkIn, checkOut) >= 0) return NextResponse.json({ error: "Check-out must be after check-in." }, { status: 400 });
+    if (!humanCheck) return NextResponse.json({ error: "Please confirm human verification before continuing." }, { status: 400 });
+    if (!agreeTerms) return NextResponse.json({ error: "Please accept the terms and agreement before continuing." }, { status: 400 });
 
     const supabase = getSupabaseAdmin();
     await cancelExpiredPendingVerifications(supabase);

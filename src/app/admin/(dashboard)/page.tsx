@@ -46,7 +46,7 @@ type Booking = {
 type Room = {
   id: string;
   room_number: string;
-  status: "Clean" | "Dirty" | "Occupied" | "Maintenance";
+  status: "Available" | "Dirty" | "Occupied" | "Maintenance";
 };
 
 type RestaurantOrder = {
@@ -157,7 +157,7 @@ export default function AdminDashboardPage() {
   const departuresToday = bookings.filter(b => b.check_out_date?.startsWith(nowData.today) && b.status === "Checked-In");
   
   const roomStats = {
-    available: rooms.filter(r => r.status === "Clean").length,
+    available: rooms.filter(r => r.status === "Available").length,
     occupied: rooms.filter(r => r.status === "Occupied").length,
     dirty: rooms.filter(r => r.status === "Dirty").length,
   };

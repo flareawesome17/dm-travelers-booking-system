@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -90,9 +91,63 @@ function formatDisplayDate(ymd?: string) {
   }).format(parsed);
 }
 
-const bookingSteps = ["Room", "Details", "Verify", "Confirmed"];
+const bookingSteps = ["Room", "Details", "Verify", "Pay", "Confirmed"];
+
+type QrPhPaymentSession = {
+  status: string;
+  payment_intent_id?: string;
+  payment_id?: string;
+  qr_image_url?: string;
+  qr_expires_at?: string;
+  amount?: number;
+  currency?: string;
+  paid?: boolean;
+  booking_status?: string;
+};
+
+type PublicBookingPolicyConfig = {
+  deposit_percent: number;
+  cancellation_policy: string;
+  currency: string;
+  payment_security_notice: string;
+};
+
+function defaultBookingPolicyConfig(): PublicBookingPolicyConfig {
+  return {
+    deposit_percent: 30,
+    cancellation_policy:
+      "A 30% down payment is required to confirm online bookings. Cancellations will release the reservation immediately, and any collected down payment is non-refundable.",
+    currency: "PHP",
+    payment_security_notice:
+      "Online payments are protected and securely processed by D&M Travelers Inn and PayMongo. Payment information is transmitted through encrypted channels and handled with strict confidentiality.",
+  };
+}
+
+function readApiError(payload: unknown, fallback: string) {
+  if (!payload || typeof payload !== "object") return fallback;
+  const record = payload as Record<string, unknown>;
+  const directError = record.error;
+  if (typeof directError === "string" && directError.trim()) return directError.trim();
+  if (directError && typeof directError === "object") {
+    const maybeMessage = (directError as Record<string, unknown>).message;
+    if (typeof maybeMessage === "string" && maybeMessage.trim()) return maybeMessage.trim();
+  }
+  return fallback;
+}
 
 export default function BookingPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-white/20 border-t-white" />
+      </div>
+    }>
+      <BookingPageContent />
+    </Suspense>
+  );
+}
+
+function BookingPageContent() {
   const searchParams = useSearchParams();
   const [step, setStep] = useState(1);
   const [selectedRoom, setSelectedRoom] = useState("");
@@ -110,6 +165,13 @@ export default function BookingPage() {
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [loadingPayment, setLoadingPayment] = useState(false);
+  const [checkingPayment, setCheckingPayment] = useState(false);
+  const [paymentSession, setPaymentSession] = useState<QrPhPaymentSession | null>(null);
+  const [paymentError, setPaymentError] = useState("");
+  const [humanVerified, setHumanVerified] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [bookingPolicy, setBookingPolicy] = useState<PublicBookingPolicyConfig>(defaultBookingPolicyConfig);
   const [bookingId, setBookingId] = useState("");
   const [referenceNumber, setReferenceNumber] = useState("");
   const [roomAvailability, setRoomAvailability] = useState<RoomTypeAvailabilityResponse | null>(null);
@@ -145,6 +207,39 @@ export default function BookingPage() {
         if (!cancelled) {
           setLoadingRooms(false);
         }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/public/booking-config")
+      .then((response) => response.json().then((json) => ({ ok: response.ok, json })))
+      .then(({ ok, json }) => {
+        if (!ok) return;
+        if (cancelled) return;
+        const next: PublicBookingPolicyConfig = {
+          deposit_percent: Number.isFinite(Number(json?.deposit_percent)) ? Number(json.deposit_percent) : 30,
+          cancellation_policy:
+            typeof json?.cancellation_policy === "string" && json.cancellation_policy.trim()
+              ? json.cancellation_policy.trim()
+              : defaultBookingPolicyConfig().cancellation_policy,
+          currency:
+            typeof json?.currency === "string" && json.currency.trim()
+              ? json.currency.trim().toUpperCase()
+              : "PHP",
+          payment_security_notice:
+            typeof json?.payment_security_notice === "string" && json.payment_security_notice.trim()
+              ? json.payment_security_notice.trim()
+              : defaultBookingPolicyConfig().payment_security_notice,
+        };
+        setBookingPolicy(next);
+      })
+      .catch(() => {
+        if (!cancelled) setBookingPolicy(defaultBookingPolicyConfig());
       });
 
     return () => {
@@ -328,7 +423,7 @@ export default function BookingPage() {
     isDayFullyBooked,
   ]);
 
-  const handleNext = () => setStep((current) => Math.min(current + 1, 4));
+  const handleNext = () => setStep((current) => Math.min(current + 1, 5));
   const handleBack = () => setStep((current) => Math.max(current - 1, 1));
 
   const resetBooking = () => {
@@ -347,6 +442,10 @@ export default function BookingPage() {
     setVerificationCode("");
     setBookingId("");
     setReferenceNumber("");
+    setPaymentSession(null);
+    setPaymentError("");
+    setHumanVerified(false);
+    setAcceptedTerms(false);
   };
 
   const createBooking = async () => {
@@ -384,12 +483,14 @@ export default function BookingPage() {
           num_adults: Number(form.guests || 1),
           num_children: 0,
           special_requests: form.request,
+          human_check: humanVerified,
+          agree_terms: acceptedTerms,
         }),
       });
 
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(payload?.error || "Failed to create booking.");
+        throw new Error(readApiError(payload, "Failed to create booking."));
       }
 
       setBookingId(String(payload.booking_id || ""));
@@ -402,6 +503,168 @@ export default function BookingPage() {
       setSubmitting(false);
     }
   };
+
+  const startQrPhPayment = useCallback(
+    async (targetBookingId?: string) => {
+      const bookingTarget = targetBookingId || bookingId;
+      if (!bookingTarget) {
+        toast.error("Missing booking info. Please try again.");
+        return false;
+      }
+
+      setLoadingPayment(true);
+      setPaymentError("");
+      try {
+        const response = await fetch("/api/public/bookings/payments/qrph/intent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            booking_id: bookingTarget,
+            email: form.email,
+          }),
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(readApiError(payload, "Failed to generate QR payment."));
+        }
+
+        const nextSession: QrPhPaymentSession = {
+          status: String(payload.status || ""),
+          payment_intent_id: typeof payload.payment_intent_id === "string" ? payload.payment_intent_id : undefined,
+          payment_id: typeof payload.payment_id === "string" ? payload.payment_id : undefined,
+          qr_image_url: typeof payload.qr_image_url === "string" ? payload.qr_image_url : undefined,
+          qr_expires_at: typeof payload.qr_expires_at === "string" ? payload.qr_expires_at : undefined,
+          amount: Number.isFinite(Number(payload.amount)) ? Number(payload.amount) : undefined,
+          currency: typeof payload.currency === "string" ? payload.currency : undefined,
+          paid: Boolean(payload.paid),
+          booking_status: typeof payload.booking_status === "string" ? payload.booking_status : undefined,
+        };
+
+        setPaymentSession(nextSession);
+        if (nextSession.paid || nextSession.status === "succeeded" || nextSession.booking_status === "Confirmed") {
+          toast.success("Payment received. Booking confirmed.");
+          setStep(5);
+          return true;
+        }
+        return false;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Failed to generate QR payment.";
+        setPaymentError(message);
+        toast.error(message);
+        return false;
+      } finally {
+        setLoadingPayment(false);
+      }
+    },
+    [bookingId, form.email]
+  );
+
+  const checkQrPhPaymentStatus = useCallback(
+    async (silent = false) => {
+      if (!bookingId) return false;
+      if (!silent) setCheckingPayment(true);
+
+      try {
+        const query = new URLSearchParams({
+          booking_id: bookingId,
+          email: form.email,
+        });
+        const response = await fetch(`/api/public/bookings/payments/qrph/status?${query.toString()}`);
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(readApiError(payload, "Unable to check payment status."));
+        }
+
+        const nextSession: QrPhPaymentSession = {
+          status: String(payload.status || ""),
+          payment_intent_id: typeof payload.payment_intent_id === "string" ? payload.payment_intent_id : paymentSession?.payment_intent_id,
+          payment_id: typeof payload.payment_id === "string" ? payload.payment_id : paymentSession?.payment_id,
+          qr_image_url: typeof payload.qr_image_url === "string" ? payload.qr_image_url : paymentSession?.qr_image_url,
+          qr_expires_at: typeof payload.qr_expires_at === "string" ? payload.qr_expires_at : paymentSession?.qr_expires_at,
+          amount: Number.isFinite(Number(payload.amount)) ? Number(payload.amount) : paymentSession?.amount,
+          currency: typeof payload.currency === "string" ? payload.currency : paymentSession?.currency,
+          paid: Boolean(payload.paid),
+          booking_status: typeof payload.booking_status === "string" ? payload.booking_status : undefined,
+        };
+        setPaymentSession(nextSession);
+
+        if (nextSession.paid || nextSession.status === "succeeded" || nextSession.booking_status === "Confirmed") {
+          setPaymentError("");
+          toast.success("Payment received. Booking confirmed.");
+          setStep(5);
+          return true;
+        }
+
+        if (nextSession.status === "failed") {
+          setPaymentError("Payment failed. Please generate a new QR code and try again.");
+        } else if (nextSession.status === "expired") {
+          setPaymentError("QR code expired. Generate a new QR code to continue.");
+        }
+        return false;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Unable to check payment status.";
+        if (!silent) {
+          setPaymentError(message);
+          toast.error(message);
+        }
+        return false;
+      } finally {
+        if (!silent) setCheckingPayment(false);
+      }
+    },
+    [
+      bookingId,
+      form.email,
+      paymentSession?.amount,
+      paymentSession?.currency,
+      paymentSession?.payment_id,
+      paymentSession?.payment_intent_id,
+      paymentSession?.qr_expires_at,
+      paymentSession?.qr_image_url,
+    ]
+  );
+
+  const cancelQrPhBooking = useCallback(async () => {
+    if (!bookingId) {
+      toast.error("No active booking to cancel.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Cancel this booking? Any collected down payment is non-refundable under hotel policy."
+    );
+    if (!confirmed) return;
+
+    setCheckingPayment(true);
+    try {
+      const response = await fetch("/api/public/bookings/payments/qrph/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          booking_id: bookingId,
+          email: form.email,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(readApiError(payload, "Unable to cancel booking."));
+      }
+
+      const notice = typeof payload?.non_refundable_notice === "string" ? payload.non_refundable_notice : "";
+      toast.success(notice || "Booking cancelled.");
+      setBookingId("");
+      setReferenceNumber("");
+      setVerificationCode("");
+      setPaymentSession(null);
+      setPaymentError("");
+      setStep(2);
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Unable to cancel booking.");
+    } finally {
+      setCheckingPayment(false);
+    }
+  }, [bookingId, form.email]);
 
   const verifyBooking = async () => {
     if (!bookingId) {
@@ -429,11 +692,16 @@ export default function BookingPage() {
 
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(payload?.error || "Verification failed.");
+        throw new Error(readApiError(payload, "Verification failed."));
       }
 
-      toast.success("Booking confirmed.");
+      const verifiedBookingId = String(payload.booking_id || bookingId);
+      if (verifiedBookingId) setBookingId(verifiedBookingId);
+      if (payload.reference_number) setReferenceNumber(String(payload.reference_number));
+
+      toast.success("Email verified. Proceed to QR payment.");
       setStep(4);
+      await startQrPhPayment(verifiedBookingId);
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Verification failed.");
     } finally {
@@ -455,7 +723,7 @@ export default function BookingPage() {
 
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(payload?.error || "Failed to resend code.");
+        throw new Error(readApiError(payload, "Failed to resend code."));
       }
 
       toast.success("Verification code resent.");
@@ -463,6 +731,19 @@ export default function BookingPage() {
       toast.error(error instanceof Error ? error.message : "Failed to resend code.");
     }
   };
+
+  useEffect(() => {
+    if (step !== 4) return;
+    if (!bookingId) return;
+    if (paymentSession?.status === "succeeded") return;
+    if (paymentSession?.status === "failed" || paymentSession?.status === "expired" || paymentSession?.status === "cancelled") return;
+
+    const timer = setInterval(() => {
+      void checkQrPhPaymentStatus(true);
+    }, 7000);
+
+    return () => clearInterval(timer);
+  }, [step, bookingId, paymentSession?.status, checkQrPhPaymentStatus]);
 
   const dateRangeValid =
     !!form.checkin &&
@@ -474,7 +755,9 @@ export default function BookingPage() {
     !!form.name &&
     !!form.email &&
     !!form.phone &&
-    dateRangeValid;
+    dateRangeValid &&
+    humanVerified &&
+    acceptedTerms;
 
   return (
     <>
@@ -484,9 +767,9 @@ export default function BookingPage() {
         imageAlt="Booking at D&M Travelers Inn"
         imageSrc="/images/room-deluxe.jpg"
         stats={[
-          { label: "Step flow", value: "4 stage" },
+          { label: "Step flow", value: "5 stage" },
           { label: "Verification", value: "Email code" },
-          { label: "Experience", value: "Premium direct booking" },
+          { label: "Payment", value: "Secure QRPh" },
         ]}
         title="Reserve with confidence in a few clear steps."
       />
@@ -896,6 +1179,53 @@ export default function BookingPage() {
                       />
                     </label>
 
+                    <div className="mt-6 space-y-4 rounded-[1.3rem] border border-white/12 bg-white/[0.04] p-4">
+                      <p className="font-body text-sm text-white/85">
+                        A <span className="font-semibold text-gold-light">{bookingPolicy.deposit_percent}% down payment</span> is required before confirmation.
+                      </p>
+                      <p className="font-body text-sm text-white/76">{bookingPolicy.cancellation_policy}</p>
+                      <p className="font-body text-sm text-white/76">{bookingPolicy.payment_security_notice}</p>
+
+                      <label className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                        <input
+                          checked={humanVerified}
+                          className="mt-1 h-4 w-4 rounded border-white/30 bg-transparent accent-[#D4AF37]"
+                          onChange={(event) => setHumanVerified(event.target.checked)}
+                          type="checkbox"
+                        />
+                        <span className="font-body text-sm text-white/84">
+                          I confirm this request is made by a real person and not an automated system.
+                        </span>
+                      </label>
+
+                      <label className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                        <input
+                          checked={acceptedTerms}
+                          className="mt-1 h-4 w-4 rounded border-white/30 bg-transparent accent-[#D4AF37]"
+                          onChange={(event) => setAcceptedTerms(event.target.checked)}
+                          type="checkbox"
+                        />
+                        <span className="font-body text-sm text-white/84">
+                          I agree to the Terms and Agreement including the cancellation and down payment policy.
+                        </span>
+                      </label>
+
+                      <details className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                        <summary className="cursor-pointer list-none font-body text-sm font-semibold text-gold-light">
+                          Read Terms and Agreement
+                        </summary>
+                        <div className="mt-3 space-y-2 font-body text-sm text-white/80">
+                          <p>1. Booking confirmation requires a down payment equal to {bookingPolicy.deposit_percent}% of the reservation amount.</p>
+                          <p>2. The reservation slot is secured once payment is successful and verified by our system.</p>
+                          <p>3. Guest-requested cancellations will mark the booking as cancelled and release room availability.</p>
+                          <p>4. Any collected down payment is non-refundable once the booking is cancelled.</p>
+                          <p>5. Remaining balance, if any, is settled according to check-in/front desk billing procedures.</p>
+                          <p>6. Online payment processing is protected and secured by D&M Travelers Inn and PayMongo transactions.</p>
+                          <p>7. Payment and booking details are handled with confidentiality and appropriate system safeguards.</p>
+                        </div>
+                      </details>
+                    </div>
+
                     <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                       <Button
                         className="h-12 rounded-full border-white/14 bg-white/6 px-6 font-body text-sm font-medium text-white transition-colors duration-300 hover:bg-white/10 hover:text-white"
@@ -932,7 +1262,7 @@ export default function BookingPage() {
                       Enter the 6-digit code sent to {form.email}.
                     </h2>
                     <p className="mt-4 font-body text-sm leading-7 text-white/78">
-                      This keeps the reservation direct and confirmed before finalizing the booking.
+                      This verifies your contact details before generating your secure QRPh payment.
                     </p>
 
                     <input
@@ -971,7 +1301,7 @@ export default function BookingPage() {
                         disabled={verifying || verificationCode.length < 6}
                         onClick={verifyBooking}
                       >
-                        {verifying ? "Verifying..." : "Verify and confirm"}
+                        {verifying ? "Verifying..." : "Verify and continue"}
                         <CheckCircle2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -980,6 +1310,101 @@ export default function BookingPage() {
               ) : null}
 
               {step === 4 ? (
+                <motion.div animate={{ opacity: 1, scale: 1 }} initial={{ opacity: 0, scale: 0.97 }}>
+                  <PublicGlassPanel className="mx-auto max-w-xl text-center">
+                    <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gold/10">
+                      <Mail className="h-10 w-10 text-gold-light" />
+                    </div>
+                    <p className="mt-6 text-[0.72rem] uppercase tracking-[0.26em] text-gold-light/86 sm:tracking-[0.34em]">
+                      Secure Payment
+                    </p>
+                    <h2 className="mt-4 font-heading text-[2.15rem] font-semibold text-white sm:text-4xl">
+                      Scan the QRPh code to confirm your booking.
+                    </h2>
+                    <p className="mt-4 font-body text-sm leading-7 text-white/78">
+                      Use your banking app or e-wallet that supports QRPh. We will confirm automatically once payment is received.
+                    </p>
+
+                    <div className="mt-8 space-y-3 rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-5 text-left">
+                      <div className="flex items-center justify-between gap-4 font-body text-sm">
+                        <span className="text-white/60">Reference</span>
+                        <span className="font-mono text-white">{referenceNumber || "Pending"}</span>
+                      </div>
+                      {paymentSession?.amount != null ? (
+                        <div className="flex items-center justify-between gap-4 font-body text-sm">
+                          <span className="text-white/60">Amount</span>
+                          <span className="text-white">
+                            {(paymentSession.currency || "PHP")} {Number(paymentSession.amount || 0).toFixed(2)}
+                          </span>
+                        </div>
+                      ) : null}
+                      {paymentSession?.qr_expires_at ? (
+                        <div className="flex items-center justify-between gap-4 font-body text-sm">
+                          <span className="text-white/60">QR expires</span>
+                          <span className="text-white">
+                            {new Date(paymentSession.qr_expires_at).toLocaleString("en-US")}
+                          </span>
+                        </div>
+                      ) : null}
+                      <div className="font-body text-xs text-white/72">
+                        Cancellation policy: {bookingPolicy.cancellation_policy}
+                      </div>
+                    </div>
+
+                    <div className="mt-6 flex justify-center">
+                      {paymentSession?.qr_image_url ? (
+                        <Image
+                          alt="QRPh payment code"
+                          className="w-full max-w-[300px] rounded-2xl border border-white/12 bg-white p-3"
+                          height={300}
+                          src={paymentSession.qr_image_url}
+                          unoptimized
+                          width={300}
+                        />
+                      ) : (
+                        <div className="w-full max-w-[300px] rounded-2xl border border-white/12 bg-white/[0.03] p-6 font-body text-sm text-white/70">
+                          {loadingPayment ? "Generating secure QR..." : "QR code is not available yet."}
+                        </div>
+                      )}
+                    </div>
+
+                    {paymentError ? (
+                      <p className="mt-4 font-body text-sm text-red-300">{paymentError}</p>
+                    ) : null}
+
+                    <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                      <Button
+                        className="h-12 rounded-full border-white/14 bg-white/6 px-6 font-body text-sm font-medium text-white transition-colors duration-300 hover:bg-white/10 hover:text-white"
+                        disabled={loadingPayment}
+                        onClick={() => startQrPhPayment()}
+                        type="button"
+                        variant="outline"
+                      >
+                        {loadingPayment ? "Generating..." : "Generate new QR"}
+                      </Button>
+                      <Button
+                        className="h-12 rounded-full border-red-300/30 bg-red-400/10 px-6 font-body text-sm font-medium text-red-100 transition-colors duration-300 hover:bg-red-400/20 hover:text-white"
+                        disabled={checkingPayment || loadingPayment}
+                        onClick={cancelQrPhBooking}
+                        type="button"
+                        variant="outline"
+                      >
+                        Cancel booking
+                      </Button>
+                      <Button
+                        className="h-12 flex-1 rounded-full bg-gradient-gold font-body text-sm font-semibold text-secondary shadow-[0_18px_40px_-20px_hsl(var(--gold)/0.95)] transition-transform duration-300 hover:-translate-y-0.5 hover:opacity-95 disabled:opacity-50"
+                        disabled={checkingPayment || loadingPayment}
+                        onClick={() => void checkQrPhPaymentStatus(false)}
+                      >
+                        {checkingPayment ? "Checking..." : "I've paid, check status"}
+                        <CheckCircle2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </PublicGlassPanel>
+                </motion.div>
+              ) : null}
+
+              {step === 5 ? (
                 <motion.div animate={{ opacity: 1, scale: 1 }} initial={{ opacity: 0, scale: 0.97 }}>
                   <PublicGlassPanel className="mx-auto max-w-xl text-center">
                     <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gold/10">

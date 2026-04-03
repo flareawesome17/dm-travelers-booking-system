@@ -23,6 +23,7 @@ import {
   X,
   PackageSearch,
   Clock,
+  Landmark,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -40,6 +41,7 @@ const operationsItems = [
   { label: "Housekeeping", path: "/admin/housekeeping", icon: Sparkles, permission: "housekeeping.read" },
   { label: "Restaurant", path: "/admin/restaurant", icon: UtensilsCrossed, permission: "restaurant.read" },
   { label: "Inventory", path: "/admin/inventory", icon: PackageSearch, permission: "inventory.read" },
+  { label: "Treasury", path: "/admin/treasury", icon: Landmark, permission: "treasury.read" },
 ];
 
 const managementItems = [
@@ -47,7 +49,7 @@ const managementItems = [
   { label: "Shifts", path: "/admin/shifts", icon: Clock, permission: "shifts.read" },
   { label: "Users", path: "/admin/users", icon: Users, permission: "users.manage" },
   { label: "Roles", path: "/admin/roles", icon: KeyRound, permission: "roles.manage" },
-  { label: "Settings", path: "/admin/settings", icon: Settings, permission: "settings.manage" },
+  { label: "Settings", path: "/admin/settings", icon: Settings, permission: "settings.read" },
 ];
 
 // Keep flat navItems for backwards compat

@@ -403,6 +403,7 @@ export default function AdminSettingsPage() {
                     id="cancellation_policy" 
                     value={settings.cancellation_policy || ""} 
                     onChange={e => handleUpdate("cancellation_policy", e.target.value)} 
+                    placeholder="Example: A 30% down payment is required and non-refundable once a booking is cancelled."
                     className="min-h-[100px]"
                   />
                 </div>
@@ -485,16 +486,21 @@ export default function AdminSettingsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="deposit_percent">Required Deposit %</Label>
+                  <Label htmlFor="deposit_percent">Public Booking Downpayment %</Label>
                   <div className="relative">
                     <Input 
                       id="deposit_percent" 
                       type="number"
+                      min={1}
+                      max={100}
                       value={settings.deposit_percent || "30"} 
                       onChange={e => handleUpdate("deposit_percent", e.target.value)} 
                     />
                     <span className="absolute right-3 top-2.5 text-slate-400 text-sm">%</span>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Used by the public booking page and QRPh payment flow before confirmation.
+                  </p>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

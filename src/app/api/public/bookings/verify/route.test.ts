@@ -1,16 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getSupabaseAdminMock, sendMailMock } = vi.hoisted(() => ({
+const { getSupabaseAdminMock } = vi.hoisted(() => ({
   getSupabaseAdminMock: vi.fn(),
-  sendMailMock: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase", () => ({
   getSupabaseAdmin: getSupabaseAdminMock,
-}));
-
-vi.mock("@/lib/mailer", () => ({
-  sendMail: sendMailMock,
 }));
 
 import { POST } from "./route";
@@ -70,6 +65,7 @@ describe("POST /api/public/bookings/verify", () => {
         id: "550e8400-e29b-41d4-a716-446655440000",
         reference_number: "DM-1001",
         status: "Confirmed",
+        guests: { email: "guest@example.com" },
         verification_code: null,
         verification_code_expires_at: null,
       },
@@ -95,6 +91,7 @@ describe("POST /api/public/bookings/verify", () => {
         id: "550e8400-e29b-41d4-a716-446655440001",
         reference_number: "DM-1002",
         status: "Pending Verification",
+        guests: { email: "guest@example.com" },
         verification_code: "123456",
         verification_code_expires_at: "2026-03-30T00:00:00.000Z",
       },
@@ -124,6 +121,7 @@ describe("POST /api/public/bookings/verify", () => {
         id: "550e8400-e29b-41d4-a716-446655440002",
         reference_number: "DM-1003",
         status: "Pending Verification",
+        guests: { email: "guest@example.com" },
         verification_code: "123456",
         verification_code_expires_at: "2099-04-10T00:00:00.000Z",
       },
@@ -144,12 +142,13 @@ describe("POST /api/public/bookings/verify", () => {
     expect(supabaseState.bookingUpdateEqMock).not.toHaveBeenCalled();
   });
 
-  it("confirms pending bookings and returns the financial summary fields used by the frontend", async () => {
+  it("marks verified bookings as pending payment and returns booking totals", async () => {
     const supabaseState = createSupabaseMock({
       booking: {
         id: "550e8400-e29b-41d4-a716-446655440003",
         reference_number: "DM-1004",
         status: "Pending Verification",
+        guests: { email: "guest@example.com" },
         verification_code: "123456",
         verification_code_expires_at: "2099-04-10T00:00:00.000Z",
         room_type_requested: "Deluxe",
@@ -172,7 +171,6 @@ describe("POST /api/public/bookings/verify", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(sendMailMock).toHaveBeenCalledOnce();
     expect(supabaseState.bookingUpdateEqMock).toHaveBeenCalledWith(
       "id",
       "550e8400-e29b-41d4-a716-446655440003"
@@ -180,7 +178,8 @@ describe("POST /api/public/bookings/verify", () => {
     expect(body).toMatchObject({
       booking_id: "550e8400-e29b-41d4-a716-446655440003",
       reference_number: "DM-1004",
-      status: "Confirmed",
+      status: "Pending Payment",
+      payment_required: true,
       room_type_requested: "Deluxe",
       check_in_date: "2026-04-10",
       check_out_date: "2026-04-12",

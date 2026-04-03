@@ -75,12 +75,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .select("*, guests(*), rooms(*)")
       .single();
 
-    // Mark the associated room as Dirty
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+    // Mark the associated room as Dirty AFTER successful booking update
     if (booking.room_id) {
-      await supabase.from("rooms").update({ status: "Dirty" }).eq("id", booking.room_id);
+      const { error: roomError } = await supabase
+        .from("rooms")
+        .update({ status: "Dirty", updated_at: new Date().toISOString() })
+        .eq("id", booking.room_id);
+
+      // Rollback booking status if room update fails
+      if (roomError) {
+        await supabase
+          .from("bookings")
+          .update({ status: "Checked-In", updated_at: new Date().toISOString() })
+          .eq("id", id);
+        return NextResponse.json(
+          { error: "Failed to update room status. Check-out has been reverted." },
+          { status: 500 }
+        );
+      }
     }
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json({ ...data, late_checkout_fee_applied: lateFee });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

@@ -146,8 +146,8 @@ describe("POST /api/bookings/[id]/check-out", () => {
     );
     const body = await response.json();
 
-    expect(response.status).toBe(400);
-    expect(body).toEqual({ error: "room update failed" });
+    expect(response.status).toBe(500);
+    expect(body).toEqual({ error: "Failed to update room status. Check-out has been reverted." });
     expect(supabaseState.roomUpdateMock).toHaveBeenCalledOnce();
     expect(supabaseState.bookingUpdateMock).toHaveBeenCalledTimes(2);
     expect(supabaseState.bookingRollbackEqMock).toHaveBeenCalledWith("id", "booking-1");

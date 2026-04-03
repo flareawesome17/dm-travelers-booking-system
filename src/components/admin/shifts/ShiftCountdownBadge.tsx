@@ -18,7 +18,9 @@ export function ShiftCountdownBadge() {
         if (res.ok) {
           setData(await res.json());
         }
-      } catch {}
+        } catch {
+          // Silently fail — shift badge is non-critical UI
+        }
     };
 
     fetchShift();

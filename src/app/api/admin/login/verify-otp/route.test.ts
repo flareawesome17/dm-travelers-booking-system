@@ -331,12 +331,12 @@ describe("POST /api/admin/login/verify-otp", () => {
     expect(setAdminSessionCookieMock).toHaveBeenCalledOnce();
     expect(response.headers.get("x-session-cookie")).toBe("set");
     expect(body).toEqual({
-      session: {
-        user: {
-          id: "admin-1",
-          email: "admin@example.com",
-        },
-        expires_at: null,
+      token: "signed-admin-token",
+      user: {
+        id: "admin-1",
+        name: "Admin",
+        email: "admin@example.com",
+        role_id: 2
       },
     });
   });

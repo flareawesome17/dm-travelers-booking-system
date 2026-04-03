@@ -1,14 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { sendMail } from "@/lib/mailer";
-import crypto from "crypto";
 
 function isUuid(s: string) {
   return /^[0-9a-fA-F-]{36}$/.test(s);
-}
-
-function randomQrToken(reference: string) {
-  return `QR-${reference}-${crypto.randomBytes(8).toString("hex")}`.toUpperCase();
 }
 
 export async function POST(req: NextRequest) {
@@ -25,10 +19,16 @@ export async function POST(req: NextRequest) {
     const supabase = getSupabaseAdmin();
     const { data: booking, error: bErr } = await supabase
       .from("bookings")
-      .select("id, reference_number, status, verification_code, verification_code_expires_at, guest_id, room_type_requested, check_in_date, check_out_date, total_amount, deposit_paid, balance_due")
+      .select("id, reference_number, status, verification_code, verification_code_expires_at, guest_id, room_type_requested, check_in_date, check_out_date, total_amount, deposit_paid, balance_due, guests(email)")
       .eq("id", bookingId)
       .single();
     if (bErr || !booking) return NextResponse.json({ error: "Booking not found." }, { status: 404 });
+
+    const bookingGuest = Array.isArray(booking.guests) ? booking.guests[0] : booking.guests;
+    const bookingEmail = typeof bookingGuest?.email === "string" ? bookingGuest.email.toLowerCase().trim() : "";
+    if (bookingEmail && bookingEmail !== email) {
+      return NextResponse.json({ error: "Booking email mismatch." }, { status: 403 });
+    }
 
     if (String(booking.status) !== "Pending Verification") {
       return NextResponse.json({ error: "This booking is not pending verification." }, { status: 400 });
@@ -44,30 +44,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Incorrect code." }, { status: 401 });
     }
 
-    const qrToken = randomQrToken(String(booking.reference_number));
+    const paymentExpiry = new Date(Date.now() + 30 * 60 * 1000).toISOString();
     const { error: upErr } = await supabase
       .from("bookings")
       .update({
-        status: "Confirmed",
+        status: "Pending Payment",
         verification_code: null,
         verification_code_expires_at: null,
-        guest_qr_code: qrToken,
+        payment_expires_at: paymentExpiry,
         updated_at: new Date().toISOString(),
       })
       .eq("id", booking.id);
     if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
 
-    await sendMail({
-      to: email,
-      subject: "D&M Travelers Inn - Booking confirmed",
-      text: `Your booking is confirmed.\n\nReference: ${booking.reference_number}\nCheck-in: ${String(booking.check_in_date).slice(0, 10)}\nCheck-out: ${String(booking.check_out_date).slice(0, 10)}\n\nPresent this reference at the front desk.`,
-      html: `<p>Your booking is confirmed.</p><p><strong>Reference:</strong> ${booking.reference_number}</p><p><strong>Check-in:</strong> ${String(booking.check_in_date).slice(0, 10)}<br/><strong>Check-out:</strong> ${String(booking.check_out_date).slice(0, 10)}</p><p>Please present this reference at the front desk.</p>`,
-    });
-
     return NextResponse.json({
       booking_id: booking.id,
       reference_number: booking.reference_number,
-      status: "Confirmed",
+      status: "Pending Payment",
+      payment_required: true,
       room_type_requested: booking.room_type_requested,
       check_in_date: String(booking.check_in_date).slice(0, 10),
       check_out_date: String(booking.check_out_date).slice(0, 10),
@@ -79,4 +73,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: e?.message || "Internal server error" }, { status: 500 });
   }
 }
-

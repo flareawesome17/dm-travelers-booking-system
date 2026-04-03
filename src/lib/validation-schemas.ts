@@ -65,7 +65,7 @@ export const createBookingSchema = z.object({
   guest: z.object({
     full_name: safeString,
     email: email,
-    phone_number: z.string().trim().min(1).max(30),
+    phone_number: z.string().trim().max(30).optional().nullable(),
   }).optional(),
   room_id: z.string().uuid().optional(),
   room_type_requested: z.string().trim().min(1).max(50).default("Standard"),
@@ -101,7 +101,7 @@ export const createBookingSchema = z.object({
 export const createPaymentSchema = z.object({
   booking_id: z.string().uuid("Invalid booking ID"),
   amount: positiveNumber,
-  method: z.enum(["Cash", "GCash", "Card", "Stripe", "PayPal"], {
+  method: z.enum(["Cash", "GCash", "Card", "Stripe", "PayPal", "QRPh"], {
     errorMap: () => ({ message: "Invalid payment method" }),
   }),
   type: z.enum(["Deposit", "Balance", "Restaurant", "Extension", "Extra", "Receivable"], {
@@ -249,4 +249,38 @@ export const verifyOtpSchema = z.object({
   otp_id: z.string().uuid("Invalid OTP request"),
   otp: z.string().trim().length(6, "OTP must be 6 characters").transform((v) => v.toUpperCase()),
   email: email,
+}).strict();
+
+export const createPublicBookingPaymongoIntentSchema = z.object({
+  booking_id: z.string().uuid("Invalid booking ID"),
+  email: email,
+}).strict();
+
+export const cancelPublicBookingPaymentSchema = z.object({
+  booking_id: z.string().uuid("Invalid booking ID"),
+  email: email,
+}).strict();
+
+export const createTreasuryDestinationSchema = z.object({
+  label: z.string().trim().min(2).max(120),
+  provider: z.enum(["instapay", "pesonet"]),
+  institution_name: z.string().trim().min(2).max(120),
+  institution_code: z.string().trim().min(2).max(60),
+  account_name: z.string().trim().min(2).max(120),
+  account_number: z.string().trim().min(4).max(60),
+}).strict();
+
+export const createTreasuryWithdrawalSchema = z.object({
+  amount: positiveNumber,
+  destination_id: z.string().uuid("Invalid destination ID"),
+  request_note: z.string().trim().max(500).optional().nullable(),
+}).strict();
+
+export const approveTreasuryWithdrawalSchema = z.object({
+  approval_note: z.string().trim().max(500).optional().nullable(),
+}).strict();
+
+export const completeTreasuryWithdrawalSchema = z.object({
+  external_reference: z.string().trim().min(3).max(120),
+  completion_note: z.string().trim().max(500).optional().nullable(),
 }).strict();

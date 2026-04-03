@@ -29,6 +29,13 @@ Copy `.env.example` to `.env` and set:
 - `VITE_API_URL` – base URL of the API server (`http://localhost:5471`; see “Two ports” below)  
 - SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`  
 - Payments: `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (optional for deposit flow)
+- PayMongo QRPh:
+  - `PAYMONGO_SECRET_KEY` (server-side API key)
+  - `PAYMONGO_WEBHOOK_SECRET` (webhook signature secret from PayMongo dashboard)
+  - `PAYMONGO_QRPH_EXPIRY_SECONDS` (optional, 60-9000; defaults to 1800)
+  - `PAYMONGO_TREASURY_WALLET_ID` (required for Treasury withdrawal submission to PayMongo)
+  - `PAYMONGO_TREASURY_CALLBACK_SECRET` (optional; falls back to `JWT_SECRET` to sign Treasury transfer callbacks)
+  - `TREASURY_DESTINATION_SECRET` (required to encrypt saved treasury destination account numbers at rest)
 
 ### 3. Database
 
@@ -130,6 +137,18 @@ Serves the built app from `dist/` on port 4242. Run `npm run build` first or you
 - `GET/PATCH /api/bookings/[id]` – get/update booking
 - `POST /api/bookings/verify` – submit email verification code
 - `POST /api/bookings/payment/deposit` – confirm 30% deposit
+- `POST /api/public/bookings/payments/qrph/intent` – create/reuse QRPh payment intent for verified public booking
+- `GET /api/public/bookings/payments/qrph/status` – check live QRPh payment status
+- `POST /api/public/bookings/payments/qrph/cancel` – cancel booking from QR payment step
+- `GET /api/public/booking-config` – public booking policy config (`deposit_percent`, cancellation policy, security notice)
+- `POST /api/public/paymongo/webhook` – PayMongo webhook endpoint (must be configured in PayMongo dashboard)
+- `GET /api/treasury/summary` – hotel-only treasury summary based on segregated ledger entries
+- `GET /api/treasury/receiving-institutions?provider=instapay|pesonet` – fetch PayMongo receiving institutions for destination setup
+- `GET/POST /api/treasury/destinations` – list or save treasury destinations with provider/institution code
+- `POST /api/treasury/withdrawals` – create treasury withdrawal request
+- `POST /api/treasury/withdrawals/[id]/approve` – approve withdrawal request
+- `POST /api/treasury/withdrawals/[id]/complete` – mark approved withdrawal as completed with external reference
+- `POST /api/treasury/withdrawals/[id]/cancel` – cancel pending treasury withdrawal
 - `GET/POST/PATCH /api/rooms`, `PATCH /api/rooms/[id]`
 - `GET /api/room_types`
 - `GET /api/housekeeping/rooms`, `PATCH /api/housekeeping/room/[id]/status`

@@ -9,6 +9,7 @@ const {
   getSupabaseAdminMock,
   findLatestReceivableForBookingMock,
   getReceivableStatusMock,
+  addShiftTransactionMock,
 } = vi.hoisted(() => ({
   requirePermissionMock: vi.fn(),
   parseAndValidateMock: vi.fn(),
@@ -17,10 +18,15 @@ const {
   getSupabaseAdminMock: vi.fn(),
   findLatestReceivableForBookingMock: vi.fn(),
   getReceivableStatusMock: vi.fn(),
+  addShiftTransactionMock: vi.fn(),
 }));
 
 vi.mock("@/lib/rbac", () => ({
   requirePermission: requirePermissionMock,
+}));
+
+vi.mock("@/lib/shiftUtils", () => ({
+  addShiftTransaction: addShiftTransactionMock,
 }));
 
 vi.mock("@/lib/api-security", async () => {
@@ -96,7 +102,14 @@ function createSupabaseMock(options?: {
 
       if (table === "payments") {
         return {
-          insert: paymentInsertMock,
+          insert: vi.fn(() => ({
+            select: vi.fn(() => ({
+              single: vi.fn(async () => {
+                await paymentInsertMock();
+                return { data: { id: "payment-1" }, error: null };
+              })
+            }))
+          })),
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
               eq: vi.fn(async () => ({
@@ -153,6 +166,7 @@ describe("POST /api/payments", () => {
     manilaDateStringMock.mockReturnValue("2026-03-31");
     findNextOpenLedgerDateMock.mockResolvedValue("2026-03-31");
     getReceivableStatusMock.mockReturnValue("partial");
+    addShiftTransactionMock.mockResolvedValue({});
   });
 
   it("returns the permission error before any payment work when the caller lacks payments.create", async () => {
