@@ -26,8 +26,9 @@ const HERO_SEQUENCE_CONFIG: HeroSequenceConfig = {
   padLength: 4,
   fallbackImagePath: "/images/hero-hotel.jpg",
   ariaLabel:
-    "Scroll-driven hero sequence revealing the D&M Travelers Inn arrival and hospitality experience.",
+    "Scroll-driven hero sequence revealing the arrival and hospitality experience.",
 };
+
 
 type HeroCanvasProps = {
   className?: string;
@@ -89,6 +90,21 @@ export default function HeroCanvas({
   const renderedFrameRef = useRef(config.startIndex);
   const targetFrameRef = useRef(config.startIndex);
   const [framesReady, setFramesReady] = useState(false);
+  const [settings, setSettings] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetch("/api/public/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && typeof data === "object" && !data.error) {
+          setSettings(data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const hotelName = settings.hotel_name || "D&M Travelers Inn";
+
 
   const syncCanvasSize = useCallback(() => {
     const canvas = canvasRef.current;
@@ -387,7 +403,7 @@ export default function HeroCanvas({
         priority
         fetchPriority="high"
         src={config.fallbackImagePath}
-        alt="D&M Travelers Inn - Boutique hotel arrival"
+        alt={`${hotelName} - Boutique hotel arrival`}
         fill
         sizes="100vw"
         className={cn(
@@ -398,7 +414,7 @@ export default function HeroCanvas({
 
       <canvas
         ref={canvasRef}
-        aria-label={config.ariaLabel}
+        aria-label={`${config.ariaLabel.replace("revealing the", `revealing the ${hotelName}`)}`}
         className="absolute inset-0 h-full w-full hidden lg:block"
         role="img"
       />

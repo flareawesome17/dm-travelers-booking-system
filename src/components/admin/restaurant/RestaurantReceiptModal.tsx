@@ -31,6 +31,23 @@ type ReceiptModalProps = {
 export function RestaurantReceiptModal({ order: initialOrder, onClose }: ReceiptModalProps) {
   const [order, setOrder] = useState<RestaurantOrder | null>(null);
   const [loading, setLoading] = useState(false);
+  const [settings, setSettings] = useState<Record<string, string>>({
+    hotel_name: "D&M Travelers Inn",
+    hotel_address: "Looc Proper, Plaridel, Misamis Occidental",
+    hotel_phone: "+63 951 868 3018",
+    hotel_logo: "/logo.png",
+  });
+
+  useEffect(() => {
+    fetch("/api/public/settings", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && !data.error) {
+          setSettings((prev) => ({ ...prev, ...data }));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (initialOrder?.id) {
@@ -79,10 +96,10 @@ export function RestaurantReceiptModal({ order: initialOrder, onClose }: Receipt
           <div className="p-6 bg-white text-slate-900 mx-auto w-full border border-slate-100 rounded-lg print:border-none print:p-0">
             {/* Header */}
             <div className="text-center border-b border-dashed border-slate-300 pb-4 mb-4">
-              <img src="/logo.png" alt="D&M Travelers Inn" className="h-12 mx-auto mb-2 object-contain" />
-              <h1 className="text-lg font-bold uppercase tracking-tight">D&M Travelers Inn</h1>
-              <p className="text-[10px] text-slate-500">Looc Proper, Plaridel, Misamis Occidental</p>
-              <p className="text-[10px] text-slate-500">+63 951 868 3018</p>
+              <img src={settings.hotel_logo} alt={settings.hotel_name} className="h-12 mx-auto mb-2 object-contain" />
+              <h1 className="text-lg font-bold uppercase tracking-tight">{settings.hotel_name}</h1>
+              <p className="text-[10px] text-slate-500">{settings.hotel_address}</p>
+              <p className="text-[10px] text-slate-500">{settings.hotel_phone}</p>
             </div>
 
             {/* Order Info */}

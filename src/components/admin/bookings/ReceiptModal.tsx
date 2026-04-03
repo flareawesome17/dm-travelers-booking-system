@@ -30,7 +30,27 @@ type ReceiptModalProps = {
   onClose: () => void;
 };
 
+import { useEffect, useState } from "react";
+
 export function ReceiptModal({ booking, onClose }: ReceiptModalProps) {
+  const [settings, setSettings] = useState<Record<string, string>>({
+    hotel_name: "D&M Travelers Inn",
+    hotel_address: "Looc Proper, Plaridel, Misamis Occidental",
+    hotel_phone: "+63 951 868 3018",
+    hotel_logo: "/logo.png",
+  });
+
+  useEffect(() => {
+    fetch("/api/public/settings", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && !data.error) {
+          setSettings((prev) => ({ ...prev, ...data }));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   if (!booking) return null;
 
   const deposit = Number(booking.deposit_paid ?? 0);
@@ -70,11 +90,11 @@ export function ReceiptModal({ booking, onClose }: ReceiptModalProps) {
         <div className="p-8 bg-white text-slate-900 mx-auto w-full max-w-[800px] border border-slate-200 rounded-lg print:border-none print:m-0 print:p-4">
           <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-slate-300 pb-6 mb-6">
             <div className="flex items-center gap-4">
-              <img src="/logo.png" alt="D&M Travelers Inn" className="h-16 w-auto object-contain print:h-12" />
+              <img src={settings.hotel_logo} alt={settings.hotel_name} className="h-16 w-auto object-contain print:h-12" />
               <div>
-                <h1 className="text-2xl font-bold text-[#07008A] tracking-tight print:text-black">D&M Travelers Inn</h1>
-                <p className="text-sm text-slate-500 mt-1">Looc Proper, Plaridel, Misamis Occidental</p>
-                <p className="text-sm text-slate-500">+63 951 868 3018</p>
+                <h1 className="text-2xl font-bold text-[#07008A] tracking-tight print:text-black">{settings.hotel_name}</h1>
+                <p className="text-sm text-slate-500 mt-1">{settings.hotel_address}</p>
+                <p className="text-sm text-slate-500">{settings.hotel_phone}</p>
               </div>
             </div>
             <div className="text-left sm:text-right">

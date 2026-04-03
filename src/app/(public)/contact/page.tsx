@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import { Clock3, Mail, MapPin, PhoneCall } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,28 +11,11 @@ import {
   PublicSection,
 } from "@/components/public/PublicPrimitives";
 
-const contactItems = [
-  {
-    icon: MapPin,
-    title: "Address",
-    text: "Looc Proper, Dipolog - Oroquieta National Rd, Plaridel, 7209 Misamis Occidental, Philippines",
-  },
-  {
-    icon: PhoneCall,
-    title: "Phone",
-    text: "+63 951 868 3018",
-  },
-  {
-    icon: Mail,
-    title: "Email",
-    text: "info@dmtravelersinn.com",
-  },
-  {
-    icon: Clock3,
-    title: "Front Desk",
-    text: "Open 24 hours, 7 days a week",
-  },
-];
+const DEFAULTS = {
+  address: "Looc Proper, Dipolog - Oroquieta National Rd, Plaridel, 7209 Misamis Occidental, Philippines",
+  phone: "+63 951 868 3018",
+  email: "info@dmtravelersinn.com",
+};
 
 export default function ContactPage() {
   const [form, setForm] = useState({
@@ -43,6 +26,41 @@ export default function ContactPage() {
   });
   const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [settings, setSettings] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetch("/api/public/settings", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && typeof data === "object" && !data.error) {
+          setSettings(data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const contactItems = [
+    {
+      icon: MapPin,
+      title: "Address",
+      text: settings.hotel_address || DEFAULTS.address,
+    },
+    {
+      icon: PhoneCall,
+      title: "Phone",
+      text: settings.hotel_phone || DEFAULTS.phone,
+    },
+    {
+      icon: Mail,
+      title: "Email",
+      text: settings.hotel_email || DEFAULTS.email,
+    },
+    {
+      icon: Clock3,
+      title: "Front Desk",
+      text: "Open 24 hours, 7 days a week",
+    },
+  ];
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();

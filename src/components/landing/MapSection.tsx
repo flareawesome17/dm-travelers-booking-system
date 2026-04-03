@@ -2,7 +2,7 @@
 
 import { motion, useInView } from "framer-motion";
 import { LocateFixed, MapPin, Navigation } from "lucide-react";
-import { useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   PublicGlassPanel,
   PublicGrid,
@@ -13,6 +13,25 @@ import {
 export default function MapSection() {
   const ref = useRef<HTMLDivElement | null>(null);
   const isInView = useInView(ref, { once: true, margin: "-120px" });
+  const [settings, setSettings] = useState<Record<string, string>>({
+    hotel_name: "D&M Travelers Inn",
+    hotel_address: "Looc Proper, Dipolog - Oroquieta National Rd, Plaridel, 7209 Misamis Occidental, Philippines",
+  });
+
+  useEffect(() => {
+    fetch("/api/public/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && typeof data === "object" && !data.error) {
+          setSettings((prev) => ({ ...prev, ...data }));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const hotelName = settings.hotel_name || "D&M Travelers Inn";
+  const hotelAddress = settings.hotel_address || "Looc Proper, Dipolog - Oroquieta National Rd, Plaridel, 7209 Misamis Occidental, Philippines";
+
 
   return (
     <PublicSection tone="deep-soft" className="py-16 lg:py-24">
@@ -66,7 +85,7 @@ export default function MapSection() {
                   referrerPolicy="no-referrer-when-downgrade"
                   src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3944.8595754630787!2d123.71979897568883!3d8.609477995413382!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x325495c8a9c5efe3%3A0xf917895811e58050!2sD%26M%20Travellers%20Inn!5e0!3m2!1sen!2sph!4v1775187551578!5m2!1sen!2sph"
                   style={{ border: 0 }}
-                  title="D&M Travelers Inn location"
+                  title={`${hotelName} location`}
                 />
               </PublicGlassPanel>
             </motion.div>
@@ -85,8 +104,7 @@ export default function MapSection() {
                       Address
                     </p>
                     <p className="mt-3 font-body text-sm leading-7 text-white/82">
-                      Looc Proper, Dipolog - Oroquieta National Rd, Plaridel, 7209
-                      Misamis Occidental, Philippines
+                      {hotelAddress}
                     </p>
                   </div>
                 </div>

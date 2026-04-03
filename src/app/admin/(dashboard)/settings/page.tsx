@@ -34,6 +34,7 @@ export default function AdminSettingsPage() {
   const [shifts, setShifts] = useState<ShiftConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [pwCurrent, setPwCurrent] = useState("");
   const [pwNew, setPwNew] = useState("");
   const [pwConfirm, setPwConfirm] = useState("");
@@ -302,7 +303,7 @@ export default function AdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-sm bg-[#07008A] text-white">
+            <Card className="border-0 shadow-sm bg-[#07008A] text-white overflow-hidden relative">
               <CardHeader>
                 <CardTitle className="text-base font-bold flex items-center gap-2">
                   <Info className="h-4 w-4" />
@@ -310,9 +311,67 @@ export default function AdminSettingsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/20 rounded-2xl bg-white/5">
-                  <img src="/logo.png" alt="Hotel Logo" className="h-20 w-auto object-contain mb-4" />
-                  <p className="text-[10px] text-white/60 text-center uppercase tracking-widest font-bold">Standard Logo</p>
+                <div 
+                  className="relative group flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/20 rounded-2xl bg-white/5 cursor-pointer hover:bg-white/10 transition-colors"
+                  onClick={() => document.getElementById("logo-upload")?.click()}
+                >
+                  {uploadingLogo && (
+                    <div className="absolute inset-0 bg-[#07008A]/80 flex items-center justify-center z-10 rounded-xl flex-col gap-2">
+                      <Loader2 className="h-6 w-6 animate-spin text-white" />
+                      <p className="text-xs text-white/80 font-medium">Uploading...</p>
+                    </div>
+                  )}
+                  <input
+                    id="logo-upload"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+
+                      setUploadingLogo(true);
+                      try {
+                        const token = localStorage.getItem("admin_token");
+                        const reader = new FileReader();
+                        reader.onload = async () => {
+                          const filePayload = {
+                            name: file.name,
+                            type: file.type || "image/jpeg",
+                            data: String(reader.result ?? ""),
+                          };
+
+                          const uploadRes = await fetch(`/api/rooms/upload-image`, {
+                            method: "POST",
+                            headers: {
+                              "Content-Type": "application/json",
+                              Authorization: `Bearer ${token}`,
+                            },
+                            body: JSON.stringify({ files: [filePayload] }),
+                          });
+
+                          const uploadData = await uploadRes.json();
+                          if (!uploadRes.ok) throw new Error(uploadData.error || "Failed to upload logo.");
+
+                          const newLogoUrl = uploadData.urls[0];
+                          handleUpdate("hotel_logo", newLogoUrl);
+                          toast.success("Logo uploaded temporarily. Click Save Changes to apply.");
+                          
+                          setUploadingLogo(false);
+                        };
+                        reader.onerror = () => {
+                          toast.error("Failed to read file");
+                          setUploadingLogo(false);
+                        };
+                        reader.readAsDataURL(file);
+                      } catch (err: any) {
+                        toast.error(err.message || "An error occurred");
+                        setUploadingLogo(false);
+                      }
+                    }}
+                  />
+                  <img src={settings.hotel_logo || "/logo.png"} alt="Hotel Logo" className="h-20 w-auto object-contain mb-4" />
+                  <p className="text-[10px] text-white/60 text-center uppercase tracking-widest font-bold group-hover:text-white transition-colors">Click to Upload Logo</p>
                 </div>
                 <div className="space-y-2">
                   <p className="text-xs text-white/80 leading-relaxed italic">

@@ -10,7 +10,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from("bookings")
-      .select("check_in_date, check_out_date, status, rate_plan_kind")
+      .select("id, check_in_date, check_out_date, status, rate_plan_kind")
       .eq("room_id", id)
       .not("status", "in", '("Cancelled","No Show","Checked-Out")')
       .order("check_in_date");

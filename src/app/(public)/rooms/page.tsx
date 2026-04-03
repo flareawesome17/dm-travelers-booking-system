@@ -140,8 +140,8 @@ export default function RoomsPage() {
                     transition={{ duration: 0.55, delay: index * 0.06 }}
                   >
                     <PublicGlassPanel className="overflow-hidden p-0">
-                      <div className="grid h-full md:grid-cols-[0.44fr_0.56fr]">
-                        <div className="relative min-h-[18rem]">
+                      <div className="flex flex-col h-full">
+                        <div className="relative h-64 sm:h-72 shrink-0 w-full">
                           <Image
                             alt={room.room_type}
                             className="object-cover"
@@ -149,66 +149,50 @@ export default function RoomsPage() {
                             sizes="(max-width: 1280px) 100vw, 44vw"
                             src={room.sample_image_url || fallbackImageForRoomType(room.room_type)}
                           />
-                          <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_10%,rgba(5,14,27,0.85)_100%)]" />
-                          <div className="absolute bottom-0 left-0 right-0 p-5">
-                            <p className="text-[0.68rem] uppercase tracking-[0.24em] text-gold-light/90 sm:tracking-[0.32em]">
-                              D&amp;M Travelers Inn
-                            </p>
-                            <p className="mt-2 font-heading text-[1.9rem] font-semibold text-white sm:text-3xl">
-                              {room.room_type}
-                            </p>
-                          </div>
                         </div>
 
-                        <div className="flex flex-col p-6 sm:p-7">
-                          <div className="flex items-start justify-between gap-4">
+                        <div className="flex flex-col p-6 sm:p-8 justify-center">
+                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-white/10 pb-5">
                             <div>
+                              <p className="text-[0.68rem] uppercase tracking-[0.24em] text-gold-light/90 sm:tracking-[0.32em]">
+                                D&amp;M Travelers Inn
+                              </p>
+                              <h2 className="mt-1.5 font-heading text-2xl font-semibold text-white sm:text-3xl">
+                                {room.room_type}
+                              </h2>
+                            </div>
+
+                            <div className="text-left sm:text-right">
                               <p className="text-[0.68rem] uppercase tracking-[0.2em] text-white/60 sm:tracking-[0.3em]">
                                 Starting rate
                               </p>
-                              <p className="mt-2 font-heading text-[2rem] text-white sm:text-3xl">
+                              <p className="mt-1 font-heading text-[1.75rem] text-gold-light font-semibold sm:text-2xl">
                                 {room.min_price != null
                                   ? `PHP ${Number(room.min_price).toLocaleString()}`
                                   : "Request rate"}
                               </p>
                             </div>
+                          </div>
 
-                            <div className="rounded-full border border-gold-light/20 bg-gold/10 px-3 py-1 text-[0.68rem] uppercase tracking-[0.24em] text-gold-light/86">
-                              Ready to book
+                          <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="flex items-center gap-3 text-white/80 font-body text-sm">
+                              <Users className="h-4 w-4 text-gold-light" />
+                              <span>Up to {room.max_capacity ?? "N/A"} guests</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-white/80 font-body text-sm">
+                              <Hotel className="h-4 w-4 text-gold-light" />
+                              <span>{room.total_rooms} rooms in inventory</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-white/80 font-body text-sm sm:col-span-2">
+                              <BedDouble className="h-4 w-4 text-gold-light" />
+                              <span>Comfortable accommodation prepared for restful overnight stays.</span>
                             </div>
                           </div>
 
-                          <p className="mt-5 font-body text-sm leading-7 text-white/78">
-                            Presented with a cleaner booking-first layout so guests can compare categories quickly without losing the premium feel of the site.
-                          </p>
-
-                          <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                            <div className="rounded-[1.2rem] border border-white/10 bg-white/[0.04] p-4">
-                              <div className="flex items-center gap-2 text-white/78">
-                                <Users className="h-4 w-4 text-gold-light" />
-                                <span className="font-body text-sm">Up to {room.max_capacity ?? "N/A"} guests</span>
-                              </div>
-                            </div>
-                            <div className="rounded-[1.2rem] border border-white/10 bg-white/[0.04] p-4">
-                              <div className="flex items-center gap-2 text-white/78">
-                                <Hotel className="h-4 w-4 text-gold-light" />
-                                <span className="font-body text-sm">{room.total_rooms} rooms in inventory</span>
-                              </div>
-                            </div>
-                            <div className="rounded-[1.2rem] border border-white/10 bg-white/[0.04] p-4 sm:col-span-2">
-                              <div className="flex items-center gap-2 text-white/78">
-                                <BedDouble className="h-4 w-4 text-gold-light" />
-                                <span className="font-body text-sm">
-                                  Comfortable accommodation prepared for restful overnight stays.
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                             <Button
                               asChild
-                              className="h-12 rounded-full bg-gradient-gold px-6 font-body text-sm font-semibold text-secondary shadow-[0_18px_40px_-20px_hsl(var(--gold)/0.95)] transition-transform duration-300 hover:-translate-y-0.5 hover:opacity-95"
+                              className="h-11 rounded-full bg-gradient-gold px-6 font-body text-sm font-semibold text-secondary shadow-[0_12px_30px_-15px_hsl(var(--gold)/0.9)] transition-transform duration-300 hover:-translate-y-0.5 hover:opacity-95"
                             >
                               <Link href={`/booking?roomType=${encodeURIComponent(room.room_type)}`}>
                                 Book this room
@@ -218,7 +202,7 @@ export default function RoomsPage() {
 
                             <Button
                               asChild
-                              className="h-12 rounded-full border-white/14 bg-white/6 px-6 font-body text-sm font-medium text-white transition-colors duration-300 hover:bg-white/10 hover:text-white"
+                              className="h-11 rounded-full border-white/14 bg-white/6 px-6 font-body text-sm font-medium text-white transition-colors duration-300 hover:bg-white/10 hover:text-white"
                               variant="outline"
                             >
                               <Link href="/contact">Ask about availability</Link>

@@ -17,6 +17,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/sonner";
 import {
   PublicGlassPanel,
@@ -480,7 +491,7 @@ function BookingPageContent() {
           room_type_requested: selectedRoom,
           check_in_date: form.checkin,
           check_out_date: form.checkout,
-          num_adults: Number(form.guests || 1),
+          num_adults: Math.min(Number(form.guests || 1), selectedRoomData?.max_capacity || 4),
           num_children: 0,
           special_requests: form.request,
           human_check: humanVerified,
@@ -570,7 +581,7 @@ function BookingPageContent() {
           booking_id: bookingId,
           email: form.email,
         });
-        const response = await fetch(`/api/public/bookings/payments/qrph/status?${query.toString()}`);
+        const response = await fetch(`/api/public/bookings/payments/qrph/status?${query.toString()}`, { cache: "no-store" });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
           throw new Error(readApiError(payload, "Unable to check payment status."));
@@ -630,11 +641,6 @@ function BookingPageContent() {
       toast.error("No active booking to cancel.");
       return;
     }
-
-    const confirmed = window.confirm(
-      "Cancel this booking? Any collected down payment is non-refundable under hotel policy."
-    );
-    if (!confirmed) return;
 
     setCheckingPayment(true);
     try {
@@ -1008,10 +1014,11 @@ function BookingPageContent() {
                           style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.5)' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")` }}
                           value={form.guests}
                         >
-                          <option className="bg-[#0d1b2a] text-white" value="1">1 guest</option>
-                          <option className="bg-[#0d1b2a] text-white" value="2">2 guests</option>
-                          <option className="bg-[#0d1b2a] text-white" value="3">3 guests</option>
-                          <option className="bg-[#0d1b2a] text-white" value="4">4 guests</option>
+                          {Array.from({ length: selectedRoomData?.max_capacity || 4 }).map((_, i) => (
+                            <option key={i + 1} className="bg-[#0d1b2a] text-white" value={i + 1}>
+                              {i + 1} guest{i > 0 ? "s" : ""}
+                            </option>
+                          ))}
                         </select>
                       </label>
 
@@ -1382,15 +1389,37 @@ function BookingPageContent() {
                       >
                         {loadingPayment ? "Generating..." : "Generate new QR"}
                       </Button>
-                      <Button
-                        className="h-12 rounded-full border-red-300/30 bg-red-400/10 px-6 font-body text-sm font-medium text-red-100 transition-colors duration-300 hover:bg-red-400/20 hover:text-white"
-                        disabled={checkingPayment || loadingPayment}
-                        onClick={cancelQrPhBooking}
-                        type="button"
-                        variant="outline"
-                      >
-                        Cancel booking
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            className="h-12 rounded-full border-red-300/30 bg-red-400/10 px-6 font-body text-sm font-medium text-red-100 transition-colors duration-300 hover:bg-red-400/20 hover:text-white"
+                            disabled={checkingPayment || loadingPayment}
+                            type="button"
+                            variant="outline"
+                          >
+                            Cancel booking
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="border-white/12 bg-secondary/95 text-white backdrop-blur-xl">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="font-heading text-2xl">Cancel this booking?</AlertDialogTitle>
+                            <AlertDialogDescription className="font-body text-white/70">
+                              Any collected down payment is non-refundable under hotel policy. Are you sure you want to cancel your reservation?
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel className="rounded-full border-white/14 bg-white/[0.04] text-white hover:bg-white/[0.08] hover:text-white">
+                              Keep booking
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              className="rounded-full bg-red-500/80 text-white hover:bg-red-500"
+                              onClick={cancelQrPhBooking}
+                            >
+                              Yes, cancel booking
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                       <Button
                         className="h-12 flex-1 rounded-full bg-gradient-gold font-body text-sm font-semibold text-secondary shadow-[0_18px_40px_-20px_hsl(var(--gold)/0.95)] transition-transform duration-300 hover:-translate-y-0.5 hover:opacity-95 disabled:opacity-50"
                         disabled={checkingPayment || loadingPayment}

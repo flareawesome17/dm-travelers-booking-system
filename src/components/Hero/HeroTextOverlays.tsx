@@ -1,5 +1,4 @@
-"use client";
-
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { MotionValue } from "framer-motion";
 import { motion, useReducedMotion, useTransform } from "framer-motion";
@@ -14,9 +13,16 @@ type HeroTextOverlaysProps = {
 
 function MobileHeroOverlays({
   scrollYProgress,
+  settings,
 }: {
   scrollYProgress: MotionValue<number>;
+  settings: Record<string, string>;
 }) {
+  const hotelName = settings.hotel_name || "D&M Travelers Inn";
+  const hotelAddress = settings.hotel_address?.split(",")?.[0]?.trim() || "Plaridel";
+  const hotelProvince = settings.hotel_address?.includes("Misamis Occidental") ? "Misamis Occidental" : "";
+  const locationText = hotelProvince ? `${hotelAddress}, ${hotelProvince}` : hotelAddress;
+
   const reduceMotion = useReducedMotion();
   const headlineOpacity = useTransform(scrollYProgress, [0, 0.45, 0.9], [1, 0.92, 0.52]);
   const headlineY = useTransform(scrollYProgress, [0, 1], [0, 10]);
@@ -37,11 +43,12 @@ function MobileHeroOverlays({
         }
       >
         <p className="font-[family:var(--font-hero-body)] text-[0.62rem] uppercase tracking-[0.34em] text-gold-light/88 sm:text-[0.7rem]">
-          D&amp;M Travelers Inn
+          {hotelName}
         </p>
         <p className="mt-2 font-[family:var(--font-hero-body)] text-[0.62rem] uppercase tracking-[0.28em] text-white/74 sm:text-[0.7rem] sm:tracking-[0.34em]">
-          Plaridel, Misamis Occidental
+          {locationText}
         </p>
+
         <h1 className="mt-4 max-w-[8ch] font-[family:var(--font-hero-display)] text-[clamp(2.15rem,13vw,3.85rem)] font-semibold leading-[0.9] tracking-[-0.05em] text-white [text-shadow:0_12px_28px_rgba(0,0,0,0.42)]">
           Stay with comfort.
           <span className="mt-2 block text-gold-light">Arrive in style.</span>
@@ -79,9 +86,16 @@ function MobileHeroOverlays({
 
 function DesktopHeroOverlays({
   scrollYProgress,
+  settings,
 }: {
   scrollYProgress: MotionValue<number>;
+  settings: Record<string, string>;
 }) {
+  const hotelName = settings.hotel_name || "D&M Travelers Inn";
+  const hotelAddress = settings.hotel_address?.split(",")?.[0]?.trim() || "Plaridel";
+  const hotelProvince = settings.hotel_address?.includes("Misamis Occidental") ? "Misamis Occidental" : "";
+  const locationText = hotelProvince ? `${hotelAddress}, ${hotelProvince}` : hotelAddress;
+
   const reduceMotion = useReducedMotion();
   const opacity = useTransform(scrollYProgress, [0, 0.16, 0.74, 1], [1, 1, 0.52, 0.2]);
   const y = useTransform(scrollYProgress, [0, 1], [0, 46]);
@@ -93,7 +107,7 @@ function DesktopHeroOverlays({
         style={reduceMotion ? undefined : { opacity, y }}
       >
         <p className="font-[family:var(--font-hero-body)] text-[0.65rem] uppercase tracking-[0.42em] text-gold-light/90 sm:text-xs">
-          D&amp;M Travelers Inn / Plaridel, Misamis Occidental
+          {hotelName} / {locationText}
         </p>
         <h1 className="mt-4 max-w-[11ch] font-[family:var(--font-hero-display)] text-[clamp(4.25rem,7vw,7.25rem)] font-semibold leading-[0.86] tracking-[-0.04em] text-white [text-shadow:0_12px_28px_rgba(0,0,0,0.28)]">
           Stay with comfort.
@@ -124,6 +138,19 @@ export default function HeroTextOverlays({
   className,
   scrollYProgress,
 }: HeroTextOverlaysProps) {
+  const [settings, setSettings] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetch("/api/public/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && typeof data === "object" && !data.error) {
+          setSettings(data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <div
       className={cn(
@@ -131,8 +158,8 @@ export default function HeroTextOverlays({
         className,
       )}
     >
-      <MobileHeroOverlays scrollYProgress={scrollYProgress} />
-      <DesktopHeroOverlays scrollYProgress={scrollYProgress} />
+      <MobileHeroOverlays scrollYProgress={scrollYProgress} settings={settings} />
+      <DesktopHeroOverlays scrollYProgress={scrollYProgress} settings={settings} />
     </div>
   );
 }

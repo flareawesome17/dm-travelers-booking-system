@@ -47,7 +47,7 @@ function getStatusVariant(status?: string) {
 }
 
 type BookingRow = {
-  id?: string; reference_number?: string; status?: string;
+  id?: string; reference_number?: string; status?: string; room_id?: string;
   check_in_date?: string; check_out_date?: string; actual_check_in_at?: string;
   total_amount?: number; deposit_paid?: number; balance_due?: number; restaurant_charges_total?: number;
   extras_total?: number; extensions_total?: number;
@@ -261,10 +261,10 @@ export default function AdminBookingsPage() {
             <div className="p-6 space-y-4">{[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
           ) : (
             <>
-              <div className="responsive-table-wrapper">
+              <div className="overflow-y-auto max-h-[calc(100vh-270px)] w-full custom-scrollbar">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/30">
+                <thead className="sticky top-0 z-10 bg-slate-50 shadow-sm ring-1 ring-slate-100">
+                  <tr className="border-b border-slate-100 bg-slate-50">
                     {["Guest & Reference", "Room & Rate", "Stay Dates", "Billing", "Status", "Actions"].map((h) => (
                       <th key={h} className={`${h === "Actions" ? "text-right pr-6 w-16" : "text-left"} py-3 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider ${h === "Guest & Reference" ? "pl-6" : ""}`}>{h}</th>
                     ))}
@@ -484,7 +484,7 @@ export default function AdminBookingsPage() {
       {/* Edit dialog */}
       <Dialog open={!!editBooking} onOpenChange={(o) => !o && setEditBooking(null)}>
         <DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Edit booking</DialogTitle></DialogHeader>
-          {editBooking?.id && <EditBookingForm apiUrl="" token={token()} booking={{ id: editBooking.id, status: editBooking.status, check_in_date: editBooking.check_in_date, check_out_date: editBooking.check_out_date, special_requests: editBooking.special_requests, deposit_paid: editBooking.deposit_paid, total_amount: editBooking.total_amount, balance_due: editBooking.balance_due, restaurant_charges_total: editBooking.restaurant_charges_total, extras_total: editBooking.extras_total, extensions_total: editBooking.extensions_total, early_checkin_fee_applied: editBooking.early_checkin_fee_applied, late_checkout_fee_applied: editBooking.late_checkout_fee_applied, is_lgu_booking: editBooking.is_lgu_booking }} onSuccess={() => { setLoading(true); fetchBookings(); }} onClose={() => setEditBooking(null)} />}
+          {editBooking?.id && <EditBookingForm apiUrl="" token={token()} booking={editBooking as any} onSuccess={() => { setLoading(true); fetchBookings(); }} onClose={() => setEditBooking(null)} />}
         </DialogContent>
       </Dialog>
 

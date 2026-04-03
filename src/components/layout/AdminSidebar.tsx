@@ -138,6 +138,18 @@ export default function AdminSidebar({
   const router = useRouter();
   const permSet = new Set(permissions);
   const [token, setToken] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string>("/logo.png");
+
+  useEffect(() => {
+    fetch("/api/public/settings", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.hotel_logo) {
+          setLogoUrl(data.hotel_logo);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     try {
@@ -204,7 +216,7 @@ export default function AdminSidebar({
         (isCollapsed && !isMobileOpen) ? "justify-center px-3 h-[72px]" : "justify-between px-5 h-[72px]"
       )}>
         <div className="flex items-center gap-3 overflow-hidden">
-          <Image src="/logo.png" alt="D&M Logo" width={36} height={36} className="shrink-0 object-contain" />
+          <img src={logoUrl} alt="D&M Logo" width={36} height={36} className="shrink-0 object-contain" />
           {(!isCollapsed || isMobileOpen) && (
             <div className="whitespace-nowrap flex-1 min-w-0">
               <p className="font-bold text-white text-sm tracking-tight leading-tight">Admin</p>
