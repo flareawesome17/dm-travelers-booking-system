@@ -1,6 +1,6 @@
 "use client";
 
-import HeroSection from "@/components/landing/HeroSection";
+import Hero from "@/components/Hero";
 import AmenitiesSection from "@/components/landing/AmenitiesSection";
 import FeaturedRoomsSection from "@/components/landing/FeaturedRoomsSection";
 import RestaurantPreview from "@/components/landing/RestaurantPreview";
@@ -11,7 +11,7 @@ import CTASection from "@/components/landing/CTASection";
 export default function HomePage() {
   return (
     <>
-      <HeroSection />
+      <Hero />
       <AmenitiesSection />
       <FeaturedRoomsSection />
       <RestaurantPreview />

@@ -1,44 +1,73 @@
 "use client";
 
 import { motion, useInView } from "framer-motion";
-import { useRef } from "react";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { useRef } from "react";
+import { ArrowRight, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  PublicGlassPanel,
+  PublicGrid,
+  PublicSection,
+  PublicSectionIntro,
+} from "@/components/public/PublicPrimitives";
 
-const TestimonialsSection = () => {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
+const previewQuotes = [
+  "Warm, straightforward hospitality that makes late arrivals easier.",
+  "Comfortable rooms and a calmer atmosphere than you expect from a quick stopover.",
+];
+
+export default function TestimonialsSection() {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const isInView = useInView(ref, { once: true, margin: "-120px" });
 
   return (
-    <section ref={ref} className="py-16 lg:py-24 bg-muted/50">
-      <div className="container mx-auto px-4 text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6 }}
-          className="mb-6"
-        >
-          <p className="text-primary text-sm uppercase tracking-[0.15em] font-medium mb-2">Testimonials</p>
-          <h2 className="font-heading text-3xl lg:text-4xl font-bold text-foreground mb-4">What Our Guests Say</h2>
-          <p className="text-muted-foreground text-sm max-w-md mx-auto">
-            We value honest feedback from our guests. Be the first to share your experience at D&amp;M Travelers Inn.
-          </p>
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >
-          <Link href="/reviews">
-            <Button className="bg-gradient-gold text-secondary font-semibold shadow-gold hover:opacity-90">
-              Read Guest Reviews <ArrowRight className="w-4 h-4 ml-1" />
-            </Button>
-          </Link>
-        </motion.div>
-      </div>
-    </section>
-  );
-};
+    <PublicSection tone="mist" className="py-16 lg:py-24">
+      <PublicGrid>
+        <div ref={ref} className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr] lg:items-end">
+          <motion.div
+            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            initial={{ opacity: 0, y: 24 }}
+            transition={{ duration: 0.65 }}
+          >
+            <PublicSectionIntro
+              eyebrow="Guest Sentiment"
+              title="Trust grows when the experience feels consistent."
+              description="The reviews page now sits within the same premium story instead of feeling like a separate product. Even before testimonials scale up, the page feels deliberate."
+            />
+          </motion.div>
 
-export default TestimonialsSection;
+          <motion.div
+            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            initial={{ opacity: 0, y: 24 }}
+            transition={{ duration: 0.65, delay: 0.08 }}
+            className="grid gap-4"
+          >
+            {previewQuotes.map((quote) => (
+              <PublicGlassPanel key={quote} className="p-5 sm:p-6">
+                <div className="flex items-center gap-1 text-gold-light">
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <Star key={index} className="h-4 w-4 fill-current" />
+                  ))}
+                </div>
+                <p className="mt-4 font-heading text-[1.5rem] leading-snug text-white sm:text-2xl">
+                  "{quote}"
+                </p>
+              </PublicGlassPanel>
+            ))}
+
+            <Button
+              asChild
+              className="mt-2 h-12 rounded-full bg-gradient-gold px-6 font-body text-sm font-semibold text-secondary shadow-[0_18px_40px_-20px_hsl(var(--gold)/0.95)] transition-transform duration-300 hover:-translate-y-0.5 hover:opacity-95"
+            >
+              <Link href="/reviews">
+                View reviews page
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+          </motion.div>
+        </div>
+      </PublicGrid>
+    </PublicSection>
+  );
+}

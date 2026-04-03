@@ -1,58 +1,79 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { useInView } from "framer-motion";
+import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
-import { Wifi, Car, UtensilsCrossed, Waves, ShieldCheck, Clock, Sparkles, MapPin, Scissors } from "lucide-react";
+import {
+  Clock3,
+  MapPin,
+  Scissors,
+  ShieldCheck,
+  Sparkles,
+  UtensilsCrossed,
+  Wifi,
+  Car,
+} from "lucide-react";
+import {
+  PublicGlassPanel,
+  PublicGrid,
+  PublicSection,
+  PublicSectionIntro,
+} from "@/components/public/PublicPrimitives";
 
 const amenities = [
-  { icon: Wifi, title: "Free Wi-Fi", desc: "High-speed internet throughout" },
-  { icon: Car, title: "Free Parking", desc: "Secure on-site parking" },
-  { icon: UtensilsCrossed, title: "Restaurant", desc: "Filipino & international cuisine" },
-  { icon: Scissors, title: "Salon", desc: "Professional salon services available" },
-  { icon: ShieldCheck, title: "24/7 Security", desc: "CCTV & security staff" },
-  { icon: Clock, title: "Front Desk", desc: "Round-the-clock service" },
-  { icon: Sparkles, title: "Housekeeping", desc: "Daily room cleaning" },
-  { icon: MapPin, title: "Prime Location", desc: "Near Plaridel attractions" },
+  { icon: Wifi, title: "Fast Wi-Fi", desc: "Stable connectivity across guest areas and rooms." },
+  { icon: Car, title: "Secure Parking", desc: "Easy arrivals with dedicated on-site parking." },
+  { icon: UtensilsCrossed, title: "Dining On Site", desc: "Comfort food and familiar favorites, thoughtfully served." },
+  { icon: Scissors, title: "Salon Services", desc: "Added convenience for longer stays and quick refreshes." },
+  { icon: ShieldCheck, title: "24/7 Security", desc: "A calm environment with dependable site monitoring." },
+  { icon: Clock3, title: "Front Desk", desc: "Responsive guest support at any hour of the day." },
+  { icon: Sparkles, title: "Housekeeping", desc: "Daily upkeep to keep every stay feeling cared for." },
+  { icon: MapPin, title: "Prime Access", desc: "Positioned well for local travel, business, and stopovers." },
 ];
 
-const AmenitiesSection = () => {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
+export default function AmenitiesSection() {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const isInView = useInView(ref, { once: true, margin: "-120px" });
 
   return (
-    <section ref={ref} className="py-16 lg:py-24 bg-background">
-      <div className="container mx-auto px-4">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-12"
-        >
-          <p className="text-primary text-sm uppercase tracking-[0.15em] font-medium mb-2">What We Offer</p>
-          <h2 className="font-heading text-3xl lg:text-4xl font-bold text-foreground">Hotel Amenities</h2>
-        </motion.div>
+    <PublicSection tone="deep-soft" className="py-16 lg:py-24">
+      <PublicGrid>
+        <div ref={ref}>
+          <motion.div
+            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            initial={{ opacity: 0, y: 24 }}
+            transition={{ duration: 0.65 }}
+          >
+            <PublicSectionIntro
+              eyebrow="What Awaits"
+              title="Comfort-led amenities with a more polished guest experience."
+              description="Every part of the stay is arranged to feel warm, practical, and quietly premium from arrival to checkout."
+            />
+          </motion.div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
-          {amenities.map((item, i) => (
-            <motion.div
-              key={item.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.5, delay: i * 0.08 }}
-              className="bg-card rounded-xl p-5 lg:p-6 text-center group hover:shadow-soft transition-shadow duration-300"
-            >
-              <div className="w-12 h-12 mx-auto mb-3 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                <item.icon className="w-6 h-6 text-primary" />
-              </div>
-              <h3 className="font-heading text-sm lg:text-base font-semibold text-foreground mb-1">{item.title}</h3>
-              <p className="text-xs text-muted-foreground">{item.desc}</p>
-            </motion.div>
-          ))}
+          <div className="mt-12 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {amenities.map((item, index) => (
+              <motion.div
+                key={item.title}
+                animate={isInView ? { opacity: 1, y: 0 } : {}}
+                initial={{ opacity: 0, y: 24 }}
+                transition={{ duration: 0.5, delay: index * 0.06 }}
+              >
+                <PublicGlassPanel className="group h-full p-4 sm:p-5 transition-transform duration-300 hover:-translate-y-1">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-gold-light/20 bg-gold/10">
+                    <item.icon className="h-5 w-5 text-gold-light" />
+                  </div>
+                  <h3 className="mt-4 font-heading text-[1.45rem] font-semibold text-white sm:text-[1.7rem]">
+                    {item.title}
+                  </h3>
+                  <p className="mt-3 font-body text-sm leading-7 text-white/80">
+                    {item.desc}
+                  </p>
+                </PublicGlassPanel>
+              </motion.div>
+            ))}
+          </div>
         </div>
-      </div>
-    </section>
+      </PublicGrid>
+    </PublicSection>
   );
-};
-
-export default AmenitiesSection;
+}

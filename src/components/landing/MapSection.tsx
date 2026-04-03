@@ -1,70 +1,130 @@
 "use client";
 
 import { motion, useInView } from "framer-motion";
+import { LocateFixed, MapPin, Navigation } from "lucide-react";
 import { useRef } from "react";
-import { MapPin, Navigation } from "lucide-react";
+import {
+  PublicGlassPanel,
+  PublicGrid,
+  PublicSection,
+  PublicSectionIntro,
+} from "@/components/public/PublicPrimitives";
 
-const MapSection = () => {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
+export default function MapSection() {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const isInView = useInView(ref, { once: true, margin: "-120px" });
 
   return (
-    <section ref={ref} className="py-16 lg:py-24 bg-background">
-      <div className="container mx-auto px-4">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-10"
-        >
-          <p className="text-primary text-sm uppercase tracking-[0.15em] font-medium mb-2">Location</p>
-          <h2 className="font-heading text-3xl lg:text-4xl font-bold text-foreground">Find Us in Plaridel, Misamis Occidental</h2>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="grid grid-cols-1 lg:grid-cols-3 gap-6"
-        >
-          <div className="lg:col-span-2 rounded-xl overflow-hidden shadow-elevated h-72 lg:h-96">
-            <iframe
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3951.0!2d123.7!3d8.6!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2sPlaridel%2C+Misamis+Occidental!5e0!3m2!1sen!2sph!4v1"
-              width="100%"
-              height="100%"
-              style={{ border: 0 }}
-              allowFullScreen
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              title="D&M Travelers Inn location - Plaridel, Misamis Occidental"
+    <PublicSection tone="deep-soft" className="py-16 lg:py-24">
+      <PublicGrid>
+        <div ref={ref}>
+          <motion.div
+            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            initial={{ opacity: 0, y: 24 }}
+            transition={{ duration: 0.65 }}
+            className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-end"
+          >
+            <PublicSectionIntro
+              eyebrow="Location"
+              title="Positioned for easy arrivals in Plaridel."
+              description="Guests can reach the property conveniently from the main road, making the inn a practical base for overnight stays, local travel, and business movement."
             />
-          </div>
 
-          <div className="bg-card rounded-xl p-6 shadow-soft flex flex-col justify-center">
-            <div className="flex items-center gap-2 mb-4">
-              <MapPin className="w-5 h-5 text-primary" />
-              <h3 className="font-heading text-lg font-semibold text-foreground">Our Address</h3>
-            </div>
-            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-              Looc Proper, Dipolog - Oroquieta National Rd,<br />
-              Plaridel, 7209 Misamis Occidental,<br />
-              Philippines
-            </p>
-            <div className="space-y-3 text-sm">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Navigation className="w-4 h-4 text-primary" />
-                Along Dipolog-Oroquieta National Road
+            <PublicGlassPanel className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <p className="text-[0.68rem] uppercase tracking-[0.22em] text-white/60 sm:tracking-[0.28em]">
+                  Setting
+                </p>
+                <p className="mt-2 font-heading text-2xl text-white">Looc Proper</p>
               </div>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Navigation className="w-4 h-4 text-primary" />
-                Near Baobawon Island
+              <div>
+                <p className="text-[0.68rem] uppercase tracking-[0.22em] text-white/60 sm:tracking-[0.28em]">
+                  Access
+                </p>
+                <p className="mt-2 font-heading text-2xl text-white">Main road frontage</p>
               </div>
-            </div>
+              <div>
+                <p className="text-[0.68rem] uppercase tracking-[0.22em] text-white/60 sm:tracking-[0.28em]">
+                  Guest fit
+                </p>
+                <p className="mt-2 font-heading text-2xl text-white">Leisure and business</p>
+              </div>
+            </PublicGlassPanel>
+          </motion.div>
+
+          <div className="mt-12 grid gap-5 lg:grid-cols-[1.08fr_0.92fr]">
+            <motion.div
+              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              initial={{ opacity: 0, y: 24 }}
+              transition={{ duration: 0.65, delay: 0.08 }}
+            >
+              <PublicGlassPanel className="h-[26rem] overflow-hidden p-0">
+                <iframe
+                  allowFullScreen
+                  className="h-full w-full"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3944.8595754630787!2d123.71979897568883!3d8.609477995413382!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x325495c8a9c5efe3%3A0xf917895811e58050!2sD%26M%20Travellers%20Inn!5e0!3m2!1sen!2sph!4v1775187551578!5m2!1sen!2sph"
+                  style={{ border: 0 }}
+                  title="D&M Travelers Inn location"
+                />
+              </PublicGlassPanel>
+            </motion.div>
+
+            <motion.div
+              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              initial={{ opacity: 0, y: 24 }}
+              transition={{ duration: 0.65, delay: 0.14 }}
+              className="grid gap-4"
+            >
+              <PublicGlassPanel>
+                <div className="flex items-start gap-3">
+                  <MapPin className="mt-1 h-5 w-5 text-gold-light" />
+                  <div>
+                    <p className="text-[0.68rem] uppercase tracking-[0.22em] text-white/60 sm:tracking-[0.28em]">
+                      Address
+                    </p>
+                    <p className="mt-3 font-body text-sm leading-7 text-white/82">
+                      Looc Proper, Dipolog - Oroquieta National Rd, Plaridel, 7209
+                      Misamis Occidental, Philippines
+                    </p>
+                  </div>
+                </div>
+              </PublicGlassPanel>
+
+              <PublicGlassPanel>
+                <div className="flex items-start gap-3">
+                  <Navigation className="mt-1 h-5 w-5 text-gold-light" />
+                  <div>
+                    <p className="text-[0.68rem] uppercase tracking-[0.22em] text-white/60 sm:tracking-[0.28em]">
+                      Direction note
+                    </p>
+                    <p className="mt-3 font-body text-sm leading-7 text-white/82">
+                      Positioned along the Dipolog-Oroquieta National Road for easy
+                      roadside access and convenient guest movement.
+                    </p>
+                  </div>
+                </div>
+              </PublicGlassPanel>
+
+              <PublicGlassPanel>
+                <div className="flex items-start gap-3">
+                  <LocateFixed className="mt-1 h-5 w-5 text-gold-light" />
+                  <div>
+                    <p className="text-[0.68rem] uppercase tracking-[0.22em] text-white/60 sm:tracking-[0.28em]">
+                      Nearby context
+                    </p>
+                    <p className="mt-3 font-body text-sm leading-7 text-white/82">
+                      Well suited for travelers moving through Plaridel and nearby
+                      destinations including Baobawon Island access points.
+                    </p>
+                  </div>
+                </div>
+              </PublicGlassPanel>
+            </motion.div>
           </div>
-        </motion.div>
-      </div>
-    </section>
+        </div>
+      </PublicGrid>
+    </PublicSection>
   );
-};
-
-export default MapSection;
+}

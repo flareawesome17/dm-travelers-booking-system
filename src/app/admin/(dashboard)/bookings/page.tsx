@@ -52,7 +52,8 @@ type BookingRow = {
   total_amount?: number; deposit_paid?: number; balance_due?: number; restaurant_charges_total?: number;
   extras_total?: number; extensions_total?: number;
   rate_plan_kind?: string; special_requests?: string | null;
-  early_checkin_fee_applied?: number; late_checkout_fee_applied?: number; is_lgu_booking?: boolean;
+  early_checkin_fee_applied?: number; late_checkout_fee_applied?: number;
+  is_lgu_booking?: boolean; is_special_booking?: boolean; special_booking_label?: string | null;
   guests?: { full_name?: string; email?: string; phone_number?: string };
   rooms?: {
     room_number?: string; room_type?: string; status?: string;
@@ -192,7 +193,17 @@ export default function AdminBookingsPage() {
     const matchesStatus = statusFilter === "all" ? true : String(b.status || "").toLowerCase() === statusFilter.toLowerCase();
     const term = search.trim().toLowerCase();
     if (!term) return matchesStatus;
-    const haystack = [b.reference_number, b.guests?.full_name, b.guests?.email, b.rooms?.room_number, b.rooms?.room_type, b.rate_plan_kind, b.is_lgu_booking ? "lgu booking" : ""].filter(Boolean).join(" ").toLowerCase();
+    const haystack = [
+      b.reference_number,
+      b.guests?.full_name,
+      b.guests?.email,
+      b.rooms?.room_number,
+      b.rooms?.room_type,
+      b.rate_plan_kind,
+      b.is_lgu_booking ? "lgu booking" : "",
+      b.is_special_booking ? "special booking" : "",
+      b.special_booking_label,
+    ].filter(Boolean).join(" ").toLowerCase();
     return matchesStatus && haystack.includes(term);
   });
 
@@ -289,6 +300,11 @@ export default function AdminBookingsPage() {
                           <span className="font-mono text-[11px] text-[#07008A]">{b.reference_number ?? "—"}</span>
                           {b.guests?.email && <span className="text-slate-500 text-[11px] truncate max-w-[140px] mt-0.5">{b.guests.email}</span>}
                           {b.is_lgu_booking && <span className="mt-1.5 inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-medium text-blue-700 w-fit border border-blue-100">LGU Booking</span>}
+                          {b.is_special_booking && (
+                            <span className="mt-1.5 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-medium text-amber-700 w-fit border border-amber-100">
+                              {b.special_booking_label?.trim() || "Special Booking"}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="py-4 px-4 align-top text-xs">

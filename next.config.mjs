@@ -47,6 +47,7 @@ const nextConfig = {
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https://yqsjczhiemzngudppkhg.supabase.co https://*.supabase.co",
               "connect-src 'self' https://yqsjczhiemzngudppkhg.supabase.co https://*.supabase.co",
+              "frame-src 'self' https://www.google.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",
