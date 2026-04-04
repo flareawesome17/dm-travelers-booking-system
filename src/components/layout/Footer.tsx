@@ -12,7 +12,7 @@ const quickLinks = [
 ];
 
 const DEFAULTS = {
-  hotel_name: "D&M Travelers Inn",
+  hotel_name: "D&M Travellers Inn",
   hotel_address: "Looc Proper, Dipolog - Oroquieta National Rd, Plaridel, Misamis Occidental",
   hotel_phone: "+63 951 868 3018",
   hotel_email: "info@dmtravelersinn.com",
@@ -150,8 +150,22 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-12 border-t border-white/10 pt-6 font-body text-xs uppercase tracking-[0.18em] text-white/56 sm:tracking-[0.22em]">
-          (c) {new Date().getFullYear()} {hotelName}. All rights reserved.
+        <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-6 font-body text-xs uppercase tracking-[0.18em] text-white/56 md:flex-row sm:tracking-[0.22em]">
+          <div className="text-center md:text-left">
+            (c) {new Date().getFullYear()} {hotelName}. All rights reserved.
+          </div>
+          <div className="text-center md:text-right text-[0.65rem] sm:text-xs text-white/40">
+            Crafted with precision by{" "}
+            <a
+              href="https://www.erniecodev.win"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-white/70 transition-colors hover:text-gold-light"
+            >
+              Erniecodev
+            </a>
+            {" "}Software Solutions
+          </div>
         </div>
       </div>
     </footer>

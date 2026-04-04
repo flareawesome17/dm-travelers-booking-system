@@ -119,7 +119,7 @@ export default function AdminLoginPage() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold tracking-tight text-[#07008A]">Admin Login</h1>
-                <p className="text-sm text-muted-foreground mt-0.5">Sign in to manage D&amp;M Travelers Inn</p>
+                <p className="text-sm text-muted-foreground mt-0.5">Sign in to manage D&amp;M Travellers Inn</p>
               </div>
             </div>
             {step === "credentials" ? (

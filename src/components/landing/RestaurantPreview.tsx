@@ -72,7 +72,7 @@ export default function RestaurantPreview() {
             <PublicGlassPanel className="overflow-hidden p-0">
               <div className="relative aspect-[4/3.25] overflow-hidden">
                 <Image
-                  alt="D&M Travelers Inn restaurant"
+                  alt="D&M Travellers Inn restaurant"
                   className="object-cover"
                   fill
                   sizes="(max-width: 1024px) 100vw, 50vw"

@@ -14,7 +14,7 @@ export default function MapSection() {
   const ref = useRef<HTMLDivElement | null>(null);
   const isInView = useInView(ref, { once: true, margin: "-120px" });
   const [settings, setSettings] = useState<Record<string, string>>({
-    hotel_name: "D&M Travelers Inn",
+    hotel_name: "D&M Travellers Inn",
     hotel_address: "Looc Proper, Dipolog - Oroquieta National Rd, Plaridel, 7209 Misamis Occidental, Philippines",
   });
 
@@ -29,7 +29,7 @@ export default function MapSection() {
       .catch(() => {});
   }, []);
 
-  const hotelName = settings.hotel_name || "D&M Travelers Inn";
+  const hotelName = settings.hotel_name || "D&M Travellers Inn";
   const hotelAddress = settings.hotel_address || "Looc Proper, Dipolog - Oroquieta National Rd, Plaridel, 7209 Misamis Occidental, Philippines";
 
 

@@ -41,6 +41,46 @@ export async function POST(req: NextRequest) {
       return apiError("booking_locked", "This booking can no longer be cancelled online.", 400);
     }
 
+    const paid = Number(booking.deposit_paid || 0);
+
+    // If no payment was ever collected, delete the booking entirely
+    // so it never appears in the admin dashboard.
+    // CASCADE constraints will clean up payment_sessions, payments, extras, etc.
+    if (paid <= 0 && status !== "Confirmed") {
+      // Cancel any active payment sessions first (PayMongo side-effects are idempotent)
+      await supabase
+        .from("public_booking_payment_sessions")
+        .update({
+          status: "cancelled",
+          updated_at: nowIso,
+        })
+        .eq("booking_id", booking.id)
+        .in("status", ["awaiting_payment_method", "awaiting_next_action", "processing", "expired"]);
+
+      // Delete the booking — cascades to payments, payment_sessions, extras, etc.
+      const { error: deleteError } = await supabase
+        .from("bookings")
+        .delete()
+        .eq("id", booking.id);
+
+      if (deleteError) {
+        console.error("[PUBLIC_BOOKING_QRPH_CANCEL_DELETE_ERROR]", deleteError);
+        // Fallback: mark as cancelled if delete fails
+        await supabase
+          .from("bookings")
+          .update({ status: "Cancelled", updated_at: nowIso })
+          .eq("id", booking.id);
+      }
+
+      return NextResponse.json({
+        success: true,
+        status: "Cancelled",
+        reference_number: booking.reference_number,
+        non_refundable_notice: "No payment has been collected for this booking.",
+      });
+    }
+
+    // If payment WAS collected, keep the booking but mark it cancelled
     if (status !== "Cancelled") {
       const { error: updateError } = await supabase
         .from("bookings")
@@ -63,19 +103,15 @@ export async function POST(req: NextRequest) {
       .eq("booking_id", booking.id)
       .in("status", ["awaiting_payment_method", "awaiting_next_action", "processing", "expired"]);
 
-    const paid = Number(booking.deposit_paid || 0);
-
     // Fetch cancellation policy from settings for the notice
-    let cancellationNotice = paid > 0
-      ? "Your down payment is subject to the hotel cancellation policy."
-      : "No payment has been collected for this booking.";
+    let cancellationNotice = "Your down payment is subject to the hotel cancellation policy.";
     try {
       const { data: policySetting } = await supabase
         .from("settings")
         .select("value")
         .eq("key", "cancellation_policy")
         .single();
-      if (policySetting?.value && paid > 0) {
+      if (policySetting?.value) {
         cancellationNotice = policySetting.value;
       }
     } catch {

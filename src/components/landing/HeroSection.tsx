@@ -12,7 +12,7 @@ const HeroSection = () => {
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0">
-        <img src={heroImage} alt="D&M Travelers Inn - Luxury boutique hotel in Plaridel" className="w-full h-full object-cover" />
+        <img src={heroImage} alt="D&M Travellers Inn - Luxury boutique hotel in Plaridel" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-hero" />
       </div>
 
@@ -46,7 +46,7 @@ const HeroSection = () => {
             className="text-lg md:text-xl mb-10 max-w-xl leading-relaxed"
             style={{ color: "hsl(40, 15%, 80%)" }}
           >
-            Experience warm Filipino hospitality at D&M Travelers Inn. Affordable luxury in Plaridel, Misamis Occidental.
+            Experience warm Filipino hospitality at D&M Travellers Inn. Affordable luxury in Plaridel, Misamis Occidental.
           </motion.p>
 
           {/* Quick Booking Form */}

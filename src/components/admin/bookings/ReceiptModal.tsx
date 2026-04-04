@@ -34,7 +34,7 @@ import { useEffect, useState } from "react";
 
 export function ReceiptModal({ booking, onClose }: ReceiptModalProps) {
   const [settings, setSettings] = useState<Record<string, string>>({
-    hotel_name: "D&M Travelers Inn",
+    hotel_name: "D&M Travellers Inn",
     hotel_address: "Looc Proper, Plaridel, Misamis Occidental",
     hotel_phone: "+63 951 868 3018",
     hotel_logo: "/logo.png",

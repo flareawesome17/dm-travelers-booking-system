@@ -195,7 +195,7 @@ export default function AdminDashboardPage() {
           <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-600">Live</span>
         </div>
         <h1 className="text-2xl lg:text-3xl font-bold text-[#07008A] tracking-tight">Dashboard Overview</h1>
-        <p className="text-muted-foreground mt-1 text-sm">Live updates from D&M Travelers Inn</p>
+        <p className="text-muted-foreground mt-1 text-sm">Live updates from D&M Travellers Inn</p>
       </motion.div>
 
       {/* Welcome Banner */}

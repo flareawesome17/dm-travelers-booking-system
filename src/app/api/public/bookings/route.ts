@@ -29,13 +29,23 @@ function randomCode6() {
   return String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
 }
 
-async function cancelExpiredPendingVerifications(supabase: ReturnType<typeof getSupabaseAdmin>) {
+async function cleanupExpiredUnpaidBookings(supabase: ReturnType<typeof getSupabaseAdmin>) {
   const nowIso = new Date().toISOString();
+
+  // Delete expired "Pending Verification" bookings (never paid)
   await supabase
     .from("bookings")
-    .update({ status: "Cancelled", updated_at: nowIso })
+    .delete()
     .eq("status", "Pending Verification")
     .lt("verification_code_expires_at", nowIso);
+
+  // Delete expired "Pending Payment" bookings (never paid)
+  await supabase
+    .from("bookings")
+    .delete()
+    .eq("status", "Pending Payment")
+    .not("payment_expires_at", "is", null)
+    .lt("payment_expires_at", nowIso);
 }
 
 export async function POST(req: NextRequest) {
@@ -73,7 +83,7 @@ export async function POST(req: NextRequest) {
     if (!agreeTerms) return NextResponse.json({ error: "Please accept the terms and agreement before continuing." }, { status: 400 });
 
     const supabase = getSupabaseAdmin();
-    await cancelExpiredPendingVerifications(supabase);
+    await cleanupExpiredUnpaidBookings(supabase);
 
     const { data: rooms, error: rErr } = await supabase
       .from("rooms")
@@ -166,6 +176,16 @@ export async function POST(req: NextRequest) {
         .single();
       if (gErr || !guest) return NextResponse.json({ error: gErr?.message || "Failed to create guest." }, { status: 500 });
       guestId = guest.id;
+    } else {
+      // If guest exists, update the name to the latest one provided
+      const { error: guestUpdateError } = await supabase
+        .from("guests")
+        .update({ full_name: fullName })
+        .eq("id", guestId);
+        
+      if (guestUpdateError) {
+        console.error("[GUEST_UPDATE_ERROR]", guestUpdateError);
+      }
     }
 
     const verificationCode = randomCode6();
@@ -208,17 +228,63 @@ export async function POST(req: NextRequest) {
 
     if (!created) return NextResponse.json({ error: "Failed to create booking." }, { status: 500 });
 
+    // Fetch hotel branding for verification email
+    const { data: settingsRows } = await supabase
+      .from("settings")
+      .select("key, value")
+      .in("key", ["hotel_name", "hotel_logo", "hotel_email", "hotel_phone", "hotel_address"]);
+    const settingsMap = new Map<string, string>();
+    for (const row of settingsRows ?? []) {
+      if (row.key) settingsMap.set(row.key, String(row.value ?? ""));
+    }
+    const hotelName = settingsMap.get("hotel_name")?.trim() || "D&M Travellers Inn";
+    const hotelLogo = settingsMap.get("hotel_logo")?.trim() || "";
+
+    const verificationHtml = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"/></head>
+<body style="margin:0;padding:20px;background-color:#f4f7f9;font-family:sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td align="center">
+      <table width="100%" style="max-width:500px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.05);border:1px solid #e1e8ed;">
+        <tr>
+          <td style="background-color:#0b1a2e;padding:30px;text-align:center;">
+            ${hotelLogo ? `<img src="${hotelLogo}" alt="${hotelName}" style="height:50px;margin-bottom:15px;"/>` : `<h1 style="color:#ffffff;margin:0;font-size:20px;letter-spacing:2px;">${hotelName}</h1>`}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:40px 30px;text-align:center;">
+            <p style="margin:0 0 20px;font-size:16px;color:#4a5568;">Your booking reference is <strong>${created.reference_number}</strong>.</p>
+            <p style="margin:0 0 10px;font-size:14px;color:#718096;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Your Verification Code</p>
+            <div style="background-color:#f8fafc;border:1px dashed #cbd5e0;padding:20px;border-radius:8px;margin:20px 0;">
+              <span style="font-size:32px;font-weight:700;color:#0b1a2e;letter-spacing:8px;margin-left:8px;">${verificationCode}</span>
+            </div>
+            <p style="margin:20px 0 0;font-size:13px;color:#a0aec0;">This code expires in 10 minutes. Please enter it on the website to proceed with your booking.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px;background-color:#f8fafc;text-align:center;border-top:1px solid #edf2f7;">
+            <p style="margin:0;font-size:12px;color:#718096;">&copy; ${new Date().getFullYear()} ${hotelName}. All rights reserved.</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+
     try {
       await sendMail({
         to: email,
-        subject: "D&M Travelers Inn - Verify your booking",
+        subject: `[${hotelName}] Verify your booking — Reference: ${created.reference_number}`,
         text: `Your booking reference is ${created.reference_number}.\n\nYour verification code is: ${verificationCode}\n\nThis code expires in 10 minutes.`,
-        html: `<p>Your booking reference is <strong>${created.reference_number}</strong>.</p><p>Your verification code is:</p><h2 style="letter-spacing:2px">${verificationCode}</h2><p>This code expires in 10 minutes.</p>`,
+        html: verificationHtml,
       });
     } catch (mailErr: any) {
       await supabase
         .from("bookings")
-        .update({ status: "Cancelled", updated_at: new Date().toISOString() })
+        .delete()
         .eq("id", created.id);
       return NextResponse.json(
         { error: mailErr?.message || "Failed to send verification email. Please try again later." },

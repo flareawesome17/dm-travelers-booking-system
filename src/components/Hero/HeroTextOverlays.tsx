@@ -18,7 +18,7 @@ function MobileHeroOverlays({
   scrollYProgress: MotionValue<number>;
   settings: Record<string, string>;
 }) {
-  const hotelName = settings.hotel_name || "D&M Travelers Inn";
+  const hotelName = settings.hotel_name || "D&M Travellers Inn";
   const hotelAddress = settings.hotel_address?.split(",")?.[0]?.trim() || "Plaridel";
   const hotelProvince = settings.hotel_address?.includes("Misamis Occidental") ? "Misamis Occidental" : "";
   const locationText = hotelProvince ? `${hotelAddress}, ${hotelProvince}` : hotelAddress;
@@ -91,7 +91,7 @@ function DesktopHeroOverlays({
   scrollYProgress: MotionValue<number>;
   settings: Record<string, string>;
 }) {
-  const hotelName = settings.hotel_name || "D&M Travelers Inn";
+  const hotelName = settings.hotel_name || "D&M Travellers Inn";
   const hotelAddress = settings.hotel_address?.split(",")?.[0]?.trim() || "Plaridel";
   const hotelProvince = settings.hotel_address?.includes("Misamis Occidental") ? "Misamis Occidental" : "";
   const locationText = hotelProvince ? `${hotelAddress}, ${hotelProvince}` : hotelAddress;

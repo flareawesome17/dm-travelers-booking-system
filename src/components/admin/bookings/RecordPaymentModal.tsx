@@ -28,14 +28,15 @@ type Props = {
 };
 
 export function RecordPaymentModal({ booking, onSuccess, onClose }: Props) {
+  const breakdown = getBookingChargeBreakdown(booking);
+  const totalPaidSoFar = getBookingTotalPaid(booking);
+
   const [amount, setAmount] = useState<string>("");
   const [method, setMethod] = useState<string>("Cash");
-  const [type, setType] = useState<string>("Deposit");
+  const [type, setType] = useState<string>(totalPaidSoFar > 0 ? "Balance" : "Deposit");
   const [transactionId, setTransactionId] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const breakdown = getBookingChargeBreakdown(booking);
-  const totalPaidSoFar = getBookingTotalPaid(booking);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,7 +154,18 @@ export function RecordPaymentModal({ booking, onSuccess, onClose }: Props) {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="pay-amount">Amount (PHP)</Label>
+          <div className="flex justify-between items-center">
+            <Label htmlFor="pay-amount">Amount (PHP)</Label>
+            {Number(booking.balance_due || 0) > 0 && (
+              <button 
+                type="button" 
+                onClick={() => setAmount(Number(booking.balance_due || 0).toFixed(2))}
+                className="text-[11px] font-medium text-[#07008A] bg-blue-50 px-2 py-0.5 rounded-full hover:bg-blue-100 transition-colors"
+              >
+                Fill Remaining Balance
+              </button>
+            )}
+          </div>
           <Input
             id="pay-amount"
             type="number"
@@ -161,7 +173,7 @@ export function RecordPaymentModal({ booking, onSuccess, onClose }: Props) {
             step="0.01"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            placeholder={`e.g. ${Number(booking.balance_due || 0).toFixed(0)}`}
+            placeholder={`e.g. ${Number(booking.balance_due || 0).toFixed(2)}`}
             required
           />
         </div>

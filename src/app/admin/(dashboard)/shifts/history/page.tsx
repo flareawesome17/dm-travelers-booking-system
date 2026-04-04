@@ -144,8 +144,15 @@ export default function ShiftHistoryPage() {
                   className={`p-4 cursor-pointer transition-colors ${selectedLog === log.id ? 'bg-[#07008A]/5 border-l-4 border-l-[#07008A]' : 'hover:bg-slate-50 border-l-4 border-l-transparent'}`}
                 >
                   <div className="flex justify-between items-center mb-1">
-                    <span className="font-semibold text-sm">{log.date}</span>
-                    <Badge variant={log.status === "CLOSED" ? "outline" : "default"} className="text-xs">
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-sm">{log.date}</span>
+                      {log.status === "CLOSED" && log.closed_at && (
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          Closed: {new Date(log.closed_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                        </span>
+                      )}
+                    </div>
+                    <Badge variant={log.status === "CLOSED" ? "outline" : "default"} className="text-xs shrink-0 ml-2">
                       {log.status}
                     </Badge>
                   </div>
@@ -190,13 +197,18 @@ export default function ShiftHistoryPage() {
                       <div>
                         <h2 className="text-2xl font-bold tracking-wide">{detail.shift_log.date}</h2>
                         <p className="opacity-80 text-sm mt-1">{detail.shift_log.shifts?.name} Shift</p>
+                        {detail.shift_log.status === "CLOSED" && detail.shift_log.closed_at && (
+                          <p className="opacity-90 text-xs mt-1 text-emerald-200 font-mono tracking-tight">
+                            Closed: {new Date(detail.shift_log.closed_at).toLocaleString()}
+                          </p>
+                        )}
                       </div>
                       {detail.shift_log.status === "CLOSED" ? (
-                        <Badge variant="outline" className="bg-emerald-500/20 text-emerald-100 border-emerald-500/30">
+                        <Badge variant="outline" className="bg-emerald-500/20 text-emerald-100 border-emerald-500/30 ml-2">
                           <Lock className="h-3 w-3 mr-1" /> CLOSED
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="bg-amber-500/20 text-amber-100 border-amber-500/30">
+                        <Badge variant="outline" className="bg-amber-500/20 text-amber-100 border-amber-500/30 ml-2">
                           OPEN
                         </Badge>
                       )}

@@ -139,37 +139,90 @@ export async function getOrCreateActiveShiftLog(adminId?: string) {
   if (sErr) throw sErr;
   if (!shifts || shifts.length === 0) throw new Error("No active shifts configured.");
 
-  // 2. Detect current shift
+  // 2. Detect current theoretical shift based on physical time
   const now = new Date();
   const currentTime = manilaTimeString(now);
   const currentDate = manilaDateString(now);
 
-  const currentShift = detectShift(shifts as ShiftDefinition[], currentTime);
-  if (!currentShift) throw new Error("No shift matches the current time.");
+  const detectedShift = detectShift(shifts as ShiftDefinition[], currentTime);
+  if (!detectedShift) throw new Error("No shift matches the current time.");
 
-  // 3. Determine the correct date for this shift log
-  const shiftDate = getShiftDate(currentShift, currentDate, currentTime);
+  const targetShiftDate = getShiftDate(detectedShift, currentDate, currentTime);
 
-  // 4. Get or create shift_log
+  // 3. Find if there's any OPEN shift log currently (to handle manual overtime)
+  const { data: openLogs, error: openErr } = await supabase
+    .from("shift_logs")
+    .select("*")
+    .eq("status", "OPEN")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (openErr) throw openErr;
+  const existingOpenLog = openLogs?.[0];
+
+  if (existingOpenLog) {
+    const isOvertime = existingOpenLog.shift_id !== detectedShift.id || existingOpenLog.date !== targetShiftDate;
+    
+    if (isOvertime) {
+      // 4. Fetch auto-close setting
+      const { data: settingsData } = await supabase
+        .from("settings")
+        .select("value")
+        .eq("key", "auto_close_shifts")
+        .maybeSingle();
+      
+      const autoCloseShifts = settingsData?.value === "true";
+
+      if (autoCloseShifts) {
+        // Auto-close the old orphaned shift
+        await supabase.from("shift_logs").update({
+          status: "CLOSED",
+          closed_at: new Date().toISOString(),
+          close_notes: "Auto-closed due to shift timeout",
+        }).eq("id", existingOpenLog.id);
+        // Fall through to create the proper detected shift
+      } else {
+        // Maintain the open shift and mark it as overtime
+        const fallbackShiftDef = shifts.find(s => s.id === existingOpenLog.shift_id) || detectedShift;
+        return { 
+          shift: fallbackShiftDef, 
+          shiftLog: existingOpenLog, 
+          shifts: shifts as ShiftDefinition[], 
+          is_overtime: true 
+        };
+      }
+    } else {
+      // Still firmly within bounds
+      const matchedShiftDef = shifts.find(s => s.id === existingOpenLog.shift_id) || detectedShift;
+      return { 
+        shift: matchedShiftDef, 
+        shiftLog: existingOpenLog, 
+        shifts: shifts as ShiftDefinition[], 
+        is_overtime: false 
+      };
+    }
+  }
+
+  // 5. Normal Path: Get or create the detected shift_log
   const { data: existing, error: eErr } = await supabase
     .from("shift_logs")
     .select("*")
-    .eq("shift_id", currentShift.id)
-    .eq("date", shiftDate)
+    .eq("shift_id", detectedShift.id)
+    .eq("date", targetShiftDate)
     .maybeSingle();
 
   if (eErr) throw eErr;
 
   if (existing) {
-    return { shift: currentShift, shiftLog: existing, shifts: shifts as ShiftDefinition[] };
+    return { shift: detectedShift, shiftLog: existing, shifts: shifts as ShiftDefinition[], is_overtime: false };
   }
 
   // Create new shift log
   const { data: created, error: cErr } = await supabase
     .from("shift_logs")
     .insert({
-      shift_id: currentShift.id,
-      date: shiftDate,
+      shift_id: detectedShift.id,
+      date: targetShiftDate,
       opened_by: adminId || null,
       status: "OPEN",
     })
@@ -178,7 +231,7 @@ export async function getOrCreateActiveShiftLog(adminId?: string) {
 
   if (cErr) throw cErr;
 
-  return { shift: currentShift, shiftLog: created, shifts: shifts as ShiftDefinition[] };
+  return { shift: detectedShift, shiftLog: created, shifts: shifts as ShiftDefinition[], is_overtime: false };
 }
 
 /**

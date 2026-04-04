@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
 
     await sendMail({
       to: user.email,
-      subject: "D&M Travelers Inn - Admin Login OTP",
+      subject: "D&M Travellers Inn - Admin Login OTP",
       text: `Your admin login OTP is: ${otp}\n\nThis code will expire in 10 minutes.`,
       html: `<p>Your admin login OTP is:</p><h2 style="letter-spacing:2px">${otp}</h2><p>This code will expire in 10 minutes.</p>`,
     });

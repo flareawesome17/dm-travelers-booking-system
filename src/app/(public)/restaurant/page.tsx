@@ -83,7 +83,7 @@ export default function RestaurantPage() {
       <PublicPageHero
         description="Browse the restaurant with clearer category filters, brighter contrast, and a more welcoming presentation that feels connected to the full guest journey."
         eyebrow="Restaurant"
-        imageAlt="Dining at D&M Travelers Inn"
+        imageAlt="Dining at D&M Travellers Inn"
         imageSrc="/images/restaurant.jpg"
         stats={[
           { label: "Dining style", value: "Warm and familiar" },

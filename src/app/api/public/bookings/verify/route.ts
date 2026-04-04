@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
 
     const exp = booking.verification_code_expires_at ? new Date(String(booking.verification_code_expires_at)).getTime() : 0;
     if (!exp || exp <= Date.now()) {
-      await supabase.from("bookings").update({ status: "Cancelled", updated_at: new Date().toISOString() }).eq("id", booking.id);
+      await supabase.from("bookings").delete().eq("id", booking.id);
       return NextResponse.json({ error: "Code expired. Please create a new booking." }, { status: 400 });
     }
 

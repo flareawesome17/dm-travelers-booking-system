@@ -12,7 +12,9 @@ import {
   CheckCircle2,
   Mail,
   PhoneCall,
+  QrCode,
   UserRound,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -120,6 +122,7 @@ type PublicBookingPolicyConfig = {
   deposit_percent: number;
   cancellation_policy: string;
   currency: string;
+  hotel_name: string;
   payment_security_notice: string;
 };
 
@@ -129,8 +132,9 @@ function defaultBookingPolicyConfig(): PublicBookingPolicyConfig {
     cancellation_policy:
       "A 30% down payment is required to confirm online bookings. Cancellations will release the reservation immediately, and any collected down payment is non-refundable.",
     currency: "PHP",
+    hotel_name: "D&M Travellers Inn",
     payment_security_notice:
-      "Online payments are protected and securely processed by D&M Travelers Inn and PayMongo. Payment information is transmitted through encrypted channels and handled with strict confidentiality.",
+      "Online payments are protected and securely processed by PayMongo. Payment information is transmitted through encrypted channels and handled with strict confidentiality.",
   };
 }
 
@@ -227,7 +231,7 @@ function BookingPageContent() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/public/booking-config")
+    fetch("/api/public/booking-config", { cache: "no-store" })
       .then((response) => response.json().then((json) => ({ ok: response.ok, json })))
       .then(({ ok, json }) => {
         if (!ok) return;
@@ -242,6 +246,10 @@ function BookingPageContent() {
             typeof json?.currency === "string" && json.currency.trim()
               ? json.currency.trim().toUpperCase()
               : "PHP",
+          hotel_name:
+            typeof json?.hotel_name === "string" && json.hotel_name.trim()
+              ? json.hotel_name.trim()
+              : defaultBookingPolicyConfig().hotel_name,
           payment_security_notice:
             typeof json?.payment_security_notice === "string" && json.payment_security_notice.trim()
               ? json.payment_security_notice.trim()
@@ -751,6 +759,23 @@ function BookingPageContent() {
     return () => clearInterval(timer);
   }, [step, bookingId, paymentSession?.status, checkQrPhPaymentStatus]);
 
+  // Clean up unpaid booking when user refreshes or leaves during QR step
+  useEffect(() => {
+    if (step !== 4) return;
+    if (!bookingId || !form.email) return;
+    if (paymentSession?.paid || paymentSession?.status === "succeeded") return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Send cancel beacon — fire-and-forget, browser will deliver even during unload
+      const payload = JSON.stringify({ booking_id: bookingId, email: form.email });
+      navigator.sendBeacon("/api/public/bookings/payments/qrph/cancel", new Blob([payload], { type: "application/json" }));
+      e.preventDefault();
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [step, bookingId, form.email, paymentSession?.paid, paymentSession?.status]);
+
   const dateRangeValid =
     !!form.checkin &&
     !!form.checkout &&
@@ -770,7 +795,7 @@ function BookingPageContent() {
       <PublicPageHero
         description="Reserve in a few clear steps with brighter contrast, cleaner spacing, and a more reassuring booking flow that works better on every screen."
         eyebrow="Book Your Stay"
-        imageAlt="Booking at D&M Travelers Inn"
+        imageAlt="Booking at D&M Travellers Inn"
         imageSrc="/images/room-deluxe.jpg"
         stats={[
           { label: "Step flow", value: "5 stage" },
@@ -1227,7 +1252,7 @@ function BookingPageContent() {
                           <p>3. Guest-requested cancellations will mark the booking as cancelled and release room availability.</p>
                           <p>4. Any collected down payment is non-refundable once the booking is cancelled.</p>
                           <p>5. Remaining balance, if any, is settled according to check-in/front desk billing procedures.</p>
-                          <p>6. Online payment processing is protected and secured by D&M Travelers Inn and PayMongo transactions.</p>
+                          <p>6. Online payment processing is protected and secured by {bookingPolicy.hotel_name} and PayMongo transactions.</p>
                           <p>7. Payment and booking details are handled with confidentiality and appropriate system safeguards.</p>
                         </div>
                       </details>
@@ -1320,13 +1345,13 @@ function BookingPageContent() {
                 <motion.div animate={{ opacity: 1, scale: 1 }} initial={{ opacity: 0, scale: 0.97 }}>
                   <PublicGlassPanel className="mx-auto max-w-xl text-center">
                     <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gold/10">
-                      <Mail className="h-10 w-10 text-gold-light" />
+                      <QrCode className="h-10 w-10 text-gold-light" />
                     </div>
                     <p className="mt-6 text-[0.72rem] uppercase tracking-[0.26em] text-gold-light/86 sm:tracking-[0.34em]">
                       Secure Payment
                     </p>
                     <h2 className="mt-4 font-heading text-[2.15rem] font-semibold text-white sm:text-4xl">
-                      Scan the QRPh code to confirm your booking.
+                      Scan the QR code to confirm your reservation.
                     </h2>
                     <p className="mt-4 font-body text-sm leading-7 text-white/78">
                       Use your banking app or e-wallet that supports QRPh. We will confirm automatically once payment is received.

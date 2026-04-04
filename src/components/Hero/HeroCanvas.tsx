@@ -103,7 +103,7 @@ export default function HeroCanvas({
       .catch(() => {});
   }, []);
 
-  const hotelName = settings.hotel_name || "D&M Travelers Inn";
+  const hotelName = settings.hotel_name || "D&M Travellers Inn";
 
 
   const syncCanvasSize = useCallback(() => {
@@ -303,56 +303,28 @@ export default function HeroCanvas({
       return undefined;
     }
 
-    const animateToTargetFrame = () => {
-      if (reduceMotion) {
-        renderedFrameRef.current = targetFrameRef.current;
-        drawFrame(renderedFrameRef.current);
-        animationFrameRef.current = null;
-        return;
-      }
-
-      const delta = targetFrameRef.current - renderedFrameRef.current;
-
-      if (Math.abs(delta) < 0.1) {
-        renderedFrameRef.current = targetFrameRef.current;
-        drawFrame(renderedFrameRef.current);
-        animationFrameRef.current = null;
-        return;
-      }
-
-      renderedFrameRef.current += delta * 0.14;
-      drawFrame(renderedFrameRef.current);
-      animationFrameRef.current = window.requestAnimationFrame(
-        animateToTargetFrame,
-      );
-    };
-
     const unsubscribe = scrollYProgress.on("change", (latestValue) => {
       const frameSpan = config.frameCount - 1;
       const nextFrame =
         config.startIndex + clamp(latestValue, 0, 1) * frameSpan;
 
       targetFrameRef.current = nextFrame;
+      renderedFrameRef.current = nextFrame;
       preloadNearbyFrames(Math.round(nextFrame), 12);
 
-      if (reduceMotion) {
-        renderedFrameRef.current = nextFrame;
-        drawFrame(nextFrame);
-        return;
+      if (animationFrameRef.current) {
+        window.cancelAnimationFrame(animationFrameRef.current);
       }
 
-      if (animationFrameRef.current === null) {
-        animationFrameRef.current = window.requestAnimationFrame(
-          animateToTargetFrame,
-        );
-      }
+      animationFrameRef.current = window.requestAnimationFrame(() => {
+        drawFrame(nextFrame);
+      });
     });
 
     drawFrame(config.startIndex);
 
     return () => {
       unsubscribe();
-
       if (animationFrameRef.current) {
         window.cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
@@ -363,7 +335,6 @@ export default function HeroCanvas({
     config.startIndex,
     drawFrame,
     preloadNearbyFrames,
-    reduceMotion,
     scrollYProgress,
   ]);
 

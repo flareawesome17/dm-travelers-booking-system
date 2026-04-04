@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { DM_Sans, Playfair_Display } from "next/font/google";
-import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
+import { motion, useReducedMotion, useScroll, useTransform, useSpring } from "framer-motion";
 import HeroCanvas from "./HeroCanvas";
 import HeroTextOverlays from "./HeroTextOverlays";
 import { cn } from "@/lib/utils";
@@ -27,11 +27,18 @@ export default function Hero() {
     offset: ["start start", "end end"],
   });
 
-  const vignetteOpacity = useTransform(scrollYProgress, [0, 0.4, 1], [0.5, 0.72, 0.84]);
-  const ambientOpacity = useTransform(scrollYProgress, [0, 0.55, 1], [0.85, 0.45, 0.2]);
-  const topTintOpacity = useTransform(scrollYProgress, [0, 0.28, 0.72, 1], [0.9, 0.7, 0.5, 0.36]);
-  const lineOpacity = useTransform(scrollYProgress, [0, 0.2, 0.8, 1], [0.2, 0.42, 0.36, 0.1]);
-  const ambientScale = useTransform(scrollYProgress, [0, 1], [1, 1.08]);
+  const smoothProgress = useSpring(scrollYProgress, {
+    stiffness: 200,
+    damping: 35,
+    restDelta: 0.005,
+    restSpeed: 0.005,
+  });
+
+  const vignetteOpacity = useTransform(smoothProgress, [0, 0.4, 1], [0.5, 0.72, 0.84]);
+  const ambientOpacity = useTransform(smoothProgress, [0, 0.55, 1], [0.85, 0.45, 0.2]);
+  const topTintOpacity = useTransform(smoothProgress, [0, 0.28, 0.72, 1], [0.9, 0.7, 0.5, 0.36]);
+  const lineOpacity = useTransform(smoothProgress, [0, 0.2, 0.8, 1], [0.2, 0.42, 0.36, 0.1]);
+  const ambientScale = useTransform(smoothProgress, [0, 1], [1, 1.08]);
 
   return (
     <section
@@ -43,7 +50,7 @@ export default function Hero() {
       )}
     >
         <div className="sticky top-0 z-20 h-screen overflow-hidden">
-          <HeroCanvas scrollYProgress={scrollYProgress} />
+          <HeroCanvas scrollYProgress={smoothProgress} />
 
           <motion.div
             aria-hidden="true"
@@ -89,7 +96,7 @@ export default function Hero() {
             style={reduceMotion ? undefined : { opacity: ambientOpacity }}
           />
 
-          <HeroTextOverlays scrollYProgress={scrollYProgress} />
+          <HeroTextOverlays scrollYProgress={smoothProgress} />
         </div>
     </section>
   );

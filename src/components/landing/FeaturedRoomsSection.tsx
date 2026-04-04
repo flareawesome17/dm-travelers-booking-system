@@ -133,7 +133,7 @@ export default function FeaturedRoomsSection() {
 
                           <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
                             <p className="text-[0.7rem] uppercase tracking-[0.22em] text-white/72 sm:tracking-[0.32em]">
-                              D&amp;M Travelers Inn
+                              D&amp;M Travellers Inn
                             </p>
                             <h3 className="mt-2 font-heading text-[1.9rem] font-semibold text-white sm:text-3xl">
                               {room.room_type}

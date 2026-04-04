@@ -39,7 +39,7 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(pathname !== "/");
   const [settings, setSettings] = useState<Record<string, string>>({
-    hotel_name: "D&M Travelers Inn",
+    hotel_name: "D&M Travellers Inn",
     hotel_phone: "+63 951 868 3018",
   });
 
@@ -63,7 +63,7 @@ export default function Navbar() {
     setIsScrolled(pathname !== "/");
   }, [pathname]);
 
-  const hotelName = settings.hotel_name || "D&M Travelers Inn";
+  const hotelName = settings.hotel_name || "D&M Travellers Inn";
   const hotelPhone = settings.hotel_phone || "+63 951 868 3018";
 
 

@@ -129,7 +129,7 @@ export default function AdminReportsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
           <h1 className="text-2xl lg:text-3xl font-bold text-[#07008A] tracking-tight">Financial Reports</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Analytics and accounting for D&M Travelers Inn</p>
+          <p className="text-muted-foreground mt-1 text-sm">Analytics and accounting for D&M Travellers Inn</p>
         </motion.div>
         
         <div className="flex items-center gap-2">

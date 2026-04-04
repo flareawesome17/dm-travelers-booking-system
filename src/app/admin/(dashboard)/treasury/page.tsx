@@ -764,7 +764,7 @@ export default function AdminTreasuryPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="account_name">Account Name</Label>
-              <Input id="account_name" value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="D&M Travelers Inn" />
+              <Input id="account_name" value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="D&M Travellers Inn" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="account_number">Account Number</Label>

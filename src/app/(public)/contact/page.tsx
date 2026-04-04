@@ -94,7 +94,7 @@ export default function ContactPage() {
       <PublicPageHero
         description="Make it easy for guests to ask a question, check availability, or reach the front desk without friction on mobile, tablet, or desktop."
         eyebrow="Contact"
-        imageAlt="D&M Travelers Inn contact and arrival experience"
+        imageAlt="D&M Travellers Inn contact and arrival experience"
         imageSrc="/images/hero-hotel.jpg"
         stats={[
           { label: "Support", value: "Front desk ready" },

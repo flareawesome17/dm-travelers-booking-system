@@ -17,7 +17,7 @@ export default function ReviewsPage() {
       <PublicPageHero
         description="Even before testimonials scale up, the reviews page should feel trustworthy, polished, and easy to scan for guests comparing where to stay."
         eyebrow="Guest Reviews"
-        imageAlt="Guest review experience at D&M Travelers Inn"
+        imageAlt="Guest review experience at D&M Travellers Inn"
         imageSrc="/images/hero-hotel.jpg"
         stats={[
           { label: "Focus", value: "Guest trust" },

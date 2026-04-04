@@ -6,6 +6,7 @@ type PublicBookingConfig = {
   depositPercent: number;
   cancellationPolicy: string;
   currency: string;
+  hotelName: string;
 };
 
 const DEFAULT_DEPOSIT_PERCENT = 30;
@@ -33,7 +34,7 @@ export async function getPublicBookingConfig(supabase: SupabaseAdminClient): Pro
   const { data } = await supabase
     .from("settings")
     .select("key, value")
-    .in("key", ["deposit_percent", "cancellation_policy", "currency"]);
+    .in("key", ["deposit_percent", "cancellation_policy", "currency", "hotel_name"]);
 
   const map = new Map<string, string>();
   for (const row of data ?? []) {
@@ -45,10 +46,12 @@ export async function getPublicBookingConfig(supabase: SupabaseAdminClient): Pro
   const depositPercent = sanitizePercent(map.get("deposit_percent"));
   const cancellationPolicy = String(map.get("cancellation_policy") || "").trim() || buildDefaultCancellationPolicy(depositPercent);
   const currency = String(map.get("currency") || "").trim().toUpperCase() || DEFAULT_CURRENCY;
+  const hotelName = String(map.get("hotel_name") || "").trim() || "D&M Travellers Inn";
 
   return {
     depositPercent,
     cancellationPolicy,
     currency,
+    hotelName,
   };
 }

@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
       await addShiftTransaction({
         source: "booking",
         referenceId: paymentRecord.id,
-        description: `Booking Payment: ${booking.reference_number || booking_id}`,
+        description: `Booking Payment (${type}): ${booking.reference_number || booking_id}`,
         amount: Number(amount),
         type: "INCOME",
         performedBy: typeof auth.payload?.sub === "string" ? auth.payload.sub : null,

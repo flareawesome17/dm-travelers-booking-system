@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     const supabase = getSupabaseAdmin();
     const adminId = typeof auth.payload.sub === "string" ? auth.payload.sub : undefined;
 
-    const { shift, shiftLog, shifts } = await getOrCreateActiveShiftLog(adminId);
+    const { shift, shiftLog, shifts, is_overtime } = await getOrCreateActiveShiftLog(adminId);
 
     // Fetch transactions for this shift log
     const { data: transactions, error: txErr } = await supabase
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
         .eq("status", "OPEN")
         .maybeSingle();
 
-      if (prevLog) previousShiftOpen = true;
+      if (prevLog && !is_overtime) previousShiftOpen = true; // Don't flag previous if THIS shift is the overtime one
     }
 
     return NextResponse.json({
@@ -70,14 +70,15 @@ export async function GET(req: NextRequest) {
       totals: { total_income: totalIncome, total_expense: totalExpense, net_total: netTotal },
       time: {
         current_time: currentTime,
-        minutes_remaining: minsRemaining,
+        minutes_remaining: is_overtime ? 0 : minsRemaining,
         is_ending_soon: isEndingSoon,
         shift_start: shift.start_time,
         shift_end: shift.end_time,
       },
       warnings: {
         previous_shift_open: previousShiftOpen,
-        ending_soon: isEndingSoon
+        is_overtime: is_overtime,
+        ending_soon: (isEndingSoon && !is_overtime)
           ? `⏰ ${minsRemaining} minutes remaining in ${shift.name} shift. Please close the ledger soon.`
           : null,
       },

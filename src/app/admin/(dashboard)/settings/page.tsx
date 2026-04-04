@@ -235,7 +235,7 @@ export default function AdminSettingsPage() {
             <Card className="lg:col-span-2 border-0 shadow-sm">
               <CardHeader className="border-b bg-slate-50/30">
                 <CardTitle className="text-base font-bold">Property Information</CardTitle>
-                <CardDescription>Basic details about D&M Travelers Inn</CardDescription>
+                <CardDescription>Basic details about D&M Travellers Inn</CardDescription>
               </CardHeader>
               <CardContent className="p-6 space-y-4">
                 <div className="space-y-2">
@@ -475,6 +475,16 @@ export default function AdminSettingsPage() {
                 <CardDescription>Set the exact time window for each shift. These values drive active-shift detection and ledger close timing on the Shifts page.</CardDescription>
               </CardHeader>
               <CardContent className="p-6 space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-4 border-b border-slate-100 mb-2">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-slate-900">Automatic Shift Ledger Closing</p>
+                    <p className="text-xs text-muted-foreground">Automatically close the active shift ledger when its schedule ends and open the next shift. If manual (off), the shift ledger remains open until explicitly closed.</p>
+                  </div>
+                  <Switch 
+                    checked={settings.auto_close_shifts === "true"} 
+                    onCheckedChange={(checked) => handleUpdate("auto_close_shifts", checked ? "true" : "false")} 
+                  />
+                </div>
                 {shifts.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No shift definitions found. Create shift rows first, then return here to configure their schedule.</p>
                 ) : (

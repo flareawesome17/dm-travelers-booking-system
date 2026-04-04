@@ -30,7 +30,7 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-16 lg:h-20">
           <Link href="/" className="flex items-center gap-2">
             <span className="font-heading text-xl lg:text-2xl font-bold text-primary-foreground">
-              D&amp;M <span className="text-primary">Travelers Inn</span>
+              D&amp;M <span className="text-primary">Travellers Inn</span>
             </span>
           </Link>
 

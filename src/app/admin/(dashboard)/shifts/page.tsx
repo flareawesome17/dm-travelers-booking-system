@@ -82,6 +82,16 @@ export default function ShiftsPage() {
                 </div>
               </motion.div>
             )}
+
+            {data.warnings?.is_overtime && data.shift_log.status !== "CLOSED" && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-md flex items-start gap-3">
+                <ShieldAlert className="h-5 w-5 mt-0.5 text-rose-600 animate-pulse" />
+                <div className="text-sm">
+                  <span className="font-semibold block">Shift Overtime!</span>
+                  This shift ledger has exceeded its scheduled time window. Please close the ledger immediately so the next shift can begin.
+                </div>
+              </motion.div>
+            )}
             
             {data.warnings?.ending_soon && data.shift_log.status !== "CLOSED" && (
               <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-md flex items-start gap-3">

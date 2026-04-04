@@ -71,14 +71,14 @@ export function PublicSectionIntro({
         className,
       )}
     >
-      <p className="text-[0.7rem] uppercase tracking-[0.28em] text-gold-light/88 sm:tracking-[0.38em]">
+      <p className="text-[0.7rem] uppercase tracking-[0.28em] text-gold-light sm:tracking-[0.38em]">
         {eyebrow}
       </p>
       <h2 className="mt-4 max-w-[16ch] font-heading text-[clamp(2.1rem,8vw,3.55rem)] font-semibold leading-[0.98] tracking-[-0.03em] text-white sm:text-[clamp(2.8rem,5vw,4.15rem)]">
         {title}
       </h2>
       {description ? (
-        <p className="mt-4 max-w-2xl font-body text-sm leading-7 text-white/80 sm:mt-5 sm:text-base">
+        <p className="mt-4 max-w-2xl font-body text-sm leading-7 text-gold-light sm:mt-5 sm:text-base">
           {description}
         </p>
       ) : null}
@@ -142,13 +142,13 @@ export function PublicPageHero({
             align === "center" ? "mx-auto text-center" : "",
           )}
         >
-          <p className="text-[0.68rem] uppercase tracking-[0.28em] text-gold-light/92 sm:text-[0.72rem] sm:tracking-[0.4em]">
+          <p className="text-[0.68rem] uppercase tracking-[0.28em] text-gold-light sm:text-[0.72rem] sm:tracking-[0.4em]">
             {eyebrow}
           </p>
           <h1 className="mt-4 max-w-[15ch] font-heading text-[clamp(2.25rem,8vw,4.75rem)] font-semibold leading-[0.96] tracking-[-0.04em] text-white">
             {title}
           </h1>
-          <p className="mt-4 max-w-[38rem] font-body text-sm leading-7 text-white/82 sm:mt-5 sm:text-base">
+          <p className="mt-4 max-w-[38rem] font-body text-sm leading-7 text-gold-light sm:mt-5 sm:text-base">
             {description}
           </p>
         </div>

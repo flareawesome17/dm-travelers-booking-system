@@ -85,7 +85,7 @@ export default function RoomsPage() {
       <PublicPageHero
         description="Browse room categories that feel clear, trustworthy, and easy to compare on any device before starting a direct booking."
         eyebrow="Rooms And Suites"
-        imageAlt="D&M Travelers Inn room interior"
+        imageAlt="D&M Travellers Inn room interior"
         imageSrc="/images/room-suite.jpg"
         stats={[
           { label: "Room types", value: loading ? "Loading" : String(roomTypes.length || 0) },
@@ -155,7 +155,7 @@ export default function RoomsPage() {
                           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-white/10 pb-5">
                             <div>
                               <p className="text-[0.68rem] uppercase tracking-[0.24em] text-gold-light/90 sm:tracking-[0.32em]">
-                                D&amp;M Travelers Inn
+                                D&amp;M Travellers Inn
                               </p>
                               <h2 className="mt-1.5 font-heading text-2xl font-semibold text-white sm:text-3xl">
                                 {room.room_type}

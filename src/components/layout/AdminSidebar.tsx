@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -79,9 +79,21 @@ interface NavItemProps {
   icon: React.ComponentType<{ className?: string }>;
   isActive: boolean;
   isCollapsed: boolean;
+  badge?: number;
 }
 
-function NavItem({ label, path, icon: Icon, isActive, isCollapsed }: NavItemProps) {
+function NavItem({ label, path, icon: Icon, isActive, isCollapsed, badge }: NavItemProps) {
+  const badgeEl = badge && badge > 0 ? (
+    <span className={cn(
+      "flex items-center justify-center rounded-full bg-red-500 text-white font-bold leading-none animate-in fade-in zoom-in-75 duration-200",
+      isCollapsed
+        ? "absolute -top-1 -right-1 h-[18px] min-w-[18px] px-1 text-[10px]"
+        : "h-5 min-w-5 px-1.5 text-[11px]"
+    )}>
+      {badge > 99 ? "99+" : badge}
+    </span>
+  ) : null;
+
   const linkContent = (
     <Link
       href={path}
@@ -102,8 +114,12 @@ function NavItem({ label, path, icon: Icon, isActive, isCollapsed }: NavItemProp
         isActive ? "text-[#FED501]" : "group-hover/nav-item:scale-110"
       )} />
       {!isCollapsed && (
-        <span className="flex-1 whitespace-nowrap truncate">{label}</span>
+        <>
+          <span className="flex-1 whitespace-nowrap truncate">{label}</span>
+          {badgeEl}
+        </>
       )}
+      {isCollapsed && badgeEl}
     </Link>
   );
 
@@ -112,7 +128,14 @@ function NavItem({ label, path, icon: Icon, isActive, isCollapsed }: NavItemProp
       <Tooltip delayDuration={0}>
         <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
         <TooltipContent side="right" sideOffset={12} className="bg-slate-900 text-white border-slate-800 text-xs font-medium px-3 py-1.5">
-          {label}
+          <span className="flex items-center gap-2">
+            {label}
+            {badge && badge > 0 ? (
+              <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                {badge > 99 ? "99+" : badge}
+              </span>
+            ) : null}
+          </span>
         </TooltipContent>
       </Tooltip>
     );
@@ -139,6 +162,40 @@ export default function AdminSidebar({
   const permSet = new Set(permissions);
   const [token, setToken] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string>("/logo.png");
+  const [newBookingCount, setNewBookingCount] = useState(0);
+  const bookingPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const LAST_SEEN_KEY = "admin_bookings_last_seen";
+
+  const fetchNewBookingCount = useCallback(async () => {
+    try {
+      const since = localStorage.getItem(LAST_SEEN_KEY) || new Date(0).toISOString();
+      const res = await fetch(`/api/bookings/new-count?since=${encodeURIComponent(since)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setNewBookingCount(typeof data.count === "number" ? data.count : 0);
+      }
+    } catch {
+      // silent
+    }
+  }, []);
+
+  // Poll for new public bookings every 30 seconds
+  useEffect(() => {
+    fetchNewBookingCount();
+    bookingPollRef.current = setInterval(fetchNewBookingCount, 30_000);
+    return () => {
+      if (bookingPollRef.current) clearInterval(bookingPollRef.current);
+    };
+  }, [fetchNewBookingCount]);
+
+  // When the admin navigates to the bookings page, mark as seen
+  useEffect(() => {
+    if (pathname === "/admin/bookings" || pathname.startsWith("/admin/bookings/")) {
+      localStorage.setItem(LAST_SEEN_KEY, new Date().toISOString());
+      setNewBookingCount(0);
+    }
+  }, [pathname]);
 
   useEffect(() => {
     fetch("/api/public/settings", { cache: "no-store" })
@@ -220,7 +277,7 @@ export default function AdminSidebar({
           {(!isCollapsed || isMobileOpen) && (
             <div className="whitespace-nowrap flex-1 min-w-0">
               <p className="font-bold text-white text-sm tracking-tight leading-tight">Admin</p>
-              <p className="text-[11px] text-white/50 leading-tight truncate">D&M Travelers Inn</p>
+              <p className="text-[11px] text-white/50 leading-tight truncate">D&M Travellers Inn</p>
             </div>
           )}
         </div>
@@ -280,6 +337,7 @@ export default function AdminSidebar({
                 icon={icon}
                 isActive={isItemActive(path)}
                 isCollapsed={isCollapsed && !isMobileOpen}
+                badge={path === "/admin/bookings" ? newBookingCount : undefined}
               />
             ))}
           </div>
