@@ -15,7 +15,9 @@ import {
 } from "@/components/public/PublicPrimitives";
 
 type RoomTypeOption = {
+  room_id: string;
   room_type: string;
+  base_room_type: string;
   sample_image_url: string | null;
   min_price: number | null;
   total_rooms: number;
@@ -68,7 +70,7 @@ export default function RoomsPage() {
   }, []);
 
   const filters = useMemo(
-    () => ["All", ...roomTypes.map((room) => room.room_type)],
+    () => ["All", ...Array.from(new Set(roomTypes.map((room) => room.base_room_type)))],
     [roomTypes],
   );
 
@@ -77,7 +79,7 @@ export default function RoomsPage() {
       return roomTypes;
     }
 
-    return roomTypes.filter((room) => room.room_type === filter);
+    return roomTypes.filter((room) => room.base_room_type === filter);
   }, [filter, roomTypes]);
 
   return (
@@ -134,7 +136,7 @@ export default function RoomsPage() {
               ) : (
                 filteredRooms.map((room, index) => (
                   <motion.div
-                    key={room.room_type}
+                    key={room.room_id}
                     animate={isInView ? { opacity: 1, y: 0 } : {}}
                     initial={{ opacity: 0, y: 24 }}
                     transition={{ duration: 0.55, delay: index * 0.06 }}
@@ -181,7 +183,7 @@ export default function RoomsPage() {
                             </div>
                             <div className="flex items-center gap-3 text-white/80 font-body text-sm">
                               <Hotel className="h-4 w-4 text-gold-light" />
-                              <span>{room.total_rooms} rooms in inventory</span>
+                              <span>Select this specific room</span>
                             </div>
                             <div className="flex items-center gap-3 text-white/80 font-body text-sm sm:col-span-2">
                               <BedDouble className="h-4 w-4 text-gold-light" />
@@ -194,7 +196,7 @@ export default function RoomsPage() {
                               asChild
                               className="h-11 rounded-full bg-gradient-gold px-6 font-body text-sm font-semibold text-secondary shadow-[0_12px_30px_-15px_hsl(var(--gold)/0.9)] transition-transform duration-300 hover:-translate-y-0.5 hover:opacity-95"
                             >
-                              <Link href={`/booking?roomType=${encodeURIComponent(room.room_type)}`}>
+                              <Link href={`/booking?roomId=${encodeURIComponent(room.room_id)}`}>
                                 Book this room
                                 <ArrowRight className="h-4 w-4" />
                               </Link>

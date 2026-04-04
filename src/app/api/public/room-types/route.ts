@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 
 type RoomRow = {
   id: string;
+  room_number: string;
   room_type: string;
   is_active?: boolean | null;
   status?: string | null;
@@ -52,7 +53,7 @@ export async function GET(req: NextRequest) {
     const { data: rooms, error: rErr } = await supabase
       .from("rooms")
       .select(
-        "id, room_type, is_active, status, image_urls, capacity, rate_24h_enabled, rate_24h_price, rate_12h_enabled, rate_12h_price, rate_5h_enabled, rate_5h_price, rate_3h_enabled, rate_3h_price"
+        "id, room_number, room_type, is_active, status, image_urls, capacity, rate_24h_enabled, rate_24h_price, rate_12h_enabled, rate_12h_price, rate_5h_enabled, rate_5h_price, rate_3h_enabled, rate_3h_price"
       )
       .eq("is_active", true);
     if (rErr) return NextResponse.json({ error: rErr.message }, { status: 500 });
@@ -93,6 +94,7 @@ export async function GET(req: NextRequest) {
     const typeMap = new Map<
       string,
       {
+        room_id: string;
         room_type: string;
         sample_image_url: string | null;
         min_price: number | null;
@@ -104,12 +106,16 @@ export async function GET(req: NextRequest) {
 
     for (const room of activeRooms) {
       const type = String(room.room_type || "").trim();
-      if (!type) continue;
-      const p = roomStartingPrice(room);
-      if (p == null) continue;
+      const roomNum = String(room.room_number || "").trim();
+      if (!type || !roomNum) continue;
 
-      const existing = typeMap.get(type) ?? {
-        room_type: type,
+      const displayType = `${type} - ${roomNum}`;
+      const p = roomStartingPrice(room);
+
+      const existing = typeMap.get(room.id) ?? {
+        room_id: room.id,
+        room_type: displayType,
+        base_room_type: type,
         sample_image_url: null as string | null,
         min_price: null as number | null,
         total_rooms: 0,
@@ -117,12 +123,14 @@ export async function GET(req: NextRequest) {
         max_capacity: null as number | null,
       };
 
-      existing.total_rooms += 1;
+      existing.total_rooms = 1;
 
       const img = Array.isArray(room.image_urls) && room.image_urls.length ? String(room.image_urls[0]) : null;
       if (!existing.sample_image_url && img) existing.sample_image_url = img;
 
-      existing.min_price = existing.min_price == null ? p : Math.min(existing.min_price, p);
+      if (p != null) {
+        existing.min_price = existing.min_price == null ? p : Math.min(existing.min_price, p);
+      }
 
       const cap = room.capacity != null ? Number(room.capacity) : null;
       if (cap != null && Number.isFinite(cap)) existing.max_capacity = existing.max_capacity == null ? cap : Math.max(existing.max_capacity, cap);
@@ -136,10 +144,10 @@ export async function GET(req: NextRequest) {
             break;
           }
         }
-        if (!overlaps) existing.available_rooms = (existing.available_rooms ?? 0) + 1;
+        if (!overlaps) existing.available_rooms = 1;
       }
 
-      typeMap.set(type, existing);
+      typeMap.set(room.id, existing);
     }
 
     const room_types = Array.from(typeMap.values()).sort((a, b) => a.room_type.localeCompare(b.room_type));

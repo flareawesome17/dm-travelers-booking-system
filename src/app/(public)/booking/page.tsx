@@ -40,7 +40,9 @@ import {
 import { cn } from "@/lib/utils";
 
 type RoomTypeOption = {
+  room_id: string;
   room_type: string;
+  base_room_type: string;
   sample_image_url: string | null;
   min_price: number | null;
   total_rooms: number;
@@ -165,7 +167,7 @@ export default function BookingPage() {
 function BookingPageContent() {
   const searchParams = useSearchParams();
   const [step, setStep] = useState(1);
-  const [selectedRoom, setSelectedRoom] = useState("");
+  const [selectedRoomId, setSelectedRoomId] = useState("");
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -194,8 +196,8 @@ function BookingPageContent() {
   const [calendarError, setCalendarError] = useState("");
   const [prefillProcessed, setPrefillProcessed] = useState(false);
 
-  const preselectedRoomParam = useMemo(
-    () => (searchParams.get("roomType") || "").trim(),
+  const preselectedRoomIdParam = useMemo(
+    () => (searchParams.get("roomId") || "").trim(),
     [searchParams],
   );
 
@@ -267,39 +269,31 @@ function BookingPageContent() {
   }, []);
 
   const selectedRoomData = useMemo(
-    () => roomTypes.find((room) => room.room_type === selectedRoom),
-    [roomTypes, selectedRoom],
+    () => roomTypes.find((room) => room.room_id === selectedRoomId),
+    [roomTypes, selectedRoomId],
   );
-  const normalizedRoomTypeMap = useMemo(() => {
-    const map = new Map<string, string>();
-    roomTypes.forEach((room) => {
-      map.set(room.room_type.trim().toLowerCase(), room.room_type);
-    });
-    return map;
-  }, [roomTypes]);
 
   useEffect(() => {
-    if (prefillProcessed || !preselectedRoomParam || loadingRooms) return;
+    if (prefillProcessed || !preselectedRoomIdParam || loadingRooms) return;
 
-    const normalized = preselectedRoomParam.toLowerCase();
-    const matchedRoomType = normalizedRoomTypeMap.get(normalized);
-    if (!matchedRoomType) {
+    const matchedRoom = roomTypes.find(r => r.room_id === preselectedRoomIdParam);
+    if (!matchedRoom) {
       setPrefillProcessed(true);
       return;
     }
 
-    setSelectedRoom(matchedRoomType);
+    setSelectedRoomId(matchedRoom.room_id);
     setStep((current) => (current < 2 ? 2 : current));
     setPrefillProcessed(true);
   }, [
     loadingRooms,
-    normalizedRoomTypeMap,
     prefillProcessed,
-    preselectedRoomParam,
+    preselectedRoomIdParam,
+    roomTypes,
   ]);
 
   useEffect(() => {
-    if (!selectedRoom) {
+    if (!selectedRoomId) {
       setRoomAvailability(null);
       setCalendarError("");
       return;
@@ -309,7 +303,7 @@ function BookingPageContent() {
     setLoadingAvailability(true);
     setCalendarError("");
 
-    const params = new URLSearchParams({ room_type: selectedRoom });
+    const params = new URLSearchParams({ room_id: selectedRoomId });
     fetch(`/api/public/room-types/availability?${params.toString()}`)
       .then((response) => response.json().then((json) => ({ ok: response.ok, json })))
       .then(({ ok, json }) => {
@@ -335,7 +329,7 @@ function BookingPageContent() {
             : [];
 
           setRoomAvailability({
-            room_type: String(json?.room_type || selectedRoom),
+            room_type: String(json?.room_type || selectedRoomId),
             room_ids: roomIds,
             reservations,
           });
@@ -356,7 +350,7 @@ function BookingPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [selectedRoom]);
+  }, [selectedRoomId]);
 
   const reservedRangesByRoom = useMemo(() => {
     const roomIds = roomAvailability?.room_ids ?? [];
@@ -446,9 +440,9 @@ function BookingPageContent() {
   const handleBack = () => setStep((current) => Math.max(current - 1, 1));
 
   const resetBooking = () => {
-    const prefilledRoom = normalizedRoomTypeMap.get(preselectedRoomParam.toLowerCase()) || "";
-    setStep(prefilledRoom ? 2 : 1);
-    setSelectedRoom(prefilledRoom);
+    const prefilledRoomId = preselectedRoomIdParam || "";
+    setStep(prefilledRoomId ? 2 : 1);
+    setSelectedRoomId(prefilledRoomId);
     setForm({
       name: "",
       email: "",
@@ -468,7 +462,7 @@ function BookingPageContent() {
   };
 
   const createBooking = async () => {
-    if (!selectedRoom) {
+    if (!selectedRoomId) {
       toast.error("Please select a room.");
       return;
     }
@@ -496,7 +490,7 @@ function BookingPageContent() {
           full_name: form.name,
           email: form.email,
           phone_number: form.phone,
-          room_type_requested: selectedRoom,
+          room_id_requested: selectedRoomId,
           check_in_date: form.checkin,
           check_out_date: form.checkout,
           num_adults: Math.min(Number(form.guests || 1), selectedRoomData?.max_capacity || 4),
@@ -782,7 +776,7 @@ function BookingPageContent() {
     new Date(form.checkout).getTime() > new Date(form.checkin).getTime();
 
   const detailsComplete =
-    !!selectedRoom &&
+    !!selectedRoomId &&
     !!form.name &&
     !!form.email &&
     !!form.phone &&
@@ -901,13 +895,13 @@ function BookingPageContent() {
                       ) : (
                         roomTypes.map((room) => (
                           <button
-                            key={room.room_type}
+                            key={room.room_id}
                             className={
-                              selectedRoom === room.room_type
+                              selectedRoomId === room.room_id
                                 ? "grid w-full gap-4 rounded-[1.5rem] border border-gold-light/30 bg-white/[0.08] p-4 text-left transition-all duration-300 md:grid-cols-[7rem_1fr_auto]"
                                 : "grid w-full gap-4 rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4 text-left transition-all duration-300 hover:border-white/18 hover:bg-white/[0.06] md:grid-cols-[7rem_1fr_auto]"
                             }
-                            onClick={() => setSelectedRoom(room.room_type)}
+                            onClick={() => setSelectedRoomId(room.room_id)}
                             type="button"
                           >
                             <div className="relative h-24 overflow-hidden rounded-[1rem]">
@@ -920,7 +914,7 @@ function BookingPageContent() {
                               />
                             </div>
                             <div>
-                              <p className="font-heading text-2xl text-white">{room.room_type}</p>
+                               <p className="font-heading text-2xl text-white">{room.room_type}</p>
                               <p className="mt-2 font-body text-sm text-white/80">
                                 {room.min_price != null
                                   ? `From PHP ${Number(room.min_price).toLocaleString()} per night`
@@ -933,12 +927,12 @@ function BookingPageContent() {
                             <div className="flex items-start justify-end">
                               <div
                                 className={
-                                  selectedRoom === room.room_type
+                                  selectedRoomId === room.room_id
                                     ? "flex h-9 w-9 items-center justify-center rounded-full bg-gradient-gold text-secondary"
                                     : "h-9 w-9 rounded-full border border-white/14 bg-white/[0.04]"
                                 }
                               >
-                                {selectedRoom === room.room_type ? (
+                                {selectedRoomId === room.room_id ? (
                                   <CheckCircle2 className="h-5 w-5" />
                                 ) : null}
                               </div>
@@ -950,7 +944,7 @@ function BookingPageContent() {
 
                     <Button
                       className="mt-8 h-12 w-full rounded-full bg-gradient-gold font-body text-sm font-semibold text-secondary shadow-[0_18px_40px_-20px_hsl(var(--gold)/0.95)] transition-transform duration-300 hover:-translate-y-0.5 hover:opacity-95 disabled:opacity-50"
-                      disabled={!selectedRoom}
+                      disabled={!selectedRoomId}
                       onClick={handleNext}
                     >
                       Continue to guest details
@@ -973,7 +967,7 @@ function BookingPageContent() {
                       <p className="font-body text-sm text-white/86">
                         Selected room:{" "}
                         <span className="font-semibold text-white">
-                          {selectedRoomData?.room_type || selectedRoom || "Not selected"}
+                          {selectedRoomData?.room_type || "Not selected"}
                         </span>
                       </p>
                       <Button
@@ -1059,7 +1053,7 @@ function BookingPageContent() {
                                 "h-12 w-full justify-start rounded-2xl border-white/10 bg-white/[0.04] px-4 font-body text-sm text-white hover:bg-white/[0.08]",
                                 !form.checkin && "text-white/58",
                               )}
-                              disabled={!selectedRoom || loadingAvailability}
+                              disabled={!selectedRoomId || loadingAvailability}
                               type="button"
                               variant="outline"
                             >

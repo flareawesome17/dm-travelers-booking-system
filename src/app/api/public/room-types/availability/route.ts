@@ -14,20 +14,28 @@ export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const roomType = (url.searchParams.get("room_type") || "").trim();
+    const roomId = (url.searchParams.get("room_id") || "").trim();
 
-    if (!roomType) {
-      return NextResponse.json({ error: "room_type is required." }, { status: 400 });
+    if (!roomType && !roomId) {
+      return NextResponse.json({ error: "room_type or room_id is required." }, { status: 400 });
     }
 
     const supabase = getSupabaseAdmin();
     const todayYmd = new Date().toISOString().slice(0, 10);
     const nowIso = new Date().toISOString();
 
-    const { data: rooms, error: roomsError } = await supabase
+    let query = supabase
       .from("rooms")
-      .select("id, status")
-      .eq("room_type", roomType)
+      .select("id, status, room_type")
       .eq("is_active", true);
+
+    if (roomId) {
+      query = query.eq("id", roomId);
+    } else {
+      query = query.eq("room_type", roomType);
+    }
+
+    const { data: rooms, error: roomsError } = await query;
 
     if (roomsError) {
       return NextResponse.json({ error: roomsError.message }, { status: 500 });
@@ -40,7 +48,7 @@ export async function GET(req: NextRequest) {
 
     if (!roomIds.length) {
       return NextResponse.json({
-        room_type: roomType,
+        room_type: roomType || (rooms && rooms.length ? rooms[0].room_type : ""),
         room_ids: [],
         reservations: [],
       });
@@ -81,7 +89,7 @@ export async function GET(req: NextRequest) {
       }));
 
     return NextResponse.json({
-      room_type: roomType,
+      room_type: roomType || (rooms && rooms.length ? rooms[0].room_type : ""),
       room_ids: roomIds,
       reservations,
     });

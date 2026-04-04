@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     const fullName = typeof body.full_name === "string" ? body.full_name.trim() : "";
     const email = typeof body.email === "string" ? body.email.toLowerCase().trim() : "";
     const phone = typeof body.phone_number === "string" ? body.phone_number.trim() : "";
-    const roomType = typeof body.room_type_requested === "string" ? body.room_type_requested.trim() : "";
+    const roomId = typeof body.room_id_requested === "string" ? body.room_id_requested.trim() : "";
     const checkIn = typeof body.check_in_date === "string" ? body.check_in_date.trim() : "";
     const checkOut = typeof body.check_out_date === "string" ? body.check_out_date.trim() : "";
     const special = typeof body.special_requests === "string" ? body.special_requests.trim() : "";
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     if (!fullName) return NextResponse.json({ error: "Full name is required." }, { status: 400 });
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: "Valid email is required." }, { status: 400 });
     if (!phone) return NextResponse.json({ error: "Phone number is required." }, { status: 400 });
-    if (!roomType) return NextResponse.json({ error: "Please select a room type." }, { status: 400 });
+    if (!roomId) return NextResponse.json({ error: "Please select a specific room." }, { status: 400 });
     if (!checkIn || !isYmd(checkIn)) return NextResponse.json({ error: "Check-in date is required." }, { status: 400 });
     if (!checkOut || !isYmd(checkOut)) return NextResponse.json({ error: "Check-out date is required." }, { status: 400 });
     if (cmpYmd(checkIn, checkOut) >= 0) return NextResponse.json({ error: "Check-out must be after check-in." }, { status: 400 });
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
     const { data: rooms, error: rErr } = await supabase
       .from("rooms")
       .select("id, room_number, room_type, is_active, status, rate_24h_enabled, rate_24h_price")
-      .eq("room_type", roomType)
+      .eq("id", roomId)
       .eq("is_active", true);
     if (rErr) return NextResponse.json({ error: rErr.message }, { status: 500 });
 
@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    let chosenRoom: { id: string; rate_24h_enabled?: boolean | null; rate_24h_price?: number | null } | null = null;
+    let chosenRoom: { id: string; room_type: string; rate_24h_enabled?: boolean | null; rate_24h_price?: number | null } | null = null;
     for (const room of candidateRooms) {
       const rid = String(room.id);
       const bks = bookingsByRoom.get(rid) ?? [];
@@ -200,7 +200,7 @@ export async function POST(req: NextRequest) {
           reference_number: reference,
           guest_id: guestId,
           room_id: chosenRoom.id,
-          room_type_requested: roomType,
+          room_type_requested: chosenRoom.room_type,
           check_in_date: checkIn,
           check_out_date: checkOut,
           num_adults: Number.isFinite(adults) && adults > 0 ? adults : 1,

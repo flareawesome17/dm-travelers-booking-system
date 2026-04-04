@@ -14,6 +14,7 @@ import {
 } from "@/components/public/PublicPrimitives";
 
 type RoomType = {
+  room_id: string;
   room_type: string;
   sample_image_url: string | null;
   min_price: number | null;
@@ -158,7 +159,7 @@ export default function FeaturedRoomsSection() {
                               className="mt-6 h-11 rounded-full bg-white/10 px-5 font-body text-sm font-medium text-white transition-colors duration-300 hover:bg-white/16"
                               variant="ghost"
                             >
-                              <Link href={`/booking?roomType=${encodeURIComponent(room.room_type)}`}>
+                              <Link href={`/booking?roomId=${encodeURIComponent(room.room_id)}`}>
                                 Book this room
                                 <ArrowRight className="h-4 w-4 text-gold-light" />
                               </Link>
