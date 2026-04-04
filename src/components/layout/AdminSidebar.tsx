@@ -443,7 +443,7 @@ export default function AdminSidebar({
           {/* Back to site */}
           <NavItem
             label="Back to site"
-            path="/"
+            path={process.env.NEXT_PUBLIC_APP_DOMAIN ? `https://${process.env.NEXT_PUBLIC_APP_DOMAIN}` : "/"}
             icon={Home}
             isActive={false}
             isCollapsed={isCollapsed && !isMobileOpen}

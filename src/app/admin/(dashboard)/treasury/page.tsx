@@ -126,10 +126,7 @@ export default function AdminTreasuryPage() {
 
   const load = useCallback(async (spin = false) => {
     const token = localStorage.getItem("admin_token");
-    if (!token) {
-      router.replace("/admin/login");
-      return;
-    }
+    
     if (spin) setRefreshing(true);
     else setLoading(true);
     try {
@@ -153,10 +150,7 @@ export default function AdminTreasuryPage() {
     if (!destinationOpen) return;
 
     const token = localStorage.getItem("admin_token");
-    if (!token) {
-      router.replace("/admin/login");
-      return;
-    }
+    
 
     let cancelled = false;
     setInstitutionsLoading(true);
@@ -202,7 +196,7 @@ export default function AdminTreasuryPage() {
 
   async function saveDestination() {
     const token = localStorage.getItem("admin_token");
-    if (!token) return router.replace("/admin/login");
+    
     if (!selectedInstitution) {
       toast.error("Select an institution from the PayMongo list first.");
       return;
@@ -241,7 +235,7 @@ export default function AdminTreasuryPage() {
 
   async function requestWithdrawal() {
     const token = localStorage.getItem("admin_token");
-    if (!token) return router.replace("/admin/login");
+    
     setSaving(true);
     try {
       const res = await fetch("/api/treasury/withdrawals", {
@@ -270,7 +264,7 @@ export default function AdminTreasuryPage() {
 
   async function approveWithdrawal(withdrawalId: string) {
     const token = localStorage.getItem("admin_token");
-    if (!token) return router.replace("/admin/login");
+    
     setSaving(true);
     try {
       const res = await fetch(`/api/treasury/withdrawals/${withdrawalId}/approve`, {
@@ -291,7 +285,7 @@ export default function AdminTreasuryPage() {
 
   async function submitWithdrawal(withdrawalId: string) {
     const token = localStorage.getItem("admin_token");
-    if (!token) return router.replace("/admin/login");
+    
     setSaving(true);
     try {
       const res = await fetch(`/api/treasury/withdrawals/${withdrawalId}/submit`, {
@@ -311,7 +305,7 @@ export default function AdminTreasuryPage() {
 
   async function syncWithdrawal(withdrawalId: string) {
     const token = localStorage.getItem("admin_token");
-    if (!token) return router.replace("/admin/login");
+    
     setSaving(true);
     try {
       const res = await fetch(`/api/treasury/withdrawals/${withdrawalId}/sync`, {
@@ -331,7 +325,7 @@ export default function AdminTreasuryPage() {
 
   async function cancelWithdrawal(withdrawalId: string) {
     const token = localStorage.getItem("admin_token");
-    if (!token) return router.replace("/admin/login");
+    
     setSaving(true);
     try {
       const res = await fetch(`/api/treasury/withdrawals/${withdrawalId}/cancel`, {
@@ -351,7 +345,7 @@ export default function AdminTreasuryPage() {
 
   async function completeWithdrawal() {
     const token = localStorage.getItem("admin_token");
-    if (!token) return router.replace("/admin/login");
+    
     if (!selectedWithdrawal) return;
     setSaving(true);
     try {

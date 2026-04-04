@@ -31,7 +31,7 @@ export default function AdminHousekeepingPage() {
 
   useEffect(() => {
     const token = localStorage.getItem("admin_token");
-    if (!token) { router.replace("/admin/login"); return; }
+    
     fetch("/api/housekeeping/rooms", { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((data) => setRooms(Array.isArray(data) ? data : []))
@@ -42,7 +42,7 @@ export default function AdminHousekeepingPage() {
   const updateRoomStatus = async (roomId: string | undefined, nextStatus: string) => {
     if (!roomId) return;
     const token = localStorage.getItem("admin_token");
-    if (!token) { router.replace("/admin/login"); return; }
+    
     
     // Optistic UI update
     setRooms(prev => prev.map(r => r.id === roomId ? { ...r, status: nextStatus } : r));

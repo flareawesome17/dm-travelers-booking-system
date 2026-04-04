@@ -43,7 +43,7 @@ export default function AdminSettingsPage() {
 
   const fetchSettings = useCallback(async () => {
     const token = localStorage.getItem("admin_token");
-    if (!token) { router.replace("/admin/login"); return; }
+    
     try {
       const [settingsRes, shiftsRes] = await Promise.all([
         fetch("/api/settings", { headers: { Authorization: `Bearer ${token}` } }),
@@ -138,7 +138,7 @@ export default function AdminSettingsPage() {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     const token = localStorage.getItem("admin_token");
-    if (!token) { router.replace("/admin/login"); return; }
+    
     if (!pwCurrent.trim() || !pwNew.trim() || !pwConfirm.trim()) {
       toast.error("Please fill out all password fields.");
       return;

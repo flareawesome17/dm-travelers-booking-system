@@ -54,7 +54,7 @@ export default function AdminReportsPage() {
 
   const fetchReportData = async () => {
     const token = localStorage.getItem("admin_token");
-    if (!token) { router.replace("/admin/login"); return; }
+    
     
     setLoading(true);
     try {

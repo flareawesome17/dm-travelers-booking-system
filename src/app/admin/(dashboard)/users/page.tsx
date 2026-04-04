@@ -50,7 +50,7 @@ export default function AdminUsersPage() {
 
   const loadUsers = () => {
     const token = localStorage.getItem("admin_token");
-    if (!token) { router.replace("/admin/login"); return; }
+    
     setLoading(true);
     fetch("/api/admin/users", { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
@@ -64,7 +64,7 @@ export default function AdminUsersPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const token = localStorage.getItem("admin_token");
-    if (!token) { router.replace("/admin/login"); return; }
+    
     if (!name.trim()) { toast.error("Name is required."); return; }
     if (!email.trim() || !password.trim()) { toast.error("Email and password are required."); return; }
     if (password.length < 8) { toast.error("Password must be at least 8 characters."); return; }
@@ -99,7 +99,7 @@ export default function AdminUsersPage() {
     e.preventDefault();
     if (!editingUser) return;
     const token = localStorage.getItem("admin_token");
-    if (!token) { router.replace("/admin/login"); return; }
+    
     if (editPassword && editPassword.length < 8) { toast.error("Password must be at least 8 characters."); return; }
     setSaving(true);
     try {
@@ -127,7 +127,7 @@ export default function AdminUsersPage() {
     if (!deleteConfirmUser) return;
     const id = deleteConfirmUser.id;
     const token = localStorage.getItem("admin_token");
-    if (!token) { router.replace("/admin/login"); return; }
+    
     setDeletingId(id);
     try {
       const res = await fetch(`/api/admin/users/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });

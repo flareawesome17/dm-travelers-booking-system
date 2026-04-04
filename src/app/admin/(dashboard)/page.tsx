@@ -70,7 +70,7 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     const token = localStorage.getItem("admin_token");
-    if (!token) { router.replace("/admin/login"); return; }
+    
 
     const p = decodeJwtPayload(token);
     const name = p && typeof p.name === "string" ? p.name : null;

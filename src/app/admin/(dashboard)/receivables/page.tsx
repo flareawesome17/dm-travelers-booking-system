@@ -144,10 +144,7 @@ export default function ReceivablesPage() {
 
   const fetchReceivables = useCallback(async () => {
     const token = localStorage.getItem("admin_token");
-    if (!token) {
-      router.replace("/admin/login");
-      return;
-    }
+    
 
     setLoading(true);
     try {
@@ -199,10 +196,7 @@ export default function ReceivablesPage() {
 
   const handleSyncNow = async () => {
     const token = localStorage.getItem("admin_token");
-    if (!token) {
-      router.replace("/admin/login");
-      return;
-    }
+    
 
     setSyncing(true);
     try {

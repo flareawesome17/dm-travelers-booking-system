@@ -45,10 +45,7 @@ export default function LguMonitoringPage() {
 
   const fetchCollectibles = () => {
     const token = localStorage.getItem("admin_token");
-    if (!token) {
-      router.replace("/admin/login");
-      return;
-    }
+    
     
     setLoading(true);
     fetch("/api/admin/collectibles", { headers: { Authorization: `Bearer ${token}` } })

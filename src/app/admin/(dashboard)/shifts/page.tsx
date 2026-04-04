@@ -22,7 +22,7 @@ export default function ShiftsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     const token = localStorage.getItem("admin_token");
-    if (!token) { router.replace("/admin/login"); return; }
+    
     
     try {
       const res = await fetch("/api/shifts/current", {

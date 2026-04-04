@@ -45,7 +45,7 @@ export default function AdminRoomsPage() {
 
   useEffect(() => {
     const token = localStorage.getItem("admin_token");
-    if (!token) { router.replace("/admin/login"); return; }
+    
     setAdminToken(token);
     fetch("/api/rooms", { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
@@ -270,7 +270,7 @@ export default function AdminRoomsPage() {
                         <div className="inline-flex items-center gap-1">
                           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-[#07008A] hover:bg-[#07008A]/10" onClick={() => { setEditingRoom(r); setOpen(true); }}><Pencil className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Edit room</TooltipContent></Tooltip>
                           <AlertDialog><Tooltip><TooltipTrigger asChild><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger></TooltipTrigger><TooltipContent>Delete room</TooltipContent></Tooltip>
-                            <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete this room?</AlertDialogTitle><AlertDialogDescription>Room <span className="font-semibold">{r.room_number}</span> will be permanently deleted if it has no bookings.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={async () => { const token = localStorage.getItem("admin_token"); if (!token) { router.replace("/admin/login"); return; } try { const res = await fetch(`/api/rooms/${r.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); if (!res.ok) { toast.error("Failed to delete room."); return; } setRooms((prev) => prev.filter((room) => room.id !== r.id)); toast.success(`Room ${r.room_number ?? ""} was deleted.`); } catch { toast.error("Something went wrong."); } }}>Delete room</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+                            <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete this room?</AlertDialogTitle><AlertDialogDescription>Room <span className="font-semibold">{r.room_number}</span> will be permanently deleted if it has no bookings.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={async () => { const token = localStorage.getItem("admin_token");  try { const res = await fetch(`/api/rooms/${r.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); if (!res.ok) { toast.error("Failed to delete room."); return; } setRooms((prev) => prev.filter((room) => room.id !== r.id)); toast.success(`Room ${r.room_number ?? ""} was deleted.`); } catch { toast.error("Something went wrong."); } }}>Delete room</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
                           </AlertDialog>
                         </div>
                       </td>

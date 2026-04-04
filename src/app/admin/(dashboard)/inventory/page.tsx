@@ -34,7 +34,7 @@ export default function InventoryPage() {
 
   const fetchItems = async () => {
     const token = localStorage.getItem("admin_token");
-    if (!token) { router.replace("/admin/login"); return; }
+    
     setLoading(true);
     try {
       const [invRes, movRes, menuRes] = await Promise.all([

@@ -5,6 +5,7 @@ import { findNextOpenLedgerDate, manilaDateString } from "@/lib/ledgerDate";
 import { parseAndValidate, dbError, internalError } from "@/lib/api-security";
 import { createBookingSchema } from "@/lib/validation-schemas";
 import { syncReceivableForBooking } from "@/lib/receivables";
+import { addShiftTransaction } from "@/lib/shiftUtils";
 
 export async function GET(req: NextRequest) {
   const auth = await requirePermission(req, "bookings.read");
@@ -121,7 +122,7 @@ export async function POST(req: NextRequest) {
       const accountingDate = await findNextOpenLedgerDate(supabase, today);
       const transactionId = `DEP-${Date.now()}-${Math.floor(Math.random() * 1000)}-${String(data.reference_number || "REF").replace(/[^A-Z0-9_-]/gi, "")}`;
 
-      const { error: pErr } = await supabase.from("payments").insert({
+      const { data: paymentData, error: pErr } = await supabase.from("payments").insert({
         booking_id: data.id,
         transaction_id: transactionId,
         method,
@@ -129,9 +130,24 @@ export async function POST(req: NextRequest) {
         type: "Deposit",
         status: "Success",
         accounting_date: accountingDate,
-      });
+      }).select().single();
+
       if (pErr) {
         console.error("[DEPOSIT_ERROR]", pErr);
+      } else if (paymentData) {
+        try {
+          await addShiftTransaction({
+            source: "booking",
+            referenceId: paymentData.id,
+            description: `Booking Payment (Deposit): ${data.reference_number || data.id}`,
+            amount: Number(depositPaid),
+            type: "INCOME",
+            performedBy: typeof auth.payload?.sub === "string" ? auth.payload.sub : null,
+            onFailure: "silent",
+          });
+        } catch (shiftError) {
+          console.error("[DEPOSIT_SHIFT_SYNC_ERROR]", shiftError);
+        }
       }
     }
 

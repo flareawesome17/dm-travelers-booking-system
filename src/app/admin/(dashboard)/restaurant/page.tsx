@@ -89,7 +89,7 @@ export default function AdminRestaurantPage() {
 
   const loadItems = () => {
     const token = localStorage.getItem("admin_token");
-    if (!token) { router.replace("/admin/login"); return; }
+    
     setLoading(true);
     fetch("/api/menu", { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json()).then((data) => setItems(Array.isArray(data) ? data as MenuItem[] : []))
@@ -105,7 +105,7 @@ export default function AdminRestaurantPage() {
 
   useEffect(() => {
     const token = localStorage.getItem("admin_token");
-    if (!token) { router.replace("/admin/login"); return; }
+    
     loadItems(); loadCategories(); loadOrders();
     fetch("/api/bookings", { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()).then((data) => setBookings(Array.isArray(data) ? data as BookingOption[] : [])).catch(() => setBookings([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -159,7 +159,7 @@ export default function AdminRestaurantPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const token = localStorage.getItem("admin_token");
-    if (!token) { router.replace("/admin/login"); return; }
+    
     if (!name.trim() || !price.trim() || !category.trim()) { toast.error("Name, category, and price are required."); return; }
     const numericPrice = Number(price);
     if (!Number.isFinite(numericPrice) || numericPrice <= 0) { toast.error("Price must be a positive number."); return; }
@@ -297,7 +297,7 @@ export default function AdminRestaurantPage() {
                       <td className="py-4 px-6 text-right">
                         <div className="inline-flex items-center gap-1">
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-[#07008A] hover:bg-[#07008A]/10" onClick={() => openForEdit(item)}><Pencil className="h-4 w-4" /></Button>
-                          <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete this menu item?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={async () => { const token = localStorage.getItem("admin_token"); if (!token) { router.replace("/admin/login"); return; } try { const res = await fetch(`/api/menu/${item.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); if (!res.ok) { toast.error("Failed to delete."); return; } setItems((prev) => prev.filter((m) => m.id !== item.id)); toast.success("Menu item deleted."); } catch { toast.error("Something went wrong."); } }}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+                          <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete this menu item?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={async () => { const token = localStorage.getItem("admin_token");  try { const res = await fetch(`/api/menu/${item.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); if (!res.ok) { toast.error("Failed to delete."); return; } setItems((prev) => prev.filter((m) => m.id !== item.id)); toast.success("Menu item deleted."); } catch { toast.error("Something went wrong."); } }}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
                         </div>
                       </td>
                     </tr>
