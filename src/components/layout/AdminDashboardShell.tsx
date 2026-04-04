@@ -1,12 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu } from "lucide-react";
 import AdminSidebar from "@/components/layout/AdminSidebar";
 import { cn } from "@/lib/utils";
-
-const IDLE_MS = 15 * 60 * 1000;
 
 export default function AdminDashboardShell({
   children,
@@ -19,26 +17,6 @@ export default function AdminDashboardShell({
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const lastActivityRef = useRef<number>(Date.now());
-  const lastWriteRef = useRef<number>(0);
-
-  const clearSessionAndRedirect = useCallback(async () => {
-    try {
-      await fetch("/api/admin/logout", { method: "POST" });
-    } catch {
-      // ignore
-    }
-
-    try {
-      localStorage.removeItem("admin_token");
-      localStorage.removeItem("admin_last_activity");
-    } catch {
-      // ignore
-    }
-
-    router.replace("/admin/login");
-    router.refresh();
-  }, [router]);
 
   useEffect(() => {
     const checkWidth = () => {
@@ -72,7 +50,8 @@ export default function AdminDashboardShell({
         const res = await fetch("/api/rbac/me", token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
         const payload = await res.json().catch(() => ({}));
         if (!res.ok) {
-          await clearSessionAndRedirect();
+          router.replace("/admin/login");
+          router.refresh();
           return;
         }
         const perms = Array.isArray(payload?.permissions)
@@ -87,7 +66,7 @@ export default function AdminDashboardShell({
     return () => {
       cancelled = true;
     };
-  }, [clearSessionAndRedirect]);
+  }, [router]);
 
   useEffect(() => {
     if (!permissionsLoaded) return;
@@ -117,68 +96,8 @@ export default function AdminDashboardShell({
     }
   }, [pathname, permissions, permissionsLoaded, router]);
 
-  useEffect(() => {
-    const markActivity = () => {
-      const now = Date.now();
-      lastActivityRef.current = now;
-      if (now - lastWriteRef.current < 5000) return;
-      lastWriteRef.current = now;
-      try {
-        localStorage.setItem("admin_last_activity", String(now));
-      } catch {
-        // ignore
-      }
-    };
-
-    const events: Array<keyof WindowEventMap> = [
-      "mousemove",
-      "mousedown",
-      "keydown",
-      "scroll",
-      "touchstart",
-      "pointerdown",
-      "wheel",
-    ];
-
-    for (const e of events) window.addEventListener(e, markActivity, { passive: true });
-    markActivity();
-
-    const syncFromStorage = (e: StorageEvent) => {
-      if (e.key === "admin_token" && e.newValue == null) {
-        router.replace("/admin/login");
-        router.refresh();
-      }
-      if (e.key === "admin_last_activity" && e.newValue) {
-        const v = Number(e.newValue);
-        if (Number.isFinite(v)) lastActivityRef.current = v;
-      }
-    };
-    window.addEventListener("storage", syncFromStorage);
-
-    const interval = window.setInterval(() => {
-      const now = Date.now();
-      let last = lastActivityRef.current;
-      try {
-        const stored = localStorage.getItem("admin_last_activity");
-        if (stored) {
-          const v = Number(stored);
-          if (Number.isFinite(v)) last = Math.max(last, v);
-        }
-      } catch {
-        // ignore
-      }
-
-      if (now - last >= IDLE_MS) {
-        void clearSessionAndRedirect();
-      }
-    }, 30_000);
-
-    return () => {
-      for (const e of events) window.removeEventListener(e, markActivity);
-      window.removeEventListener("storage", syncFromStorage);
-      window.clearInterval(interval);
-    };
-  }, [clearSessionAndRedirect, router]);
+  // NOTE: Idle auto-logout disabled for development.
+  // Re-enable for production by restoring the activity tracking + IDLE_MS timer.
 
   const handleMobileClose = useCallback(() => setIsMobileOpen(false), []);
 
