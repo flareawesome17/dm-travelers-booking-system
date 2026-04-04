@@ -1475,7 +1475,7 @@ function BookingPageContent() {
                       </div>
                       <div className="flex items-center justify-between gap-4 font-body text-sm">
                         <span className="text-white/60">Room</span>
-                        <span className="text-white">{selectedRoomData?.room_type || selectedRoom}</span>
+                        <span className="text-white">{selectedRoomData?.room_type || "Not selected"}</span>
                       </div>
                       <div className="flex items-center justify-between gap-4 font-body text-sm">
                         <span className="text-white/60">Check-in</span>
