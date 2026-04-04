@@ -7,13 +7,16 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const host = request.headers.get("host") || "";
-  const adminDomain = process.env.ADMIN_SUBDOMAIN || "admin.localhost";
-  // The public app domain, useful for redirecting back if needed. 
-  // We match host directly rather than assuming what the public domain is, 
-  // to support any public domain/alias seamlessly, but check against the explicit admin domain.
-
-  const isAdminDomain = host === adminDomain;
+  // Get the hostname specifically (without port), which is much more reliable than host header
+  const hostname = request.nextUrl.hostname || "";
+  // Check against the env var, or explicitly against the known production subdomain
+  const configuredAdminDomain = process.env.ADMIN_SUBDOMAIN || "admin.dm.erniecodev.win";
+  
+  // Also generously allow admin.localhost for local development tests if NODE_ENV check was somehow bypassed
+  const isAdminDomain = 
+    hostname === configuredAdminDomain || 
+    hostname === "admin.dm.erniecodev.win" ||
+    hostname === "admin.localhost";
   const isPublicDomain = !isAdminDomain;
 
   const url = request.nextUrl;
