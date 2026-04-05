@@ -26,6 +26,7 @@ import {
   FileText,
   ShieldCheck,
   Percent,
+  Star,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -51,6 +52,7 @@ const operationsItems = [
 const managementItems = [
   { label: "Reports", path: "/admin/reports", icon: BarChart3, permission: "reports.read" },
   { label: "Shifts", path: "/admin/shifts", icon: Clock, permission: "shifts.read" },
+  { label: "Reviews", path: "/admin/reviews", icon: Star, permission: "reviews.read" },
   { label: "Discounts", path: "/admin/discounts", icon: Percent, permission: "discounts.read" },
   { label: "Users", path: "/admin/users", icon: Users, permission: "users.manage" },
   { label: "Roles", path: "/admin/roles", icon: KeyRound, permission: "roles.manage" },

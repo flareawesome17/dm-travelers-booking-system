@@ -31,6 +31,10 @@ next-env.d.ts
 .augment/
 .claude/
 .cursor/
+.gemini/
+.cody/
+.idx/
+.ai/
 skills-lock.json
 CLAUDE.md
 docs/

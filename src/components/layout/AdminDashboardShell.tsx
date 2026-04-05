@@ -89,6 +89,7 @@ export default function AdminDashboardShell({
       ["/admin/users", "users.manage"],
       ["/admin/roles", "roles.manage"],
       ["/admin/settings", "settings.read"],
+      ["/admin/reviews", "reviews.read"],
     ];
 
     const permSet = new Set(permissions);
