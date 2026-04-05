@@ -28,7 +28,8 @@ type CollectPaymentModalProps = {
 
 export function CollectPaymentModal({ open, onClose, receivable, token, onSuccess }: CollectPaymentModalProps) {
   const [amount, setAmount] = useState("");
-  const [method, setMethod] = useState<"Cash" | "GCash" | "Card" | "Bank Transfer">("Cash");
+  const [method, setMethod] = useState<"Cash" | "GCash" | "Card" | "Bank Transfer" | "Cheque">("Cash");
+  const [chequeNumber, setChequeNumber] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -56,7 +57,12 @@ export function CollectPaymentModal({ open, onClose, receivable, token, onSucces
       const res = await fetch(`/api/receivables/${receivable.id}/payments`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ amount: paymentAmount, method, notes: notes.trim() || null }),
+        body: JSON.stringify({ 
+          amount: paymentAmount, 
+          method, 
+          notes: notes.trim() || null,
+          cheque_number: method === "Cheque" ? chequeNumber.trim() || null : null
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -194,7 +200,7 @@ export function CollectPaymentModal({ open, onClose, receivable, token, onSucces
                     <div className="space-y-2">
                       <Label className="text-xs font-semibold uppercase tracking-[0.16em] text-white/65">Payment method</Label>
                       <div className="grid grid-cols-2 gap-2">
-                        {(["Cash", "GCash", "Card", "Bank Transfer"] as const).map((entry) => (
+                        {(["Cash", "GCash", "Card", "Bank Transfer", "Cheque"] as const).map((entry) => (
                           <button
                             key={entry}
                             type="button"
@@ -223,6 +229,21 @@ export function CollectPaymentModal({ open, onClose, receivable, token, onSucces
                         className="h-12 rounded-2xl border-white/10 bg-white/8 text-white placeholder:text-white/35"
                       />
                     </div>
+
+                    {method === "Cheque" && (
+                      <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                        <Label htmlFor="cheque-number" className="text-xs font-semibold uppercase tracking-[0.16em] text-white/65">
+                          Cheque Number
+                        </Label>
+                        <Input
+                          id="cheque-number"
+                          value={chequeNumber}
+                          onChange={(e) => setChequeNumber(e.target.value)}
+                          placeholder="Enter cheque number..."
+                          className="h-12 rounded-2xl border-white/10 bg-white/8 text-white placeholder:text-white/35"
+                        />
+                      </div>
+                    )}
 
                     <div className="rounded-2xl border border-white/10 bg-white/6 p-4">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/60">Integrity check</p>

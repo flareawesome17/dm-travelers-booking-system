@@ -21,6 +21,9 @@ export function RecipeEditorModal({
   const [selectedItemId, setSelectedItemId] = useState("");
   const [quantity, setQuantity] = useState("1");
 
+  const selectedItemData = inventoryItems.find((i) => i.id === selectedItemId);
+  const displayUnit = selectedItemData?.recipe_unit || selectedItemData?.unit || "";
+
   useEffect(() => {
     const fetchData = async () => {
       const token = localStorage.getItem("admin_token");
@@ -120,16 +123,20 @@ export function RecipeEditorModal({
                 >
                   <option value="">Select ingredient...</option>
                   {inventoryItems.map(i => (
-                    <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>
+                    <option key={i.id} value={i.id}>
+                      {i.name} ({i.unit}) {i.recipe_unit ? `— Uses: ${i.recipe_unit}` : ''}
+                    </option>
                   ))}
                 </select>
               </div>
-              <div className="w-24 space-y-1">
-                <label className="text-xs font-semibold text-slate-600 uppercase">Qty req.</label>
+              <div className="w-32 space-y-1">
+                <label className="text-xs font-semibold text-slate-600 uppercase">
+                  Qty req. {displayUnit ? `(${displayUnit})` : ""}
+                </label>
                 <input
                   type="number"
-                  step="0.01"
-                  min="0.01"
+                  step="0.0001"
+                  min="0.0001"
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
                   className="w-full h-9 rounded-md border border-slate-200 text-sm px-2"
@@ -148,7 +155,9 @@ export function RecipeEditorModal({
                   <div key={r.id} className="flex items-center justify-between p-3 bg-white hover:bg-slate-50 transition-colors">
                     <div>
                       <div className="font-medium text-sm text-slate-900">{r.inventory_items?.name}</div>
-                      <div className="text-xs text-slate-500">Deducts {r.quantity_required} {r.inventory_items?.unit} per order</div>
+                      <div className="text-xs text-slate-500">
+                        Uses {r.quantity_required} {r.inventory_items?.recipe_unit || r.inventory_items?.unit} per order
+                      </div>
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => handleRemove(r.id)} className="h-8 w-8 text-red-500 hover:bg-red-50">
                       <Trash2 className="h-4 w-4" />

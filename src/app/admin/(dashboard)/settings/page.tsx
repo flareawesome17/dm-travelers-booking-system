@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { usePermissions } from "@/context/PermissionsContext";
 import { getErrorMessage } from "@/lib/utils";
 
 type ShiftConfig = {
@@ -33,6 +34,7 @@ export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [shifts, setShifts] = useState<ShiftConfig[]>([]);
   const [loading, setLoading] = useState(true);
+  const { hasPermission } = usePermissions();
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [pwCurrent, setPwCurrent] = useState("");
@@ -197,14 +199,16 @@ export default function AdminSettingsPage() {
           <p className="text-muted-foreground mt-1 text-sm">Manage your property details and system preferences</p>
         </motion.div>
         
-        <Button 
-          onClick={handleSave} 
-          disabled={saving}
-          className="bg-[#07008A] hover:bg-[#05006a] text-white shadow-md transition-all active:scale-95"
-        >
-          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-          Save Changes
-        </Button>
+        {hasPermission("settings.write") && (
+          <Button 
+            onClick={handleSave} 
+            disabled={saving}
+            className="bg-[#07008A] hover:bg-[#05006a] text-white shadow-md transition-all active:scale-95"
+          >
+            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+            Save Changes
+          </Button>
+        )}
       </div>
 
       <Tabs defaultValue="general" className="w-full">
@@ -315,63 +319,66 @@ export default function AdminSettingsPage() {
                   className="relative group flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/20 rounded-2xl bg-white/5 cursor-pointer hover:bg-white/10 transition-colors"
                   onClick={() => document.getElementById("logo-upload")?.click()}
                 >
-                  {uploadingLogo && (
-                    <div className="absolute inset-0 bg-[#07008A]/80 flex items-center justify-center z-10 rounded-xl flex-col gap-2">
-                      <Loader2 className="h-6 w-6 animate-spin text-white" />
-                      <p className="text-xs text-white/80 font-medium">Uploading...</p>
-                    </div>
-                  )}
-                  <input
-                    id="logo-upload"
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
+                   {uploadingLogo && (
+                     <div className="absolute inset-0 bg-[#07008A]/80 flex items-center justify-center z-10 rounded-xl flex-col gap-2">
+                       <Loader2 className="h-6 w-6 animate-spin text-white" />
+                       <p className="text-xs text-white/80 font-medium">Uploading...</p>
+                     </div>
+                   )}
+                   <input
+                     id="logo-upload"
+                     type="file"
+                     accept="image/*"
+                     className="hidden"
+                     disabled={!hasPermission("settings.write")}
+                     onChange={async (e) => {
+                       const file = e.target.files?.[0];
+                       if (!file) return;
 
-                      setUploadingLogo(true);
-                      try {
-                        const token = localStorage.getItem("admin_token");
-                        const reader = new FileReader();
-                        reader.onload = async () => {
-                          const filePayload = {
-                            name: file.name,
-                            type: file.type || "image/jpeg",
-                            data: String(reader.result ?? ""),
-                          };
+                       setUploadingLogo(true);
+                       try {
+                         const token = localStorage.getItem("admin_token");
+                         const reader = new FileReader();
+                         reader.onload = async () => {
+                           const filePayload = {
+                             name: file.name,
+                             type: file.type || "image/jpeg",
+                             data: String(reader.result ?? ""),
+                           };
 
-                          const uploadRes = await fetch(`/api/rooms/upload-image`, {
-                            method: "POST",
-                            headers: {
-                              "Content-Type": "application/json",
-                              Authorization: `Bearer ${token}`,
-                            },
-                            body: JSON.stringify({ files: [filePayload] }),
-                          });
+                           const uploadRes = await fetch(`/api/rooms/upload-image`, {
+                             method: "POST",
+                             headers: {
+                               "Content-Type": "application/json",
+                               Authorization: `Bearer ${token}`,
+                             },
+                             body: JSON.stringify({ files: [filePayload] }),
+                           });
 
-                          const uploadData = await uploadRes.json();
-                          if (!uploadRes.ok) throw new Error(uploadData.error || "Failed to upload logo.");
+                           const uploadData = await uploadRes.json();
+                           if (!uploadRes.ok) throw new Error(uploadData.error || "Failed to upload logo.");
 
-                          const newLogoUrl = uploadData.urls[0];
-                          handleUpdate("hotel_logo", newLogoUrl);
-                          toast.success("Logo uploaded temporarily. Click Save Changes to apply.");
-                          
-                          setUploadingLogo(false);
-                        };
-                        reader.onerror = () => {
-                          toast.error("Failed to read file");
-                          setUploadingLogo(false);
-                        };
-                        reader.readAsDataURL(file);
-                      } catch (err: any) {
-                        toast.error(err.message || "An error occurred");
-                        setUploadingLogo(false);
-                      }
-                    }}
-                  />
-                  <img src={settings.hotel_logo || "/logo.png"} alt="Hotel Logo" className="h-20 w-auto object-contain mb-4" />
-                  <p className="text-[10px] text-white/60 text-center uppercase tracking-widest font-bold group-hover:text-white transition-colors">Click to Upload Logo</p>
+                           const newLogoUrl = uploadData.urls[0];
+                           handleUpdate("hotel_logo", newLogoUrl);
+                           toast.success("Logo uploaded temporarily. Click Save Changes to apply.");
+                           
+                           setUploadingLogo(false);
+                         };
+                         reader.onerror = () => {
+                           toast.error("Failed to read file");
+                           setUploadingLogo(false);
+                         };
+                         reader.readAsDataURL(file);
+                       } catch (err: any) {
+                         toast.error(err.message || "An error occurred");
+                         setUploadingLogo(false);
+                       }
+                     }}
+                   />
+                   <img src={settings.hotel_logo || "/logo.png"} alt="Hotel Logo" className="h-20 w-auto object-contain mb-4" />
+                   <p className="text-[10px] text-white/60 text-center uppercase tracking-widest font-bold group-hover:text-white transition-colors">
+                     {hasPermission("settings.write") ? "Click to Upload Logo" : "Logo Preview"}
+                   </p>
                 </div>
                 <div className="space-y-2">
                   <p className="text-xs text-white/80 leading-relaxed italic">
@@ -572,32 +579,7 @@ export default function AdminSettingsPage() {
                   </p>
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="tax_rate">VAT / Tax Rate (%)</Label>
-                  <div className="relative">
-                    <Input 
-                      id="tax_rate" 
-                      type="number"
-                      value={settings.tax_rate || "12"} 
-                      onChange={e => handleUpdate("tax_rate", e.target.value)} 
-                    />
-                    <span className="absolute right-3 top-2.5 text-slate-400 text-sm">%</span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="service_charge">Restaurant Service Charge (%)</Label>
-                  <div className="relative">
-                    <Input 
-                      id="service_charge" 
-                      type="number"
-                      value={settings.service_charge || "0"} 
-                      onChange={e => handleUpdate("service_charge", e.target.value)} 
-                    />
-                    <span className="absolute right-3 top-2.5 text-slate-400 text-sm">%</span>
-                  </div>
-                </div>
-              </div>
+
             </CardContent>
           </Card>
         </TabsContent>

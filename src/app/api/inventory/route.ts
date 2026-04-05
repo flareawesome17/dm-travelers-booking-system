@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { name, category, unit, current_stock, min_stock_alert, cost_per_unit } = body;
+    const { name, category, unit, current_stock, min_stock_alert, cost_per_unit, recipe_unit, yield_per_unit } = body;
 
     if (!name?.trim()) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -64,6 +64,8 @@ export async function POST(req: NextRequest) {
         current_stock: Number(current_stock) || 0,
         min_stock_alert: Number(min_stock_alert) || 5,
         cost_per_unit: Number(cost_per_unit) || 0,
+        recipe_unit: recipe_unit || null,
+        yield_per_unit: yield_per_unit ? Number(yield_per_unit) : 1,
       })
       .select()
       .single();

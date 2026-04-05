@@ -205,19 +205,22 @@ export function RecordPaymentModal({ booking, onSuccess, onClose }: Props) {
               <option value="GCash">GCash</option>
               <option value="PayPal">PayPal</option>
               <option value="Stripe">Stripe Terminal</option>
+              <option value="Cheque">Cheque</option>
             </select>
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="pay-txn">Transaction ID (Optional)</Label>
+          <Label htmlFor="pay-txn">{method === "Cheque" ? "Cheque Number" : "Transaction ID"} (Optional)</Label>
           <Input
             id="pay-txn"
             value={transactionId}
             onChange={(e) => setTransactionId(e.target.value)}
-            placeholder="e.g. GCASH-REF-12345"
+            placeholder={method === "Cheque" ? "Enter cheque number" : "e.g. GCASH-REF-12345"}
           />
-          <p className="text-xs text-slate-500">Useful for tracking digital payments securely.</p>
+          <p className="text-xs text-slate-500">
+            {method === "Cheque" ? "Record the cheque number for tracking purposes." : "Useful for tracking digital payments securely."}
+          </p>
         </div>
 
         <div className="flex justify-end gap-2 pt-4 border-t">

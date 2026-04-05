@@ -14,7 +14,10 @@ export async function GET(req: NextRequest) {
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from("expenses")
-      .select("*")
+      .select(`
+        *,
+        performed_by_user:admin_users!performed_by(name)
+      `)
       .order("date", { ascending: false });
 
     if (error) return dbError(error, "Failed to load expenses");
@@ -54,7 +57,7 @@ export async function POST(req: NextRequest) {
 
     const { data, error } = await supabase
       .from("expenses")
-      .insert({ ...parsed.data, date: expenseDate })
+      .insert({ ...parsed.data, date: expenseDate, performed_by: adminId })
       .select()
       .single();
 

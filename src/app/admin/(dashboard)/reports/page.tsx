@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   BarChart3, Download, Banknote, TrendingUp, TrendingDown, 
-  Wallet, Plus, Calendar, Filter, PieChart, ArrowUpRight, ArrowDownRight
+  Wallet, Plus, Calendar, Filter, PieChart, ArrowUpRight, ArrowDownRight, ShieldAlert, User
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,9 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/ui/empty-state";
+import { usePermissions } from "@/context/PermissionsContext";
 
 type ReportData = {
   total_revenue: number;
@@ -39,6 +41,7 @@ export default function AdminReportsPage() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("monthly");
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
+  const { hasPermission } = usePermissions();
   const router = useRouter();
 
   // Expense form state
@@ -46,6 +49,7 @@ export default function AdminReportsPage() {
   const [expAmt, setExpAmt] = useState("");
   const [expCat, setExpCat] = useState("Supplies");
   const [expDate, setExpDate] = useState(new Date().toISOString().split("T")[0]);
+  const [expNotes, setExpNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -88,13 +92,14 @@ export default function AdminReportsPage() {
           description: expDesc,
           amount: parseFloat(expAmt),
           category: expCat,
-          date: expDate
+          date: expDate,
+          notes: expNotes
         })
       });
       if (res.ok) {
         toast.success("Expense recorded");
         setIsAddExpenseOpen(false);
-        setExpDesc(""); setExpAmt("");
+        setExpDesc(""); setExpAmt(""); setExpNotes("");
         fetchReportData();
       }
     } catch {
@@ -138,19 +143,28 @@ export default function AdminReportsPage() {
               <TabsTrigger value="daily" className="text-xs px-3 py-1.5">Daily</TabsTrigger>
               <TabsTrigger value="weekly" className="text-xs px-3 py-1.5">Weekly</TabsTrigger>
               <TabsTrigger value="monthly" className="text-xs px-3 py-1.5">Monthly</TabsTrigger>
-              <TabsTrigger value="yearly" className="text-xs px-3 py-1.5">Yearly</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <Button onClick={handleExport} variant="outline" size="sm" className="h-9">
-            <Download className="h-4 w-4 mr-2" /> Export
-          </Button>
-        </div>
+               <TabsTrigger value="yearly" className="text-xs px-3 py-1.5">Yearly</TabsTrigger>
+             </TabsList>
+           </Tabs>
+           {hasPermission("reports.export") && (
+             <Button onClick={handleExport} variant="outline" size="sm" className="h-9">
+               <Download className="h-4 w-4 mr-2" /> Export
+             </Button>
+           )}
+         </div>
       </div>
 
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[1,2,3].map(i => <Skeleton key={i} className="h-32 w-full rounded-2xl" />)}
         </div>
+      ) : !hasPermission("reports.read") ? (
+        <EmptyState
+          icon={ShieldAlert}
+          title="Access Restricted"
+          description="You do not have the required permissions to view financial reports."
+          action={null}
+        />
       ) : data && (
         <>
           {/* Summary Cards */}
@@ -270,58 +284,64 @@ export default function AdminReportsPage() {
           {/* Expense Management */}
           <Card className="border border-slate-100 shadow-xs bg-white overflow-hidden">
             <CardHeader className="border-b border-slate-100 bg-slate-50/40 py-4 px-5 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-base font-bold">Recent Expenses</CardTitle>
-                <CardDescription className="text-xs">Manage your operational costs</CardDescription>
-              </div>
-              <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm" className="bg-[#07008A] hover:bg-[#05006a] h-8">
-                    <Plus className="h-4 w-4 mr-1" /> Add Expense
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Record New Expense</DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleAddExpense} className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="exp-desc">Description</Label>
-                      <Input id="exp-desc" value={expDesc} onChange={e => setExpDesc(e.target.value)} placeholder="e.g. Electricity Bill" required />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="exp-amt">Amount (₱)</Label>
-                        <Input id="exp-amt" type="number" step="0.01" value={expAmt} onChange={e => setExpAmt(e.target.value)} required />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="exp-cat">Category</Label>
-                        <select 
-                          id="exp-cat" 
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-[#07008A]/20"
-                          value={expCat}
-                          onChange={e => setExpCat(e.target.value)}
-                        >
-                          <option value="Utilities">Utilities</option>
-                          <option value="Supplies">Supplies</option>
-                          <option value="Maintenance">Maintenance</option>
-                          <option value="Salaries">Salaries</option>
-                          <option value="Food & Beverage">Food & Beverage</option>
-                          <option value="Taxes">Taxes</option>
-                          <option value="Other">Other</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="exp-date">Date</Label>
-                      <Input id="exp-date" type="date" value={expDate} onChange={e => setExpDate(e.target.value)} required />
-                    </div>
-                    <Button type="submit" disabled={submitting} className="w-full bg-[#07008A] hover:bg-[#05006a]">
-                      {submitting ? "Saving..." : "Record Expense"}
-                    </Button>
-                  </form>
-                </DialogContent>
-              </Dialog>
+               <div>
+                 <CardTitle className="text-base font-bold">Recent Expenses</CardTitle>
+                 <CardDescription className="text-xs">Manage your operational costs</CardDescription>
+               </div>
+               {hasPermission("expenses.create") && (
+                 <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
+                   <DialogTrigger asChild>
+                     <Button size="sm" className="bg-[#07008A] hover:bg-[#05006a] h-8">
+                       <Plus className="h-4 w-4 mr-1" /> Add Expense
+                     </Button>
+                   </DialogTrigger>
+                   <DialogContent>
+                     <DialogHeader>
+                       <DialogTitle>Record New Expense</DialogTitle>
+                     </DialogHeader>
+                     <form onSubmit={handleAddExpense} className="space-y-4 py-4">
+                       <div className="space-y-2">
+                         <Label htmlFor="exp-desc">Description</Label>
+                         <Input id="exp-desc" value={expDesc} onChange={e => setExpDesc(e.target.value)} placeholder="e.g. Electricity Bill" required />
+                       </div>
+                       <div className="grid grid-cols-2 gap-4">
+                         <div className="space-y-2">
+                           <Label htmlFor="exp-amt">Amount (₱)</Label>
+                           <Input id="exp-amt" type="number" step="0.01" value={expAmt} onChange={e => setExpAmt(e.target.value)} required />
+                         </div>
+                         <div className="space-y-2">
+                           <Label htmlFor="exp-cat">Category</Label>
+                           <select 
+                             id="exp-cat" 
+                             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-[#07008A]/20"
+                             value={expCat}
+                             onChange={e => setExpCat(e.target.value)}
+                           >
+                             <option value="Utilities">Utilities</option>
+                             <option value="Supplies">Supplies</option>
+                             <option value="Maintenance">Maintenance</option>
+                             <option value="Salaries">Salaries</option>
+                             <option value="Food & Beverage">Food & Beverage</option>
+                             <option value="Taxes">Taxes</option>
+                             <option value="Other">Other</option>
+                           </select>
+                         </div>
+                       </div>
+                       <div className="space-y-2">
+                         <Label htmlFor="exp-date">Date</Label>
+                         <Input id="exp-date" type="date" value={expDate} onChange={e => setExpDate(e.target.value)} required />
+                       </div>
+                       <div className="space-y-2">
+                         <Label htmlFor="exp-notes">Notes</Label>
+                         <Textarea id="exp-notes" value={expNotes} onChange={e => setExpNotes(e.target.value)} placeholder="Optional notes (e.g. receipt number)" />
+                       </div>
+                       <Button type="submit" disabled={submitting} className="w-full bg-[#07008A] hover:bg-[#05006a]">
+                         {submitting ? "Saving..." : "Record Expense"}
+                       </Button>
+                     </form>
+                   </DialogContent>
+                 </Dialog>
+               )}
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -331,6 +351,8 @@ export default function AdminReportsPage() {
                       <th className="py-3 px-6 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">Date</th>
                       <th className="py-3 px-6 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">Description</th>
                       <th className="py-3 px-6 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">Category</th>
+                      <th className="py-3 px-6 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">Recorded By</th>
+                      <th className="py-3 px-6 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">Notes</th>
                       <th className="py-3 px-6 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider">Amount</th>
                     </tr>
                   </thead>
@@ -342,11 +364,13 @@ export default function AdminReportsPage() {
                             icon={Banknote} 
                             title="No expenses recorded" 
                             description="There are no operational costs recorded for this period." 
-                            action={
-                              <Button className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={() => setIsAddExpenseOpen(true)}>
-                                <Plus className="mr-1 h-4 w-4"/> Add Expense
-                              </Button>
-                            } 
+                             action={
+                               hasPermission("expenses.create") ? (
+                                 <Button className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={() => setIsAddExpenseOpen(true)}>
+                                   <Plus className="mr-1 h-4 w-4"/> Add Expense
+                                 </Button>
+                               ) : null
+                             } 
                             borderless 
                           />
                         </td>
@@ -360,6 +384,15 @@ export default function AdminReportsPage() {
                             <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">
                               {exp.category}
                             </span>
+                          </td>
+                          <td className="py-4 px-6 text-xs text-slate-600 capitalize">
+                            <div className="flex items-center gap-1.5">
+                              <User className="h-3 w-3 text-slate-400" />
+                              {exp.performed_by_user?.name || "System"}
+                            </div>
+                          </td>
+                          <td className="py-4 px-6 text-xs text-slate-500 italic max-w-[150px] truncate" title={exp.notes}>
+                            {exp.notes || "-"}
                           </td>
                           <td className="py-4 px-6 text-right font-bold text-red-500 text-xs">₱{Number(exp.amount).toLocaleString()}</td>
                         </tr>

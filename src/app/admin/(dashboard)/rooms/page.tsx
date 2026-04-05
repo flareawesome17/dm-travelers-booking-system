@@ -18,6 +18,7 @@ import {
 import { toast } from "@/components/ui/sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
+import { usePermissions } from "@/context/PermissionsContext";
 
 type RoomRow = {
   id: string; room_number?: string; room_type?: string; floor?: number; capacity?: number;
@@ -31,6 +32,11 @@ type RoomRow = {
 };
 
 export default function AdminRoomsPage() {
+  const { hasPermission } = usePermissions();
+  const canCreate = hasPermission("rooms.create");
+  const canUpdate = hasPermission("rooms.update");
+  const canDelete = hasPermission("rooms.delete");
+
   const [rooms, setRooms] = useState<RoomRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -121,17 +127,19 @@ export default function AdminRoomsPage() {
                   {filteredRooms.length} shown · {rooms.length} total
                 </span>
               </CardTitle>
-              <Dialog open={open} onOpenChange={setOpen}>
-                <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={() => { setEditingRoom(null); setOpen(true); }}>
-                  <Plus className="h-4 w-4 mr-1" /> Add room
-                </Button>
-                <DialogContent className="admin-modal-responsive [--admin-modal-width:76rem] max-h-[92vh] overflow-y-auto modal-scrollbar p-5 sm:p-6">
-                  <DialogHeader><DialogTitle>{editingRoom ? "Edit room" : "Add new room"}</DialogTitle></DialogHeader>
-                  <RoomForm apiUrl="" token={adminToken || ""} room={editingRoom ?? undefined}
-                    onSuccess={(room) => { setRooms((prev) => { if (!room || typeof room !== "object") return prev; const u = room as RoomRow; if (!u.id) return prev; const idx = prev.findIndex((r) => r.id === u.id); if (idx === -1) return [...prev, u]; const n = [...prev]; n[idx] = u; return n; }); }}
-                    onClose={() => setOpen(false)} />
-                </DialogContent>
-              </Dialog>
+              {canCreate && (
+                <Dialog open={open} onOpenChange={setOpen}>
+                  <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={() => { setEditingRoom(null); setOpen(true); }}>
+                    <Plus className="h-4 w-4 mr-1" /> Add room
+                  </Button>
+                  <DialogContent className="admin-modal-responsive [--admin-modal-width:76rem] max-h-[92vh] overflow-y-auto modal-scrollbar p-5 sm:p-6">
+                    <DialogHeader><DialogTitle>{editingRoom ? "Edit room" : "Add new room"}</DialogTitle></DialogHeader>
+                    <RoomForm apiUrl="" token={adminToken || ""} room={editingRoom ?? undefined}
+                      onSuccess={(room) => { setRooms((prev) => { if (!room || typeof room !== "object") return prev; const u = room as RoomRow; if (!u.id) return prev; const idx = prev.findIndex((r) => r.id === u.id); if (idx === -1) return [...prev, u]; const n = [...prev]; n[idx] = u; return n; }); }}
+                      onClose={() => setOpen(false)} />
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
@@ -234,11 +242,11 @@ export default function AdminRoomsPage() {
                           action={
                             query || statusFilter !== "all" || typeFilter !== "all" || floorFilter !== "all" || !activeOnly ? (
                               <Button type="button" variant="outline" onClick={clearFilters}><FilterX className="h-4 w-4 mr-2" /> Reset Filters</Button>
-                            ) : (
+                            ) : canCreate ? (
                               <Button type="button" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-6" onClick={() => { setEditingRoom(null); setOpen(true); }}>
                                 <Plus className="h-4 w-4 mr-1" /> Add room
                               </Button>
-                            )
+                            ) : null
                           } 
                           borderless 
                         />
@@ -268,16 +276,21 @@ export default function AdminRoomsPage() {
                       <td className="py-4 px-4 text-xs text-slate-500">{r.updated_at ? new Date(r.updated_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : r.created_at ? new Date(r.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—"}</td>
                       <td className="py-4 px-6 text-right">
                         <div className="inline-flex items-center gap-1">
-                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-[#07008A] hover:bg-[#07008A]/10" onClick={() => { setEditingRoom(r); setOpen(true); }}><Pencil className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Edit room</TooltipContent></Tooltip>
-                          <AlertDialog><Tooltip><TooltipTrigger asChild><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger></TooltipTrigger><TooltipContent>Delete room</TooltipContent></Tooltip>
-                            <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete this room?</AlertDialogTitle><AlertDialogDescription>Room <span className="font-semibold">{r.room_number}</span> will be permanently deleted if it has no bookings.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={async () => { const token = localStorage.getItem("admin_token");  try { const res = await fetch(`/api/rooms/${r.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); if (!res.ok) { toast.error("Failed to delete room."); return; } setRooms((prev) => prev.filter((room) => room.id !== r.id)); toast.success(`Room ${r.room_number ?? ""} was deleted.`); } catch { toast.error("Something went wrong."); } }}>Delete room</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
-                          </AlertDialog>
+                          {canUpdate && (
+                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-[#07008A] hover:bg-[#07008A]/10" onClick={() => { setEditingRoom(r); setOpen(true); }}><Pencil className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Edit room</TooltipContent></Tooltip>
+                          )}
+                          {canDelete && (
+                            <AlertDialog><Tooltip><TooltipTrigger asChild><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger></TooltipTrigger><TooltipContent>Delete room</TooltipContent></Tooltip>
+                              <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete this room?</AlertDialogTitle><AlertDialogDescription>Room <span className="font-semibold">{r.room_number}</span> will be permanently deleted if it has no bookings.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={async () => { const token = localStorage.getItem("admin_token");  try { const res = await fetch(`/api/rooms/${r.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); if (!res.ok) { toast.error("Failed to delete room."); return; } setRooms((prev) => prev.filter((room) => room.id !== r.id)); toast.success(`Room ${r.room_number ?? ""} was deleted.`); } catch { toast.error("Something went wrong."); } }}>Delete room</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+                            </AlertDialog>
+                          )}
                         </div>
                       </td>
-                    </tr>
+                      </tr>
+                    )
                   ))
-                  )}
-                </tbody>
+                }
+              </tbody>
               </table>
             </div>
           )}

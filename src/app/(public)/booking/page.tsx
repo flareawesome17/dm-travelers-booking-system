@@ -10,6 +10,7 @@ import {
   ArrowRight,
   CalendarDays,
   CheckCircle2,
+  Hotel,
   Mail,
   PhoneCall,
   QrCode,
@@ -45,6 +46,14 @@ type RoomTypeOption = {
   base_room_type: string;
   sample_image_url: string | null;
   min_price: number | null;
+  original_price: number | null;
+  discount: {
+    id: string;
+    name: string;
+    type: string;
+    value: number;
+    amount: number;
+  } | null;
   total_rooms: number;
   available_rooms: number | null;
   max_capacity: number | null;
@@ -63,13 +72,7 @@ type RoomTypeAvailabilityResponse = {
   reservations: RoomReservation[];
 };
 
-function fallbackImageForRoomType(roomType: string) {
-  const value = roomType.toLowerCase();
-  if (value.includes("suite")) return "/images/room-suite.jpg";
-  if (value.includes("deluxe")) return "/images/room-deluxe.jpg";
-  if (value.includes("standard")) return "/images/room-standard.jpg";
-  return "/images/room-standard.jpg";
-}
+// Remove fallback image function
 
 function toDateOnly(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -842,14 +845,23 @@ function BookingPageContent() {
 
               {selectedRoomData ? (
                 <PublicGlassPanel className="overflow-hidden p-0">
-                  <div className="relative aspect-[4/2.4]">
-                    <Image
-                      alt={selectedRoomData.room_type}
-                      className="object-cover"
-                      fill
-                      sizes="(max-width: 1024px) 100vw, 34vw"
-                      src={selectedRoomData.sample_image_url || fallbackImageForRoomType(selectedRoomData.room_type)}
-                    />
+                  <div className="relative aspect-[4/2.4] overflow-hidden">
+                    {selectedRoomData.sample_image_url ? (
+                      <Image
+                        alt={selectedRoomData.room_type}
+                        className="object-cover"
+                        fill
+                        sizes="(max-width: 1024px) 100vw, 34vw"
+                        src={selectedRoomData.sample_image_url}
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary/60 to-secondary/20 p-8 text-center backdrop-blur-md">
+                        <div className="flex flex-col items-center gap-2">
+                          <Hotel className="h-6 w-6 text-gold-light/40" />
+                          <p className="text-[10px] uppercase tracking-[0.15em] text-white/30">No Image</p>
+                        </div>
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_18%,rgba(5,14,27,0.82)_100%)]" />
                     <div className="absolute bottom-0 left-0 right-0 p-5">
                       <p className="text-[0.68rem] uppercase tracking-[0.3em] text-gold-light/82">
@@ -861,11 +873,28 @@ function BookingPageContent() {
                     </div>
                   </div>
                   <div className="p-5">
-                    <p className="font-body text-sm leading-7 text-white/80">
-                      {selectedRoomData.min_price != null
-                        ? `Starting from PHP ${Number(selectedRoomData.min_price).toLocaleString()} per night.`
-                        : "Rate available upon inquiry."}
-                    </p>
+                    <div className="flex items-baseline gap-2">
+                      <p className="font-heading text-2xl text-white">
+                        {selectedRoomData.min_price != null
+                          ? `PHP ${Number(selectedRoomData.min_price).toLocaleString()}`
+                          : "Rate available upon inquiry."}
+                      </p>
+                      {selectedRoomData.original_price != null &&
+                        selectedRoomData.min_price != null &&
+                        selectedRoomData.original_price > selectedRoomData.min_price && (
+                          <p className="font-body text-sm text-white/40 line-through">
+                            PHP {Number(selectedRoomData.original_price).toLocaleString()}
+                          </p>
+                        )}
+                    </div>
+                    {selectedRoomData.discount && (
+                      <p className="mt-1 font-body text-xs text-gold-light/80">
+                        {selectedRoomData.discount.name} applied 
+                        ({selectedRoomData.discount.type === "percent" 
+                          ? `${selectedRoomData.discount.value}% off` 
+                          : `PHP ${selectedRoomData.discount.value.toLocaleString()} off`})
+                      </p>
+                    )}
                   </div>
                 </PublicGlassPanel>
               ) : null}
@@ -905,21 +934,39 @@ function BookingPageContent() {
                             type="button"
                           >
                             <div className="relative h-24 overflow-hidden rounded-[1rem]">
-                              <Image
-                                alt={room.room_type}
-                                className="object-cover"
-                                fill
-                                sizes="112px"
-                                src={room.sample_image_url || fallbackImageForRoomType(room.room_type)}
-                              />
+                              {room.sample_image_url ? (
+                                <Image
+                                  alt={room.room_type}
+                                  className="object-cover"
+                                  fill
+                                  sizes="112px"
+                                  src={room.sample_image_url}
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center bg-white/[0.08]">
+                                  <Hotel className="h-5 w-5 text-gold-light/30" />
+                                </div>
+                              )}
                             </div>
                             <div>
-                               <p className="font-heading text-2xl text-white">{room.room_type}</p>
-                              <p className="mt-2 font-body text-sm text-white/80">
-                                {room.min_price != null
-                                  ? `From PHP ${Number(room.min_price).toLocaleString()} per night`
-                                  : "Rate available upon inquiry"}
-                              </p>
+                              <p className="font-heading text-2xl text-white">{room.room_type}</p>
+                              <div className="mt-2 flex items-center gap-2">
+                                <p className="font-body text-sm text-white/80">
+                                  {room.min_price != null
+                                    ? `PHP ${Number(room.min_price).toLocaleString()} / night`
+                                    : "Rate available upon inquiry"}
+                                </p>
+                                {room.original_price != null && room.min_price != null && room.original_price > room.min_price && (
+                                  <p className="font-body text-xs text-white/40 line-through">
+                                    PHP {Number(room.original_price).toLocaleString()}
+                                  </p>
+                                )}
+                                {room.discount && (
+                                  <span className="rounded-full bg-gold/10 px-2.5 py-0.5 font-body text-[10px] font-semibold uppercase tracking-wider text-gold-light">
+                                    {room.discount.type === "percent" ? `${room.discount.value}% Off` : "Discounted"}
+                                  </span>
+                                )}
+                              </div>
                               <p className="mt-3 font-body text-xs uppercase tracking-[0.18em] text-white/60 sm:tracking-[0.24em]">
                                 Up to {room.max_capacity ?? "N/A"} guests
                               </p>

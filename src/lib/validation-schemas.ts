@@ -83,11 +83,17 @@ export const createBookingSchema = z.object({
   special_requests: z.string().max(1000).optional().nullable(),
   reference_number: z.string().max(30).optional(),
   rate_plan_kind: z.string().max(20).optional(),
-  deposit_method: z.enum(["Cash", "GCash", "Card", "Stripe", "PayPal"]).optional().nullable(),
+  deposit_method: z.enum(["Cash", "GCash", "Card", "Stripe", "PayPal", "Cheque"]).optional().nullable(),
   // Feature 2 / 3 – LGU + Special Booking
   is_lgu_booking: z.boolean().optional(),
   is_special_booking: z.boolean().optional(),
   special_booking_label: z.string().trim().max(200).optional().nullable(),
+  cheque_number: z.string().trim().max(100).optional().nullable(),
+  // Discounts (Feature 7)
+  discount_value: nonNegativeNumber.optional().default(0),
+  discount_type: z.enum(["fixed", "percent"]).optional().default("fixed"),
+  discount_amount: nonNegativeNumber.optional().default(0),
+  discount_id: z.string().uuid().optional().nullable(),
   // Booking Extras from initial creation
   extras: z.array(z.object({
     extra_type: z.string().trim().min(1).max(100),
@@ -101,7 +107,7 @@ export const createBookingSchema = z.object({
 export const createPaymentSchema = z.object({
   booking_id: z.string().uuid("Invalid booking ID"),
   amount: positiveNumber,
-  method: z.enum(["Cash", "GCash", "Card", "Stripe", "PayPal", "QRPh"], {
+  method: z.enum(["Cash", "GCash", "Card", "Stripe", "PayPal", "QRPh", "Cheque"], {
     errorMap: () => ({ message: "Invalid payment method" }),
   }),
   type: z.enum(["Deposit", "Balance", "Restaurant", "Extension", "Extra", "Receivable"], {
@@ -234,8 +240,9 @@ export const createBookingExtrasSchema = z.object({
 
 export const createReceivablePaymentSchema = z.object({
   amount: positiveNumber,
-  method: z.enum(["Cash", "GCash", "Card", "Bank Transfer"]),
+  method: z.enum(["Cash", "GCash", "Card", "Bank Transfer", "Cheque"]),
   notes: z.string().max(500).optional().nullable(),
+  cheque_number: z.string().max(100).optional().nullable(),
 }).strict();
 
 // ─── Login Schemas ─────────────────────────────────────────────────────────────
@@ -284,3 +291,37 @@ export const completeTreasuryWithdrawalSchema = z.object({
   external_reference: z.string().trim().min(3).max(120),
   completion_note: z.string().trim().max(500).optional().nullable(),
 }).strict();
+
+// ─── Discount Schemas (Global Module) ──────────────────────────────────────────
+
+const discountBaseSchema = z.object({
+  name: safeString.max(100),
+  description: z.string().max(500).optional().nullable(),
+  type: z.enum(["percent", "fixed"]),
+  value: positiveNumber,
+  start_date: z.string(),
+  end_date: z.string(),
+  is_active: z.boolean().default(true),
+  apply_to_rooms: z.boolean().default(false),
+  apply_to_restaurant: z.boolean().default(false),
+}).strict();
+
+const discountRefinement = (data: any, ctx: z.RefinementCtx) => {
+  if (data.start_date && data.end_date && new Date(data.start_date) >= new Date(data.end_date)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["end_date"],
+      message: "End date must be after start date",
+    });
+  }
+  if (data.type === "percent" && data.value > 100) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["value"],
+      message: "Percentage discount cannot exceed 100%",
+    });
+  }
+};
+
+export const createDiscountSchema = discountBaseSchema.superRefine(discountRefinement);
+export const updateDiscountSchema = discountBaseSchema.partial().superRefine(discountRefinement);

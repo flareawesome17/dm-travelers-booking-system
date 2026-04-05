@@ -5,6 +5,7 @@ export type BookingFinancialFields = Partial<{
   extensions_total: number | string | null;
   early_checkin_fee_applied: number | string | null;
   late_checkout_fee_applied: number | string | null;
+  discount_amount: number | string | null;
   deposit_paid: number | string | null;
   balance_due: number | string | null;
 }>;
@@ -21,6 +22,7 @@ export function getBookingChargeBreakdown(booking: BookingFinancialFields) {
   const extensionsTotal = toMoneyNumber(booking.extensions_total);
   const earlyCheckInFee = toMoneyNumber(booking.early_checkin_fee_applied);
   const lateCheckOutFee = toMoneyNumber(booking.late_checkout_fee_applied);
+  const discountAmount = toMoneyNumber(booking.discount_amount);
 
   return {
     roomTotal,
@@ -29,6 +31,7 @@ export function getBookingChargeBreakdown(booking: BookingFinancialFields) {
     extensionsTotal,
     earlyCheckInFee,
     lateCheckOutFee,
+    discountAmount,
     grandTotal:
       roomTotal +
       restaurantTotal +

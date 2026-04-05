@@ -19,6 +19,7 @@ type BookingRow = {
   special_requests?: string | null;
   early_checkin_fee_applied?: number;
   late_checkout_fee_applied?: number;
+  discount_amount?: number;
   is_lgu_booking?: boolean;
   guests?: { full_name?: string; email?: string; phone_number?: string };
   rooms?: { room_number?: string; room_type?: string } | null;
@@ -68,6 +69,7 @@ export function ReceiptModal({ booking, onClose }: ReceiptModalProps) {
     extensionsTotal,
     earlyCheckInFee,
     lateCheckOutFee,
+    discountAmount,
     grandTotal,
   } = getBookingChargeBreakdown({
     ...booking,
@@ -153,8 +155,18 @@ export function ReceiptModal({ booking, onClose }: ReceiptModalProps) {
                     <div className="text-[11px] text-slate-500 mt-0.5">{booking.rooms?.room_type || "Standard Room"} - {booking.rooms?.room_number ? `Room ${booking.rooms.room_number}` : "No room"}</div>
                   </td>
                   <td className="py-4 text-center">1</td>
-                  <td className="py-4 text-right font-medium text-slate-900">PHP {roomTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="py-4 text-right font-medium text-slate-900">PHP {(roomTotal + discountAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 </tr>
+                {discountAmount > 0 && (
+                  <tr>
+                    <td className="py-4 pr-4">
+                      <div className="font-semibold text-emerald-700">Applied Discount</div>
+                      <div className="text-[11px] text-emerald-600 mt-0.5">Global promotion / special offer</div>
+                    </td>
+                    <td className="py-4 text-center">--</td>
+                    <td className="py-4 text-right font-medium text-emerald-700">- PHP {discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  </tr>
+                )}
                 {extrasTotal > 0 && (
                   <tr>
                     <td className="py-4 pr-4">

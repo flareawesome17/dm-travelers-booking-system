@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Menu } from "lucide-react";
 import AdminSidebar from "@/components/layout/AdminSidebar";
 import { cn } from "@/lib/utils";
+import { PermissionsProvider } from "@/context/PermissionsContext";
 
 export default function AdminDashboardShell({
   children,
@@ -73,6 +74,7 @@ export default function AdminDashboardShell({
     if (!pathname.startsWith("/admin")) return;
     if (pathname === "/admin" || pathname === "/admin/login") return;
 
+    // Protection mapping for all 16 modules
     const required: Array<[string, string]> = [
       ["/admin/bookings", "bookings.read"],
       ["/admin/rooms", "rooms.read"],
@@ -82,6 +84,8 @@ export default function AdminDashboardShell({
       ["/admin/treasury", "treasury.read"],
       ["/admin/reports", "reports.read"],
       ["/admin/shifts", "shifts.read"],
+      ["/admin/receivables", "receivables.read"],
+      ["/admin/lgu-monitoring", "lgu-monitoring.read"],
       ["/admin/users", "users.manage"],
       ["/admin/roles", "roles.manage"],
       ["/admin/settings", "settings.read"],
@@ -95,9 +99,6 @@ export default function AdminDashboardShell({
       }
     }
   }, [pathname, permissions, permissionsLoaded, router]);
-
-  // NOTE: Idle auto-logout disabled for development.
-  // Re-enable for production by restoring the activity tracking + IDLE_MS timer.
 
   const handleMobileClose = useCallback(() => setIsMobileOpen(false), []);
 
@@ -135,7 +136,9 @@ export default function AdminDashboardShell({
       )}>
         <div className="admin-container py-5 tablet:py-6 laptop:py-8">
           <div className="page-enter">
-            {children}
+            <PermissionsProvider permissions={permissions} isLoading={!permissionsLoaded}>
+              {children}
+            </PermissionsProvider>
           </div>
         </div>
       </main>

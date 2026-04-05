@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
         total_income: totalIncome,
         total_expense: totalExpense,
         net_total: netTotal,
+        closing_type: "MANUAL",
       })
       .eq("id", shiftLog.id)
       .select()

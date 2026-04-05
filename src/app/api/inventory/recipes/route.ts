@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
     let query = supabase
       .from("menu_item_ingredients")
-      .select("*, inventory_items(id, name, unit, current_stock, min_stock_alert), restaurant_menu(id, name)");
+      .select("*, inventory_items(id, name, unit, recipe_unit, yield_per_unit, current_stock, min_stock_alert), restaurant_menu(id, name)");
 
     if (menuItemId) {
       query = query.eq("menu_item_id", menuItemId);
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
         .from("menu_item_ingredients")
         .update({ quantity_required: qty })
         .eq("id", existing.id)
-        .select("*, inventory_items(id, name, unit), restaurant_menu(id, name)")
+        .select("*, inventory_items(id, name, unit, recipe_unit, yield_per_unit), restaurant_menu(id, name)")
         .single();
 
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     const { data, error } = await supabase
       .from("menu_item_ingredients")
       .insert({ menu_item_id, inventory_item_id, quantity_required: qty })
-      .select("*, inventory_items(id, name, unit), restaurant_menu(id, name)")
+      .select("*, inventory_items(id, name, unit, recipe_unit, yield_per_unit), restaurant_menu(id, name)")
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

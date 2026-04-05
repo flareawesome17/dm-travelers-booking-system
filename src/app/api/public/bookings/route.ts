@@ -156,9 +156,33 @@ export async function POST(req: NextRequest) {
     const nights = nightsBetween(checkIn, checkOut);
     if (nights <= 0) return NextResponse.json({ error: "Invalid date range." }, { status: 400 });
 
-    const totalAmount = rate * nights;
+    // Fetch active global room discounts
+    const now = new Date().toISOString();
+    const { data: activeDiscounts } = await supabase
+      .from("discounts")
+      .select("*")
+      .eq("is_active", true)
+      .eq("apply_to_rooms", true)
+      .lte("start_date", now)
+      .gte("end_date", now)
+      .order("created_at", { ascending: false });
+
+    const activeDiscount = activeDiscounts?.[0];
+    let discountAmountPerNight = 0;
+    if (activeDiscount) {
+      if (activeDiscount.type === "percent") {
+        discountAmountPerNight = (rate * Number(activeDiscount.value)) / 100;
+      } else {
+        discountAmountPerNight = Number(activeDiscount.value);
+      }
+    }
+
+    const totalAmountBeforeDiscount = rate * nights;
+    const totalDiscountAmount = discountAmountPerNight * nights;
+    const finalTotalAmount = Math.max(0, totalAmountBeforeDiscount - totalDiscountAmount);
+
     const depositPaid = 0;
-    const balanceDue = totalAmount;
+    const balanceDue = finalTotalAmount;
 
     const { data: existingGuest } = await supabase
       .from("guests")
@@ -205,7 +229,7 @@ export async function POST(req: NextRequest) {
           check_out_date: checkOut,
           num_adults: Number.isFinite(adults) && adults > 0 ? adults : 1,
           num_children: Number.isFinite(children) && children >= 0 ? children : 0,
-          total_amount: totalAmount,
+          total_amount: finalTotalAmount,
           deposit_paid: depositPaid,
           balance_due: balanceDue,
           status: "Pending Verification",
@@ -213,6 +237,10 @@ export async function POST(req: NextRequest) {
           verification_code: verificationCode,
           verification_code_expires_at: expiresAt,
           special_requests: special || null,
+          discount_id: activeDiscount?.id || null,
+          discount_type: activeDiscount?.type || null,
+          discount_value: activeDiscount?.value || 0,
+          discount_amount: totalDiscountAmount,
           updated_at: new Date().toISOString(),
         })
         .select("id, reference_number, check_in_date, check_out_date, room_type_requested, total_amount, deposit_paid, balance_due, status")

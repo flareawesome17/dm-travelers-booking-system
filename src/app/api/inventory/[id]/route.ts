@@ -66,6 +66,8 @@ export async function PATCH(
     if (body.unit !== undefined) updates.unit = body.unit;
     if (body.min_stock_alert !== undefined) updates.min_stock_alert = Number(body.min_stock_alert);
     if (body.cost_per_unit !== undefined) updates.cost_per_unit = Number(body.cost_per_unit);
+    if (body.recipe_unit !== undefined) updates.recipe_unit = body.recipe_unit || null;
+    if (body.yield_per_unit !== undefined) updates.yield_per_unit = body.yield_per_unit ? Number(body.yield_per_unit) : 1;
 
     const { data, error } = await supabase
       .from("inventory_items")

@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn, getErrorMessage } from "@/lib/utils";
+import { usePermissions } from "@/context/PermissionsContext";
 
 const statusConfig = [
   { key: "Dirty", icon: Droplets, color: "text-rose-600", bgIcon: "bg-rose-50", border: "border-rose-200/60", headerBg: "bg-rose-50", headerBorder: "border-l-rose-500", countBg: "bg-rose-100 text-rose-700" },
@@ -28,6 +29,7 @@ export default function AdminHousekeepingPage() {
   const [rooms, setRooms] = useState<Array<{ id?: string; room_number?: string; room_type?: string; status?: string }>>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const { hasPermission } = usePermissions();
 
   useEffect(() => {
     const token = localStorage.getItem("admin_token");
@@ -77,6 +79,8 @@ export default function AdminHousekeepingPage() {
   }
 
   const renderActionButtons = (room: any, key: string) => {
+    if (!hasPermission("housekeeping.update")) return null;
+
     switch (key) {
       case "Dirty":
         return (

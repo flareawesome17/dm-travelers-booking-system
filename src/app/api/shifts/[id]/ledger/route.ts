@@ -18,9 +18,10 @@ export async function GET(
     const { data: shiftLog, error: logErr } = await supabase
       .from("shift_logs")
       .select(
-        `id, date, status, opened_by, closed_by, closed_at, close_notes,
+        `id, date, status, opened_by, closed_by, closed_at, close_notes, closing_type,
          total_income, total_expense, net_total,
-         shifts ( id, name, start_time, end_time )`
+         shifts ( id, name, start_time, end_time ),
+         closed_by_user:admin_users!closed_by(name)`
       )
       .eq("id", id)
       .maybeSingle();
@@ -41,7 +42,7 @@ export async function GET(
     // Fetch all transactions for this shift log (immutable — no edits returned)
     const { data: transactions, error: txErr } = await supabase
       .from("shift_transactions")
-      .select("id, source, reference_id, description, amount, type, category, performed_by, created_at")
+      .select("id, source, reference_id, description, amount, type, category, performed_by, created_at, performed_by_user:admin_users!performed_by(name)")
       .eq("shift_log_id", id)
       .order("created_at", { ascending: true });
 

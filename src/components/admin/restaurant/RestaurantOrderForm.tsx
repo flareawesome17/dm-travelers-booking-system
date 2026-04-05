@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Plus, Minus, Trash2, Search, UtensilsCrossed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,19 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
   const [orderLines, setOrderLines] = useState<{ menu_item_id: string; quantity: number }[]>([]);
   const [isLguOrder, setIsLguOrder] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [activeDiscount, setActiveDiscount] = useState<any>(null);
+
+  useEffect(() => {
+    fetch("/api/public/discounts")
+      .then((res) => res.json())
+      .then((data) => {
+        const restDiscounts = Array.isArray(data) ? data.filter((d: any) => d.apply_to_restaurant && d.is_active) : [];
+        if (restDiscounts.length > 0) {
+          setActiveDiscount(restDiscounts[0]);
+        }
+      })
+      .catch((err) => console.error("Failed to fetch global discounts", err));
+  }, []);
 
   const getItemPrice = (item: MenuItem | undefined) => {
     if (!item) return 0;
@@ -91,6 +104,16 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
       return sum + (getItemPrice(item) * line.quantity);
     }, 0);
   }, [orderLines, items, isLguOrder]);
+
+  const discountAmount = useMemo(() => {
+    if (!activeDiscount) return 0;
+    if (activeDiscount.type === "percent") {
+      return (subtotal * Number(activeDiscount.value)) / 100;
+    }
+    return Number(activeDiscount.value);
+  }, [subtotal, activeDiscount]);
+
+  const totalAmount = Math.max(0, subtotal - discountAmount);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -364,9 +387,17 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
                     <span>Subtotal</span>
                     <span>₱{subtotal.toFixed(2)}</span>
                   </div>
+                  {discountAmount > 0 && (
+                    <div className="flex justify-between items-center text-sm mb-2 text-emerald-600 font-medium">
+                      <div className="flex items-center gap-1">
+                        <span>Discount ({activeDiscount?.name})</span>
+                      </div>
+                      <span>-₱{discountAmount.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center text-lg font-bold text-[#07008A]">
                     <span>Total Amount</span>
-                    <span>₱{subtotal.toFixed(2)}</span>
+                    <span>₱{totalAmount.toFixed(2)}</span>
                   </div>
                 </div>
               </Card>
@@ -378,7 +409,7 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
       <div className="mt-auto flex shrink-0 justify-end gap-3 border-t bg-background pt-5">
         <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
         <Button type="submit" className="bg-[#07008A] hover:bg-[#05006a] text-white px-8" disabled={saving || orderLines.length === 0}>
-          {saving ? "Processing..." : `Confirm Order (₱${subtotal.toFixed(0)})`}
+          {saving ? "Processing..." : `Confirm Order (₱${totalAmount.toFixed(0)})`}
         </Button>
       </div>
     </form>

@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { usePermissions } from "@/context/PermissionsContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/utils";
@@ -104,6 +105,7 @@ export default function AdminTreasuryPage() {
   const router = useRouter();
   const [summary, setSummary] = useState<TreasurySummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const { hasPermission } = usePermissions();
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [destinationOpen, setDestinationOpen] = useState(false);
@@ -456,14 +458,18 @@ export default function AdminTreasuryPage() {
             {refreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
             Refresh
           </Button>
-          <Button variant="outline" onClick={() => setDestinationOpen(true)} className="h-11 min-w-[148px] justify-center">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Destination
-          </Button>
-          <Button className="h-11 min-w-[176px] justify-center bg-[#07008A] hover:bg-[#05006a] text-white" onClick={() => setRequestOpen(true)} disabled={activeDestinations.length === 0}>
-            <Landmark className="mr-2 h-4 w-4" />
-            Request Withdrawal
-          </Button>
+          {hasPermission("treasury.create") && (
+            <Button variant="outline" onClick={() => setDestinationOpen(true)} className="h-11 min-w-[148px] justify-center">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Destination
+            </Button>
+          )}
+          {hasPermission("treasury.withdraw") && (
+            <Button className="h-11 min-w-[176px] justify-center bg-[#07008A] hover:bg-[#05006a] text-white" onClick={() => setRequestOpen(true)} disabled={activeDestinations.length === 0}>
+              <Landmark className="mr-2 h-4 w-4" />
+              Request Withdrawal
+            </Button>
+          )}
         </div>
       </div>
 
@@ -611,45 +617,63 @@ export default function AdminTreasuryPage() {
                         <div className="flex flex-wrap justify-end gap-2">
                           {item.status === "pending_review" ? (
                             <>
-                              <Button size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={() => approveWithdrawal(item.id)} disabled={saving}>
-                                Approve
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => cancelWithdrawal(item.id)} disabled={saving}>
-                                Cancel
-                              </Button>
+                              {hasPermission("treasury.approve") && (
+                                <Button size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={() => approveWithdrawal(item.id)} disabled={saving}>
+                                  Approve
+                                </Button>
+                              )}
+                              {(hasPermission("treasury.withdraw") || hasPermission("treasury.approve")) && (
+                                <Button size="sm" variant="outline" onClick={() => cancelWithdrawal(item.id)} disabled={saving}>
+                                  Cancel
+                                </Button>
+                              )}
                             </>
                           ) : null}
                           {item.status === "approved" ? (
                             <>
-                              <Button size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={() => submitWithdrawal(item.id)} disabled={saving}>
-                                Send to PayMongo
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => openCompleteDialog(item)} disabled={saving}>
-                                Complete Manually
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => cancelWithdrawal(item.id)} disabled={saving}>
-                                Cancel
-                              </Button>
+                              {hasPermission("treasury.approve") && (
+                                <>
+                                  <Button size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={() => submitWithdrawal(item.id)} disabled={saving}>
+                                    Send to PayMongo
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => openCompleteDialog(item)} disabled={saving}>
+                                    Complete Manually
+                                  </Button>
+                                </>
+                              )}
+                              {(hasPermission("treasury.withdraw") || hasPermission("treasury.approve")) && (
+                                <Button size="sm" variant="outline" onClick={() => cancelWithdrawal(item.id)} disabled={saving}>
+                                  Cancel
+                                </Button>
+                              )}
                             </>
                           ) : null}
                           {item.status === "processing" ? (
                             <>
-                              <Button size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={() => syncWithdrawal(item.id)} disabled={saving}>
-                                Sync Status
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => openCompleteDialog(item)} disabled={saving}>
-                                Complete Manually
-                              </Button>
+                              {(hasPermission("treasury.withdraw") || hasPermission("treasury.approve")) && (
+                                <Button size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={() => syncWithdrawal(item.id)} disabled={saving}>
+                                  Sync Status
+                                </Button>
+                              )}
+                              {hasPermission("treasury.approve") && (
+                                <Button size="sm" variant="outline" onClick={() => openCompleteDialog(item)} disabled={saving}>
+                                  Complete Manually
+                                </Button>
+                              )}
                             </>
                           ) : null}
                           {item.status === "failed" ? (
                             <>
-                              <Button size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={() => submitWithdrawal(item.id)} disabled={saving}>
-                                Retry Submit
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => cancelWithdrawal(item.id)} disabled={saving}>
-                                Cancel
-                              </Button>
+                              {hasPermission("treasury.approve") && (
+                                <Button size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={() => submitWithdrawal(item.id)} disabled={saving}>
+                                  Retry Submit
+                                </Button>
+                              )}
+                              {(hasPermission("treasury.withdraw") || hasPermission("treasury.approve")) && (
+                                <Button size="sm" variant="outline" onClick={() => cancelWithdrawal(item.id)} disabled={saving}>
+                                  Cancel
+                                </Button>
+                              )}
                             </>
                           ) : null}
                           {item.status === "succeeded" && item.external_reference ? (

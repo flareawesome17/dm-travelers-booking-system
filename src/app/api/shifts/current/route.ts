@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     // Fetch transactions for this shift log
     const { data: transactions, error: txErr } = await supabase
       .from("shift_transactions")
-      .select("*")
+      .select("id, source, reference_id, description, amount, type, category, performed_by, created_at, performed_by_user:admin_users!performed_by(name)")
       .eq("shift_log_id", shiftLog.id)
       .order("created_at", { ascending: false });
 

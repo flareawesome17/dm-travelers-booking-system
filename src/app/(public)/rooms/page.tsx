@@ -20,17 +20,18 @@ type RoomTypeOption = {
   base_room_type: string;
   sample_image_url: string | null;
   min_price: number | null;
+  original_price?: number | null;
+  discount?: {
+    name: string;
+    type: string;
+    value: number;
+    amount: number;
+  } | null;
   total_rooms: number;
   max_capacity: number | null;
 };
 
-function fallbackImageForRoomType(roomType: string) {
-  const value = roomType.toLowerCase();
-  if (value.includes("suite")) return "/images/room-suite.jpg";
-  if (value.includes("deluxe")) return "/images/room-deluxe.jpg";
-  if (value.includes("standard")) return "/images/room-standard.jpg";
-  return "/images/room-standard.jpg";
-}
+// Remove fallback image function
 
 export default function RoomsPage() {
   const [filter, setFilter] = useState("All");
@@ -143,14 +144,28 @@ export default function RoomsPage() {
                   >
                     <PublicGlassPanel className="overflow-hidden p-0">
                       <div className="flex flex-col h-full">
-                        <div className="relative h-64 sm:h-72 shrink-0 w-full">
-                          <Image
-                            alt={room.room_type}
-                            className="object-cover"
-                            fill
-                            sizes="(max-width: 1280px) 100vw, 44vw"
-                            src={room.sample_image_url || fallbackImageForRoomType(room.room_type)}
-                          />
+                        <div className="relative h-64 sm:h-72 shrink-0 w-full overflow-hidden">
+                          {room.sample_image_url ? (
+                            <Image
+                              alt={room.room_type}
+                              className="object-cover"
+                              fill
+                              sizes="(max-width: 1280px) 100vw, 44vw"
+                              src={room.sample_image_url}
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary/40 to-secondary/10 p-8 text-center backdrop-blur-md transition-all duration-700 group-hover:scale-105">
+                              <div className="flex flex-col items-center gap-3">
+                                <div className="rounded-full bg-white/10 p-4 backdrop-blur-sm">
+                                  <Hotel className="h-8 w-8 text-gold-light/40" />
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="font-heading text-lg font-medium text-white/40">No Preview Available</p>
+                                  <p className="text-[10px] uppercase tracking-[0.2em] text-white/20">Image coming soon</p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex flex-col p-6 sm:p-8 justify-center">
@@ -164,15 +179,27 @@ export default function RoomsPage() {
                               </h2>
                             </div>
 
-                            <div className="text-left sm:text-right">
+                            <div className="text-left sm:text-right flex flex-col items-start sm:items-end">
                               <p className="text-[0.68rem] uppercase tracking-[0.2em] text-white/60 sm:tracking-[0.3em]">
                                 Starting rate
                               </p>
-                              <p className="mt-1 font-heading text-[1.75rem] text-gold-light font-semibold sm:text-2xl">
-                                {room.min_price != null
-                                  ? `PHP ${Number(room.min_price).toLocaleString()}`
-                                  : "Request rate"}
-                              </p>
+                              <div className="flex flex-col items-start sm:items-end mt-1">
+                                {room.discount && (
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-xs text-white/40 line-through font-medium">
+                                      PHP {Number(room.original_price).toLocaleString()}
+                                    </span>
+                                    <span className="text-[10px] px-2 py-0.5 rounded bg-gold-light/20 text-gold-light font-bold uppercase tracking-wider border border-gold-light/30">
+                                      {room.discount.name}
+                                    </span>
+                                  </div>
+                                )}
+                                <p className="font-heading text-[1.75rem] text-gold-light font-semibold sm:text-2xl leading-none">
+                                  {room.min_price != null
+                                    ? `PHP ${Number(room.min_price).toLocaleString()}`
+                                    : "Request rate"}
+                                </p>
+                              </div>
                             </div>
                           </div>
 

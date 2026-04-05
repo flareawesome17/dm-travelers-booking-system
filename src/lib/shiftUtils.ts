@@ -179,6 +179,7 @@ export async function getOrCreateActiveShiftLog(adminId?: string) {
           status: "CLOSED",
           closed_at: new Date().toISOString(),
           close_notes: "Auto-closed due to shift timeout",
+          closing_type: "AUTO",
         }).eq("id", existingOpenLog.id);
         // Fall through to create the proper detected shift
       } else {

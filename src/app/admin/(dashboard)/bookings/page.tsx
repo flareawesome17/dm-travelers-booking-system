@@ -35,6 +35,7 @@ import { ManageExtrasModal } from "@/components/admin/bookings/ManageExtrasModal
 import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "@/components/ui/sonner";
 import { getBookingChargeBreakdown } from "@/lib/bookingTotals";
+import { usePermissions } from "@/context/PermissionsContext";
 
 const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   confirmed: "default", "pending payment": "secondary", "pending verification": "secondary",
@@ -64,6 +65,12 @@ type BookingRow = {
 };
 
 export default function AdminBookingsPage() {
+  const { hasPermission } = usePermissions();
+  const canCreate = hasPermission("bookings.create");
+  const canUpdate = hasPermission("bookings.update");
+  const canDelete = hasPermission("bookings.delete");
+  const canRecordPayment = hasPermission("payments.create");
+
   const [list, setList] = useState<BookingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -228,15 +235,17 @@ export default function AdminBookingsPage() {
             </CardTitle>
             <span className="hidden sm:inline-block ml-1 text-xs font-medium rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{filtered.length} filtered / {list.length} total</span>
           </div>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={() => setOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" /> New booking
-            </Button>
-            <DialogContent className="admin-modal-responsive [--admin-modal-width:68rem] max-h-[92vh] overflow-y-auto modal-scrollbar p-5 sm:p-6">
-              <DialogHeader><DialogTitle>Add new booking</DialogTitle></DialogHeader>
-              <BookingForm apiUrl="" token={typeof window !== "undefined" ? localStorage.getItem("admin_token") || "" : ""} onSuccess={() => { setLoading(true); fetchBookings(); }} onClose={() => setOpen(false)} />
-            </DialogContent>
-          </Dialog>
+          {canCreate && (
+            <Dialog open={open} onOpenChange={setOpen}>
+              <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={() => setOpen(true)}>
+                <Plus className="h-4 w-4 mr-1" /> New booking
+              </Button>
+              <DialogContent className="admin-modal-responsive [--admin-modal-width:68rem] max-h-[92vh] overflow-y-auto modal-scrollbar p-5 sm:p-6">
+                <DialogHeader><DialogTitle>Add new booking</DialogTitle></DialogHeader>
+                <BookingForm apiUrl="" token={typeof window !== "undefined" ? localStorage.getItem("admin_token") || "" : ""} onSuccess={() => { setLoading(true); fetchBookings(); }} onClose={() => setOpen(false)} />
+              </DialogContent>
+            </Dialog>
+          )}
         </CardHeader>
         <CardContent className="p-0">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 py-4 border-b bg-slate-50/60 gap-4">
@@ -281,11 +290,11 @@ export default function AdminBookingsPage() {
                           action={
                             search || statusFilter !== "all" ? (
                               <Button variant="outline" onClick={() => { setSearch(""); setStatusFilter("all"); setPage(1); }}>Reset Filters</Button>
-                            ) : (
+                            ) : canCreate ? (
                               <Button className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={() => setOpen(true)}>
                                 <Plus className="h-4 w-4 mr-1" /> New booking
                               </Button>
-                            )
+                            ) : null
                           }
                           borderless
                         />
@@ -319,10 +328,10 @@ export default function AdminBookingsPage() {
                            <span><span className="text-slate-400 text-[10px] uppercase font-semibold mr-1">Out</span> {b.check_out_date ?? "—"}</span>
                            {b.status === "Checked-In" && (
                              <CountdownTimer 
-                               checkInDateStr={b.check_in_date} 
-                               checkOutDateStr={b.check_out_date} 
-                               actualCheckInAt={b.actual_check_in_at} 
-                               ratePlanKind={b.rate_plan_kind} 
+                                checkInDateStr={b.check_in_date} 
+                                checkOutDateStr={b.check_out_date} 
+                                actualCheckInAt={b.actual_check_in_at} 
+                                ratePlanKind={b.rate_plan_kind} 
                              />
                            )}
                          </div>
@@ -390,18 +399,18 @@ export default function AdminBookingsPage() {
                                 🧾 View Receipt
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              {Number(b.balance_due || 0) > 0 && b.status !== "Cancelled" && (
+                              {canRecordPayment && Number(b.balance_due || 0) > 0 && b.status !== "Cancelled" && (
                                 <DropdownMenuItem onClick={() => setPaymentBooking(b)} className="text-emerald-700 focus:text-emerald-700 focus:bg-emerald-50 cursor-pointer text-sm">
                                   <Banknote className="mr-2 h-4 w-4" /> Record Payment
                                 </DropdownMenuItem>
                               )}
-                              {b.status !== "Checked-In" && b.status !== "Checked-Out" && b.status !== "Cancelled" && (
+                              {canUpdate && b.status !== "Checked-In" && b.status !== "Checked-Out" && b.status !== "Cancelled" && (
                                 <DropdownMenuItem onClick={() => setEditBooking(b)} className="cursor-pointer text-[#07008A] focus:text-[#07008A] focus:bg-[#07008A]/10 text-sm">
                                   <Pencil className="mr-2 h-4 w-4" /> Edit Details
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuSeparator />
-                              {b.status !== "Checked-In" && b.status !== "Checked-Out" && b.status !== "Cancelled" && (
+                              {canUpdate && b.status !== "Checked-In" && b.status !== "Checked-Out" && b.status !== "Cancelled" && (
                                 <DropdownMenuItem
                                   onClick={() => {
                                     const roomStatus = b.rooms?.status;
@@ -420,7 +429,7 @@ export default function AdminBookingsPage() {
                                   <LogIn className="mr-2 h-4 w-4" /> Check In Guest
                                 </DropdownMenuItem>
                               )}
-                              {b.status === "Checked-In" && (
+                              {canUpdate && b.status === "Checked-In" && (
                                 <DropdownMenuItem onClick={() => setCheckOutBooking(b)} className="text-amber-600 focus:text-amber-600 focus:bg-amber-50 cursor-pointer text-sm">
                                   <LogOut className="mr-2 h-4 w-4" /> Check Out Guest
                                 </DropdownMenuItem>
@@ -429,41 +438,44 @@ export default function AdminBookingsPage() {
                               <DropdownMenuSeparator />
 
                               {/* NEW ENTERPRISE FEATURES */}
-                              {b.status === "Checked-In" && (
+                              {canUpdate && b.status === "Checked-In" && (
                                 <DropdownMenuItem onClick={() => setExtendBooking(b)} className="text-violet-600 focus:text-violet-700 focus:bg-violet-50 cursor-pointer text-sm">
                                   <CalendarPlus className="mr-2 h-4 w-4" /> Extend Stay
                                 </DropdownMenuItem>
                               )}
-                              {b.status !== "Cancelled" && (
+                              {canUpdate && b.status !== "Cancelled" && (
                                 <DropdownMenuItem onClick={() => setExtrasBooking(b)} className="text-blue-600 focus:text-blue-700 focus:bg-blue-50 cursor-pointer text-sm">
                                   <Package className="mr-2 h-4 w-4" /> Manage Extras
                                 </DropdownMenuItem>
                               )}
                               
                               <DropdownMenuSeparator />
-                              {b.status !== "Checked-In" && b.status !== "Checked-Out" && b.status !== "Cancelled" && (
+                              {canUpdate && b.status !== "Checked-In" && b.status !== "Checked-Out" && b.status !== "Cancelled" && (
                                 <DropdownMenuItem onClick={async () => { if (!b.id) return; try { const res = await api(`/api/bookings/${b.id}`, { method: "PATCH", body: JSON.stringify({ status: "Cancelled" }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Failed to cancel."); return; } toast.success("Cancelled."); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }} className="text-red-500 focus:text-red-500 focus:bg-red-50 cursor-pointer text-sm">
                                   <XCircle className="mr-2 h-4 w-4" /> Cancel Booking
                                 </DropdownMenuItem>
                               )}
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer text-sm">
-                                    <Trash2 className="mr-2 h-4 w-4" /> Delete Booking
-                                  </DropdownMenuItem>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader><AlertDialogTitle>Delete this booking?</AlertDialogTitle><AlertDialogDescription>This will permanently delete booking <span className="font-semibold">{b.reference_number}</span>. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                                  <AlertDialogFooter><AlertDialogCancel>Keep Booking</AlertDialogCancel><AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={async () => { if (!b.id) return; try { const res = await api(`/api/bookings/${b.id}`, { method: "DELETE" }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Failed."); return; } toast.success("Deleted."); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }}>Delete booking</AlertDialogAction></AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                              {canDelete && (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer text-sm">
+                                      <Trash2 className="mr-2 h-4 w-4" /> Delete Booking
+                                    </DropdownMenuItem>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader><AlertDialogTitle>Delete this booking?</AlertDialogTitle><AlertDialogDescription>This will permanently delete booking <span className="font-semibold">{b.reference_number}</span>. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                                    <AlertDialogFooter><AlertDialogCancel>Keep Booking</AlertDialogCancel><AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={async () => { if (!b.id) return; try { const res = await api(`/api/bookings/${b.id}`, { method: "DELETE" }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Failed."); return; } toast.success("Deleted."); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }}>Delete booking</AlertDialogAction></AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
                            </DropdownMenuContent>
                          </DropdownMenu>
                       </td>
-                    </tr>
+                      </tr>
+                    )
                   ))
-                )}
-                </tbody>
+                }
+              </tbody>
               </table>
             </div>
             {filtered.length > 0 && (
@@ -482,14 +494,14 @@ export default function AdminBookingsPage() {
       </Card>
 
       {/* Edit dialog */}
-      <Dialog open={!!editBooking} onOpenChange={(o) => !o && setEditBooking(null)}>
+      <Dialog open={!!editBooking} onOpenChange={(o) => {!o && setEditBooking(null)}}>
         <DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Edit booking</DialogTitle></DialogHeader>
           {editBooking?.id && <EditBookingForm apiUrl="" token={token()} booking={editBooking as any} onSuccess={() => { setLoading(true); fetchBookings(); }} onClose={() => setEditBooking(null)} />}
         </DialogContent>
       </Dialog>
 
       {/* Payment Modal */}
-      <Dialog open={!!paymentBooking} onOpenChange={(o) => !o && setPaymentBooking(null)}>
+      <Dialog open={!!paymentBooking} onOpenChange={(o) => {!o && setPaymentBooking(null)}}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-[#07008A] flex items-center gap-2">
@@ -508,7 +520,7 @@ export default function AdminBookingsPage() {
       </Dialog>
 
       {/* Check-in dialog */}
-      <AlertDialog open={!!checkInBooking} onOpenChange={(o) => !o && setCheckInBooking(null)}>
+      <AlertDialog open={!!checkInBooking} onOpenChange={(o) => {!o && setCheckInBooking(null)}}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Confirm check-in?</AlertDialogTitle><AlertDialogDescription>This will mark the booking as <span className="font-semibold">Checked-In</span>. Early check-in fees apply automatically if before 2:00 PM.</AlertDialogDescription></AlertDialogHeader>
           <div className="space-y-2">
@@ -522,7 +534,7 @@ export default function AdminBookingsPage() {
       </AlertDialog>
 
       {/* Check-out dialog */}
-      <AlertDialog open={!!checkOutBooking} onOpenChange={(o) => !o && setCheckOutBooking(null)}>
+      <AlertDialog open={!!checkOutBooking} onOpenChange={(o) => {!o && setCheckOutBooking(null)}}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Confirm check-out?</AlertDialogTitle><AlertDialogDescription>This will mark the booking as <span className="font-semibold">Checked-Out</span>. Late check-out fees apply automatically after the designated checkout time.</AlertDialogDescription></AlertDialogHeader>
           <div className="space-y-2">

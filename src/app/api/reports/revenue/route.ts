@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     if (rErr) throw rErr;
 
     // 3. Fetch Expenses
-    let eQuery = supabase.from("expenses").select("*");
+    let eQuery = supabase.from("expenses").select("*, performed_by_user:admin_users!performed_by(name)");
     if (startDay) eQuery = eQuery.gte("date", startDay);
     if (endDay) eQuery = eQuery.lte("date", endDay);
     const { data: expenses, error: eErr } = await eQuery;

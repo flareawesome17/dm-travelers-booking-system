@@ -103,6 +103,70 @@ export async function POST(req: NextRequest) {
       initialStatus = "Paid";
     }
 
+    // 0. Pre-validate Inventory Availability (Strict Block)
+    const inventoryRequirements: Record<string, { qty: number, item: any, lines: string[] }> = {};
+    
+    for (const li of lineItems) {
+      const { data: ingredients } = await supabase
+        .from("menu_item_ingredients")
+        .select("inventory_item_id, quantity_required, inventory_items(id, name, current_stock, min_stock_alert, unit, recipe_unit, yield_per_unit)")
+        .eq("menu_item_id", li.menu_item_id);
+
+      if (ingredients && ingredients.length > 0) {
+        for (const ing of ingredients) {
+          const invItem = ing.inventory_items as any;
+          if (!invItem) continue;
+
+          const rawRecipeUsage = Number(ing.quantity_required) * Number(li.quantity);
+          const yieldAmt = Number(invItem.yield_per_unit) || 1;
+          const deductQty = rawRecipeUsage / yieldAmt;
+
+          if (!inventoryRequirements[invItem.id]) {
+            inventoryRequirements[invItem.id] = { qty: 0, item: invItem, lines: [] };
+          }
+          inventoryRequirements[invItem.id].qty += deductQty;
+          inventoryRequirements[invItem.id].lines.push(`${li.name} x${li.quantity}`);
+        }
+      }
+    }
+
+    const insufficientItems = [];
+    for (const req of Object.values(inventoryRequirements)) {
+      if (Number(req.item.current_stock) < req.qty) {
+        insufficientItems.push(`${req.item.name} (has ${Number(req.item.current_stock).toFixed(2)}, needs ${req.qty.toFixed(2)} ${req.item.unit})`);
+      }
+    }
+
+    if (insufficientItems.length > 0) {
+      return NextResponse.json(
+        { error: `Insufficient inventory: ${insufficientItems.join(" | ")}` },
+        { status: 400 }
+      );
+    }
+
+    // Fetch active global restaurant discounts
+    const now = new Date().toISOString();
+    const { data: activeDiscounts } = await supabase
+      .from("discounts")
+      .select("*")
+      .eq("is_active", true)
+      .eq("apply_to_restaurant", true)
+      .lte("start_date", now)
+      .gte("end_date", now)
+      .order("created_at", { ascending: false });
+
+    const activeDiscount = activeDiscounts?.[0];
+    let discountAmount = 0;
+    if (activeDiscount) {
+      if (activeDiscount.type === "percent") {
+        discountAmount = (subtotal * Number(activeDiscount.value)) / 100;
+      } else {
+        discountAmount = Number(activeDiscount.value);
+      }
+    }
+
+    const finalTotal = Math.max(0, subtotal - discountAmount);
+
     // 1. Insert order
     const { data: orderData, error: oErr } = await supabase
       .from("restaurant_orders")
@@ -118,7 +182,11 @@ export async function POST(req: NextRequest) {
         status: initialStatus,
         subtotal,
         service_charge: 0,
-        total_amount: subtotal
+        total_amount: finalTotal,
+        discount_id: activeDiscount?.id || null,
+        discount_type: activeDiscount?.type || null,
+        discount_value: activeDiscount?.value || 0,
+        discount_amount: discountAmount,
       })
       .select()
       .single();
@@ -146,56 +214,44 @@ export async function POST(req: NextRequest) {
          
        const currentCharges = Number(existingBooking?.restaurant_charges_total || 0);
        const currentBalance = Number(existingBooking?.balance_due || 0);
-       await supabase
-         .from("bookings")
-         .update({ 
-           restaurant_charges_total: currentCharges + subtotal,
-           balance_due: currentBalance + subtotal
-         })
-         .eq("id", booking_id);
+        await supabase
+          .from("bookings")
+          .update({ 
+            restaurant_charges_total: currentCharges + finalTotal,
+            balance_due: currentBalance + finalTotal
+          })
+          .eq("id", booking_id);
     }
 
-    // 4. Auto-deduct inventory based on recipes (non-blocking)
+    // 4. Auto-deduct inventory using validated requirements
     const stockWarnings: string[] = [];
     try {
-      for (const li of lineItems) {
-        const { data: ingredients } = await supabase
-          .from("menu_item_ingredients")
-          .select("inventory_item_id, quantity_required, inventory_items(id, name, current_stock, min_stock_alert, unit)")
-          .eq("menu_item_id", li.menu_item_id);
+      for (const req of Object.values(inventoryRequirements)) {
+        const invItem = req.item;
+        const prevStock = Number(invItem.current_stock);
+        const newStock = prevStock - req.qty;
 
-        if (ingredients && ingredients.length > 0) {
-          for (const ing of ingredients) {
-            const deductQty = Number(ing.quantity_required) * Number(li.quantity);
-            const invItem = ing.inventory_items as any;
-            if (!invItem) continue;
+        await supabase
+          .from("inventory_items")
+          .update({ current_stock: newStock, updated_at: new Date().toISOString() })
+          .eq("id", invItem.id);
 
-            const prevStock = Number(invItem.current_stock);
-            const newStock = prevStock - deductQty;
+        await supabase.from("inventory_movements").insert({
+          item_id: invItem.id,
+          type: "OUT",
+          quantity: req.qty,
+          previous_stock: prevStock,
+          new_stock: newStock,
+          source: "order",
+          reference_id: orderData.id,
+          notes: `Auto-deducted for order (${req.lines.join(", ")})`,
+          performed_by: auth.payload.sub || null,
+        });
 
-            await supabase
-              .from("inventory_items")
-              .update({ current_stock: newStock, updated_at: new Date().toISOString() })
-              .eq("id", ing.inventory_item_id);
-
-            await supabase.from("inventory_movements").insert({
-              item_id: ing.inventory_item_id,
-              type: "OUT",
-              quantity: deductQty,
-              previous_stock: prevStock,
-              new_stock: newStock,
-              source: "order",
-              reference_id: orderData.id,
-              notes: `Auto-deducted for order (${li.name} x${li.quantity})`,
-              performed_by: auth.payload.sub || null,
-            });
-
-            if (newStock <= Number(invItem.min_stock_alert)) {
-              stockWarnings.push(
-                `"${invItem.name}" is at ${newStock} ${invItem.unit || "units"} (threshold: ${invItem.min_stock_alert})`
-              );
-            }
-          }
+        if (newStock <= Number(invItem.min_stock_alert)) {
+          stockWarnings.push(
+            `"${invItem.name}" is at ${newStock.toFixed(2)} ${invItem.unit || "units"} (threshold: ${invItem.min_stock_alert})`
+          );
         }
       }
     } catch (invErr) {
@@ -208,7 +264,7 @@ export async function POST(req: NextRequest) {
         source: "restaurant",
         referenceId: orderData.id,
         description: `Restaurant order - ${customer_name || "Walk-in"} (${payment_method || "Cash"})`,
-        amount: subtotal,
+        amount: finalTotal,
         type: "INCOME",
         category: "Restaurant",
       });

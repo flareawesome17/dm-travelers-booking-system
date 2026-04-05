@@ -17,8 +17,15 @@ type MenuItem = {
   name?: string | null;
   description?: string | null;
   price?: number | null;
+  original_price?: number | null;
   category?: string | null;
   image_url?: string | null;
+  discount?: {
+    name: string;
+    type: string;
+    value: number;
+    amount: number;
+  } | null;
 };
 
 export default function RestaurantPage() {
@@ -174,9 +181,21 @@ export default function RestaurantPage() {
                               {item.description || "Prepared to suit guests looking for warm, satisfying dining options."}
                             </p>
                           </div>
-                          <div className="shrink-0 rounded-full bg-gradient-gold px-3 py-1 text-sm font-semibold text-secondary">
-                            PHP {Number(item.price || 0).toLocaleString()}
-                          </div>
+                            <div className="flex flex-col items-end gap-1">
+                              {item.discount && (
+                                <span className="text-[10px] text-white/40 line-through font-medium">
+                                  PHP {Number(item.original_price).toLocaleString()}
+                                </span>
+                              )}
+                              <div className="shrink-0 rounded-full bg-gradient-gold px-3 py-1 text-sm font-semibold text-secondary relative group/price">
+                                PHP {Number(item.price || 0).toLocaleString()}
+                                {item.discount && (
+                                  <div className="absolute -top-8 right-0 bg-gold-light text-secondary text-[8px] font-black px-2 py-0.5 rounded opacity-0 group-hover/price:opacity-100 transition-opacity whitespace-nowrap shadow-lg">
+                                    {item.discount.name}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                         </div>
 
                         <div className="mt-6 flex items-center gap-2 text-[0.7rem] uppercase tracking-[0.22em] text-white/62 sm:tracking-[0.28em]">

@@ -23,6 +23,8 @@ interface ShiftLog {
   total_income: number;
   total_expense: number;
   net_total: number;
+  closing_type?: string | null;
+  closed_by_user?: { name: string } | null;
   shifts: { id: string; name: string; start_time: string; end_time: string } | null;
 }
 
@@ -35,6 +37,7 @@ interface Transaction {
   type: "INCOME" | "EXPENSE";
   category: string | null;
   created_at: string;
+  performed_by_user?: { name: string } | null;
 }
 
 interface DetailData {
@@ -198,9 +201,19 @@ export default function ShiftHistoryPage() {
                         <h2 className="text-2xl font-bold tracking-wide">{detail.shift_log.date}</h2>
                         <p className="opacity-80 text-sm mt-1">{detail.shift_log.shifts?.name} Shift</p>
                         {detail.shift_log.status === "CLOSED" && detail.shift_log.closed_at && (
-                          <p className="opacity-90 text-xs mt-1 text-emerald-200 font-mono tracking-tight">
-                            Closed: {new Date(detail.shift_log.closed_at).toLocaleString()}
-                          </p>
+                          <div className="flex flex-col gap-1 mt-1">
+                            <p className="opacity-90 text-xs text-emerald-200 font-mono tracking-tight">
+                              Closed: {new Date(detail.shift_log.closed_at).toLocaleString()}
+                            </p>
+                            <div className="flex gap-2">
+                              <Badge variant="outline" className="text-[10px] bg-white/10 text-white border-0 py-0 h-4 font-mono">
+                                By: {detail.shift_log.closed_by_user?.name || "System"}
+                              </Badge>
+                              <Badge variant="outline" className="text-[10px] bg-white/10 text-white border-0 py-0 h-4 font-mono">
+                                {detail.shift_log.closing_type === "AUTO" ? "Auto Closed" : "Manual Close"}
+                              </Badge>
+                            </div>
+                          </div>
                         )}
                       </div>
                       {detail.shift_log.status === "CLOSED" ? (
@@ -275,8 +288,16 @@ export default function ShiftHistoryPage() {
                                       </Badge>
                                       <span className="font-medium text-sm text-slate-800 line-clamp-2 leading-tight">{t.description}</span>
                                     </div>
-                                    <div className="text-[11px] text-slate-400 font-mono">
-                                      Ref: {t.reference_id?.substring(0,8) || 'N/A'} • {new Date(t.created_at).toLocaleTimeString([],{hour:'2-digit', minute:'2-digit'})}
+                                    <div className="text-[11px] text-slate-400 font-mono flex items-center gap-1.5 flex-wrap">
+                                      <span>Ref: {t.reference_id?.substring(0,8) || 'N/A'}</span>
+                                      <span>•</span>
+                                      <span>{new Date(t.created_at).toLocaleTimeString([],{hour:'2-digit', minute:'2-digit'})}</span>
+                                      {t.performed_by_user?.name && (
+                                        <>
+                                          <span>•</span>
+                                          <span className="text-slate-500 font-sans font-medium">By: {t.performed_by_user.name}</span>
+                                        </>
+                                      )}
                                     </div>
                                   </div>
                                   <div className={`font-semibold text-right shrink-0 ${t.type==='INCOME' ? 'text-emerald-600' : 'text-amber-600'}`}>

@@ -57,6 +57,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         amount: body.amount,
         method: body.method,
         notes: body.notes || null,
+        cheque_number: body.cheque_number || null,
         recorded_by_admin_id: typeof auth.payload?.sub === "string" ? auth.payload.sub : null,
         accounting_date: accountingDate,
       })
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       await addShiftTransaction({
         source: "booking",
         referenceId: payment.id,
-        description: `Receivable Collection: ${refIdentifier}`,
+        description: `Receivable Collection (${body.method}): ${refIdentifier}`,
         amount: Number(body.amount),
         type: "INCOME",
         performedBy: typeof auth.payload?.sub === "string" ? auth.payload.sub : null,

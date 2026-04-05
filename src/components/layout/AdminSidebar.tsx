@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -24,6 +23,9 @@ import {
   PackageSearch,
   Clock,
   Landmark,
+  FileText,
+  ShieldCheck,
+  Percent,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -36,17 +38,19 @@ import {
 const operationsItems = [
   { label: "Dashboard", path: "/admin", icon: LayoutDashboard },
   { label: "Bookings", path: "/admin/bookings", icon: CalendarCheck, permission: "bookings.read" },
-  { label: "Receivables", path: "/admin/receivables", icon: Building2, permission: "bookings.read" },
+  { label: "Receivables", path: "/admin/receivables", icon: Building2, permission: "receivables.read" },
   { label: "Rooms", path: "/admin/rooms", icon: BedDouble, permission: "rooms.read" },
   { label: "Housekeeping", path: "/admin/housekeeping", icon: Sparkles, permission: "housekeeping.read" },
   { label: "Restaurant", path: "/admin/restaurant", icon: UtensilsCrossed, permission: "restaurant.read" },
   { label: "Inventory", path: "/admin/inventory", icon: PackageSearch, permission: "inventory.read" },
   { label: "Treasury", path: "/admin/treasury", icon: Landmark, permission: "treasury.read" },
+  { label: "LGU Monitoring", path: "/admin/lgu-monitoring", icon: ShieldCheck, permission: "lgu-monitoring.read" },
 ];
 
 const managementItems = [
   { label: "Reports", path: "/admin/reports", icon: BarChart3, permission: "reports.read" },
   { label: "Shifts", path: "/admin/shifts", icon: Clock, permission: "shifts.read" },
+  { label: "Discounts", path: "/admin/discounts", icon: Percent, permission: "discounts.read" },
   { label: "Users", path: "/admin/users", icon: Users, permission: "users.manage" },
   { label: "Roles", path: "/admin/roles", icon: KeyRound, permission: "roles.manage" },
   { label: "Settings", path: "/admin/settings", icon: Settings, permission: "settings.read" },

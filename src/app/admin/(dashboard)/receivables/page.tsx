@@ -35,6 +35,7 @@ import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CollectPaymentModal } from "@/components/admin/bookings/CollectPaymentModal";
 import { toast } from "@/components/ui/sonner";
+import { usePermissions } from "@/context/PermissionsContext";
 import { getErrorMessage } from "@/lib/utils";
 
 type ReceivableRow = {
@@ -139,6 +140,7 @@ export default function ReceivablesPage() {
   const [list, setList] = useState<ReceivableRow[]>([]);
   const [search, setSearch] = useState("");
   const [paymentTarget, setPaymentTarget] = useState<ReceivableRow | null>(null);
+  const { hasPermission } = usePermissions();
 
   const router = useRouter();
 
@@ -246,15 +248,17 @@ export default function ReceivablesPage() {
                 className="h-11 rounded-full border-slate-200 bg-white pl-9 shadow-sm"
               />
             </div>
-            <Button
-              type="button"
-              onClick={handleSyncNow}
-              disabled={syncing}
-              className="h-11 rounded-full bg-[#07008A] px-5 text-white hover:bg-[#05006a]"
-            >
-              <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-              {syncing ? "Syncing..." : "Sync Now"}
-            </Button>
+            {hasPermission("receivables.update") && (
+              <Button
+                type="button"
+                onClick={handleSyncNow}
+                disabled={syncing}
+                className="h-11 rounded-full bg-[#07008A] px-5 text-white hover:bg-[#05006a]"
+              >
+                <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+                {syncing ? "Syncing..." : "Sync Now"}
+              </Button>
+            )}
           </div>
         </div>
       </motion.div>
@@ -565,20 +569,24 @@ export default function ReceivablesPage() {
                               {formatCurrency(row.amount_paid)}
                             </td>
                             <td className="px-4 py-4">{getStatusBadge(row.status)}</td>
-                            <td className="px-6 py-4 text-right">
-                              {row.status !== "Settled" && row.amount_due > 0 ? (
-                                <Button
-                                  size="sm"
-                                  className="h-9 rounded-full bg-[#07008A] px-4 text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-[#05006a]"
-                                  onClick={() => setPaymentTarget(row)}
-                                >
-                                  Quick Collect
-                                  <ArrowRight className="ml-2 h-3.5 w-3.5" />
-                                </Button>
-                              ) : (
-                                <span className="text-xs font-medium text-slate-400">No action needed</span>
-                              )}
-                            </td>
+                             <td className="px-6 py-4 text-right">
+                               {row.status !== "Settled" && row.amount_due > 0 ? (
+                                 hasPermission("receivables.update") ? (
+                                   <Button
+                                     size="sm"
+                                     className="h-9 rounded-full bg-[#07008A] px-4 text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-[#05006a]"
+                                     onClick={() => setPaymentTarget(row)}
+                                   >
+                                     Quick Collect
+                                     <ArrowRight className="ml-2 h-3.5 w-3.5" />
+                                   </Button>
+                                 ) : (
+                                   <span className="text-xs font-medium text-slate-400 italic">Protected</span>
+                                 )
+                               ) : (
+                                 <span className="text-xs font-medium text-slate-400">No action needed</span>
+                               )}
+                             </td>
                           </tr>
                         );
                       })}

@@ -77,6 +77,12 @@ export async function POST(req: NextRequest) {
       is_lgu_booking: body.is_lgu_booking ?? false,
       is_special_booking: body.is_special_booking ?? false,
       special_booking_label: body.is_special_booking ? (body.special_booking_label || null) : null,
+      // Discounts (Feature 7)
+      discount_value: body.discount_value || 0,
+      discount_type: body.discount_type || "fixed",
+      discount_amount: body.discount_amount || 0,
+      discount_id: body.discount_id || null,
+      cheque_number: body.cheque_number || null,
     };
 
     const { data, error } = await supabase
@@ -117,7 +123,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (depositPaid > 0 && data?.id) {
-      const method = body.deposit_method && ["Cash", "GCash", "Card", "Stripe", "PayPal"].includes(body.deposit_method) ? body.deposit_method : "Cash";
+      const method = body.deposit_method && ["Cash", "GCash", "Card", "Stripe", "PayPal", "Cheque"].includes(body.deposit_method) ? body.deposit_method : "Cash";
       const today = manilaDateString();
       const accountingDate = await findNextOpenLedgerDate(supabase, today);
       const transactionId = `DEP-${Date.now()}-${Math.floor(Math.random() * 1000)}-${String(data.reference_number || "REF").replace(/[^A-Z0-9_-]/gi, "")}`;
@@ -139,7 +145,7 @@ export async function POST(req: NextRequest) {
           await addShiftTransaction({
             source: "booking",
             referenceId: paymentData.id,
-            description: `Booking Payment (Deposit): ${data.reference_number || data.id}`,
+            description: `Booking Deposit (${method}): ${data.reference_number || data.id}`,
             amount: Number(depositPaid),
             type: "INCOME",
             performedBy: typeof auth.payload?.sub === "string" ? auth.payload.sub : null,

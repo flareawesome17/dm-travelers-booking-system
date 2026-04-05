@@ -17,9 +17,10 @@ export async function GET(req: NextRequest) {
     const { data: logs, error: logsErr, count } = await supabase
       .from("shift_logs")
       .select(
-        `id, date, status, opened_by, closed_by, closed_at, close_notes,
+        `id, date, status, opened_by, closed_by, closed_at, close_notes, closing_type,
          total_income, total_expense, net_total,
-         shifts ( id, name, start_time, end_time )`,
+         shifts ( id, name, start_time, end_time ),
+         closed_by_user:admin_users!closed_by(name)`,
         { count: "exact" }
       )
       .eq("status", "CLOSED")

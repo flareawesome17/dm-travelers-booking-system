@@ -19,6 +19,7 @@ type RestaurantOrder = {
   total_amount?: number | null;
   subtotal?: number | null;
   service_charge?: number | null;
+  discount_amount?: number | null;
   created_at?: string | null;
   items?: OrderItem[];
 };
@@ -160,6 +161,12 @@ export function RestaurantReceiptModal({ order: initialOrder, onClose }: Receipt
                 <div className="flex justify-between text-[11px]">
                   <span className="text-slate-500">Service Charge</span>
                   <span>₱{Number(order.service_charge).toFixed(2)}</span>
+                </div>
+              )}
+              {Number(order.discount_amount || 0) > 0 && (
+                <div className="flex justify-between text-[11px] text-emerald-600 font-medium">
+                  <span>Discount</span>
+                  <span>-₱{Number(order.discount_amount).toFixed(2)}</span>
                 </div>
               )}
               <div className="flex justify-between text-sm font-bold pt-1 border-t border-slate-100">

@@ -96,13 +96,28 @@ export async function GET(req: NextRequest) {
       {
         room_id: string;
         room_type: string;
+        base_room_type?: string;
         sample_image_url: string | null;
         min_price: number | null;
+        original_price: number | null;
+        discount: any | null;
         total_rooms: number;
         available_rooms: number | null;
         max_capacity: number | null;
       }
     >();
+
+    const now = new Date().toISOString();
+    const { data: activeDiscounts } = await supabase
+      .from("discounts")
+      .select("*")
+      .eq("is_active", true)
+      .lte("start_date", now)
+      .gte("end_date", now)
+      .eq("apply_to_rooms", true)
+      .order("created_at", { ascending: false });
+
+    const latestDiscount = activeDiscounts?.[0] || null;
 
     for (const room of activeRooms) {
       const type = String(room.room_type || "").trim();
@@ -118,6 +133,8 @@ export async function GET(req: NextRequest) {
         base_room_type: type,
         sample_image_url: null as string | null,
         min_price: null as number | null,
+        original_price: null as number | null,
+        discount: null as any,
         total_rooms: 0,
         available_rooms: checkIn && checkOut ? 0 : null,
         max_capacity: null as number | null,
@@ -129,7 +146,24 @@ export async function GET(req: NextRequest) {
       if (!existing.sample_image_url && img) existing.sample_image_url = img;
 
       if (p != null) {
-        existing.min_price = existing.min_price == null ? p : Math.min(existing.min_price, p);
+        existing.original_price = p;
+        if (latestDiscount) {
+          let discountAmt = 0;
+          if (latestDiscount.type === "percent") {
+            discountAmt = (p * latestDiscount.value) / 100;
+          } else {
+            discountAmt = latestDiscount.value;
+          }
+          existing.min_price = Math.max(0, p - discountAmt);
+          existing.discount = {
+            name: latestDiscount.name,
+            type: latestDiscount.type,
+            value: latestDiscount.value,
+            amount: discountAmt
+          };
+        } else {
+          existing.min_price = p;
+        }
       }
 
       const cap = room.capacity != null ? Number(room.capacity) : null;

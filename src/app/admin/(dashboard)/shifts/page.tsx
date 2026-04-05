@@ -12,12 +12,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CloseShiftModal } from "@/components/admin/shifts/CloseShiftModal";
 import { toast } from "@/components/ui/sonner";
 import { EmptyState } from "@/components/ui/empty-state";
+import { usePermissions } from "@/context/PermissionsContext";
 
 export default function ShiftsPage() {
   const router = useRouter();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const { hasPermission } = usePermissions();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -142,9 +144,16 @@ export default function ShiftsPage() {
 
                 <div className="mt-8">
                   {data.shift_log.status !== "CLOSED" ? (
-                    <Button onClick={() => setShowCloseModal(true)} className="w-full bg-red-600 hover:bg-red-700 h-12 text-md font-semibold" disabled={data.warnings?.previous_shift_open}>
-                      <KeyRound className="mr-2 h-5 w-5"/> Close Ledger
-                    </Button>
+                    hasPermission("shifts.close") ? (
+                      <Button onClick={() => setShowCloseModal(true)} className="w-full bg-red-600 hover:bg-red-700 h-12 text-md font-semibold" disabled={data.warnings?.previous_shift_open}>
+                        <KeyRound className="mr-2 h-5 w-5"/> Close Ledger
+                      </Button>
+                    ) : (
+                      <div className="text-center p-3 rounded-lg bg-slate-50 border border-dashed border-slate-200">
+                        <p className="text-xs font-medium text-slate-500 italic">Protected Action</p>
+                        <p className="text-[10px] text-slate-400 mt-1">Only authorized personnel can close the ledger.</p>
+                      </div>
+                    )
                   ) : (
                     <div className="flex items-center justify-center gap-2 text-emerald-600 bg-emerald-50 py-3 rounded-md font-medium text-sm border border-emerald-100">
                       <CheckCircle2 className="h-5 w-5" /> Shift securely closed
@@ -183,18 +192,26 @@ export default function ShiftsPage() {
                           <div className="divide-y divide-slate-100">
                             {filtered.map((t: any) => (
                               <div key={t.id} className="p-4 hover:bg-slate-50/50 flex justify-between items-start group transition-colors">
-                                <div className="space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 bg-white">
+                                <div className="space-y-1 pr-4">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <Badge variant="outline" className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 bg-white shrink-0">
                                       {t.source}
                                     </Badge>
-                                    <span className="font-medium text-sm text-slate-800">{t.description}</span>
+                                    <span className="font-medium text-sm text-slate-800 line-clamp-2 leading-tight">{t.description}</span>
                                   </div>
-                                  <div className="text-xs text-slate-400 font-mono">
-                                    Ref: {t.reference_id || 'N/A'} • {new Date(t.created_at).toLocaleTimeString([],{hour:'2-digit', minute:'2-digit'})}
+                                  <div className="text-[11px] text-slate-400 font-mono flex items-center gap-1.5 flex-wrap">
+                                    <span>Ref: {t.reference_id?.substring(0, 8) || 'N/A'}</span>
+                                    <span>•</span>
+                                    <span>{new Date(t.created_at).toLocaleTimeString([],{hour:'2-digit', minute:'2-digit'})}</span>
+                                    {t.performed_by_user?.name && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="text-slate-500 font-sans font-medium">By: {t.performed_by_user.name}</span>
+                                      </>
+                                    )}
                                   </div>
                                 </div>
-                                <div className={`font-semibold text-right ${t.type==='INCOME' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                <div className={`font-semibold text-right shrink-0 ${t.type==='INCOME' ? 'text-emerald-600' : 'text-amber-600'}`}>
                                   {t.type==='INCOME'?'+':'-'} ₱{t.amount?.toFixed(2)}
                                 </div>
                               </div>

@@ -26,12 +26,13 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
 import { getErrorMessage } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePermissions } from "@/context/PermissionsContext";
 import { RestaurantOrderForm } from "@/components/admin/restaurant/RestaurantOrderForm";
 import { RestaurantReceiptModal } from "@/components/admin/restaurant/RestaurantReceiptModal";
 import { ChevronLeft, ChevronRight, Search, Receipt } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 
-type MenuItem = { id: string; name?: string; description?: string | null; category?: string | null; price?: number | null; is_available?: boolean | null; image_url?: string | null; lgu_markup_percentage?: number | null };
+type MenuItem = { id: string; name?: string; description?: string | null; category?: string | null; price?: number | null; is_available?: boolean | null; image_url?: string | null; lgu_markup_percentage?: number | null; dynamic_available?: boolean; deficient_ingredients?: string };
 type RestaurantCategory = { id: string; name: string; sort_order?: number | null };
 type BookingOption = { id: string; reference_number?: string; check_in_date?: string; check_out_date?: string; status?: string; is_lgu_booking?: boolean; guests?: { full_name?: string | null }; rooms?: { room_number?: string | null } };
 type RestaurantOrder = { id: string; booking_id?: string | null; room_id?: string | null; order_source?: string | null; customer_name?: string | null; payment_method?: string | null; status?: string | null; subtotal?: number | null; service_charge?: number | null; total_amount?: number | null; created_at?: string | null; notes?: string | null };
@@ -39,6 +40,7 @@ type RestaurantOrder = { id: string; booking_id?: string | null; room_id?: strin
 export default function AdminRestaurantPage() {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const { hasPermission } = usePermissions();
   const [categories, setCategories] = useState<RestaurantCategory[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [filterCategory, setFilterCategory] = useState<string>("all");
@@ -220,21 +222,23 @@ export default function AdminRestaurantPage() {
             Menu Items
           </CardTitle>
           <div className="flex items-center gap-2">
-            <Dialog open={open} onOpenChange={setOpen}>
-              <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={openForCreate}><Plus className="h-4 w-4 mr-1" /> Add item</Button>
-              <DialogContent className="admin-modal-responsive [--admin-modal-width:40rem] max-h-[90vh] overflow-y-auto modal-scrollbar p-5 sm:p-6"><DialogHeader><DialogTitle>{editingItem ? "Edit menu item" : "Add menu item"}</DialogTitle></DialogHeader>
-                <form className="space-y-4" onSubmit={handleSave}>
-                  <div className="space-y-2"><Label htmlFor="menu-name">Name</Label><Input id="menu-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Tapsilog" required /></div>
-                  <div className="space-y-2"><Label htmlFor="menu-category">Category</Label><select id="menu-category" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={category} onChange={(e) => setCategory(e.target.value)} disabled={categoriesLoading || categories.length === 0}>{categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></div>
-                  <div className="space-y-2"><Label htmlFor="menu-price">Price (₱)</Label><Input id="menu-price" type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="150" required /></div>
-                  <div className="space-y-2"><Label htmlFor="menu-lgu-markup">LGU Markup % (optional)</Label><Input id="menu-lgu-markup" type="number" min={0} max={100} step="1" value={lguMarkup} onChange={(e) => setLguMarkup(e.target.value)} placeholder="0" /></div>
-                  <div className="space-y-2"><Label htmlFor="menu-description">Description (optional)</Label><Input id="menu-description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Short description..." /></div>
-                  <div className="space-y-2"><Label htmlFor="menu-image">Image (optional)</Label><Input id="menu-image" type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0] ?? null; setImageFile(file); if (file) { setImagePreview(URL.createObjectURL(file)); } else { setImagePreview(editingItem?.image_url ?? null); } }} />{(imagePreview || editingItem?.image_url) && <div className="mt-2"><img src={imagePreview || editingItem?.image_url || ""} className="h-24 w-24 rounded-md object-cover border border-slate-200 bg-slate-100" alt="" /></div>}</div>
-                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={isAvailable} onChange={(e) => setIsAvailable(e.target.checked)} /><span>Available</span></label>
-                  <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Saving..." : editingItem ? "Update item" : "Save item"}</Button></div>
-                </form>
-              </DialogContent>
-            </Dialog>
+            {hasPermission("restaurant.create") && (
+              <Dialog open={open} onOpenChange={setOpen}>
+                <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={openForCreate}><Plus className="h-4 w-4 mr-1" /> Add item</Button>
+                <DialogContent className="admin-modal-responsive [--admin-modal-width:40rem] max-h-[90vh] overflow-y-auto modal-scrollbar p-5 sm:p-6"><DialogHeader><DialogTitle>{editingItem ? "Edit menu item" : "Add menu item"}</DialogTitle></DialogHeader>
+                  <form className="space-y-4" onSubmit={handleSave}>
+                    <div className="space-y-2"><Label htmlFor="menu-name">Name</Label><Input id="menu-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Tapsilog" required /></div>
+                    <div className="space-y-2"><Label htmlFor="menu-category">Category</Label><select id="menu-category" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={category} onChange={(e) => setCategory(e.target.value)} disabled={categoriesLoading || categories.length === 0}>{categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></div>
+                    <div className="space-y-2"><Label htmlFor="menu-price">Price (₱)</Label><Input id="menu-price" type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="150" required /></div>
+                    <div className="space-y-2"><Label htmlFor="menu-lgu-markup">LGU Markup % (optional)</Label><Input id="menu-lgu-markup" type="number" min={0} max={100} step="1" value={lguMarkup} onChange={(e) => setLguMarkup(e.target.value)} placeholder="0" /></div>
+                    <div className="space-y-2"><Label htmlFor="menu-description">Description (optional)</Label><Input id="menu-description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Short description..." /></div>
+                    <div className="space-y-2"><Label htmlFor="menu-image">Image (optional)</Label><Input id="menu-image" type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0] ?? null; setImageFile(file); if (file) { setImagePreview(URL.createObjectURL(file)); } else { setImagePreview(editingItem?.image_url ?? null); } }} />{(imagePreview || editingItem?.image_url) && <div className="mt-2"><img src={imagePreview || editingItem?.image_url || ""} className="h-24 w-24 rounded-md object-cover border border-slate-200 bg-slate-100" alt="" /></div>}</div>
+                    <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={isAvailable} onChange={(e) => setIsAvailable(e.target.checked)} /><span>Available</span></label>
+                    <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Saving..." : editingItem ? "Update item" : "Save item"}</Button></div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -277,7 +281,9 @@ export default function AdminRestaurantPage() {
                                 menuSearch || filterCategory !== "all" ? (
                                   <Button variant="outline" onClick={() => { setMenuSearch(""); setFilterCategory("all"); setMenuPage(1); }}>Reset Filters</Button>
                                 ) : (
-                                  <Button className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={openForCreate}><Plus className="mr-1 h-4 w-4"/> Add item</Button>
+                                  hasPermission("restaurant.create") && (
+                                    <Button className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={openForCreate}><Plus className="mr-1 h-4 w-4"/> Add item</Button>
+                                  )
                                 )
                               }
                               borderless
@@ -293,11 +299,28 @@ export default function AdminRestaurantPage() {
                       <td className="py-4 px-4 text-xs text-slate-600">{item.category ?? "—"}</td>
                       <td className="py-4 px-4 font-semibold text-[#07008A]">₱{Number(item.price ?? 0).toFixed(0)}</td>
                       <td className="py-4 px-4 text-xs text-slate-600">{item.image_url ? <div className="flex items-center gap-2"><div className="h-8 w-8 overflow-hidden rounded-md border border-slate-200 bg-slate-100"><img src={item.image_url} className="h-full w-full object-cover" alt="" /></div></div> : <span className="text-xs text-slate-400">No image</span>}</td>
-                      <td className="py-4 px-4 text-xs text-slate-600">{item.is_available ? "Available" : "Hidden"}</td>
+                      <td className="py-4 px-4 text-xs font-medium">
+                        {!item.is_available ? (
+                          <span className="text-slate-500 bg-slate-100 px-2 py-1 rounded-sm">Hidden</span>
+                        ) : item.dynamic_available === false ? (
+                          <div className="flex flex-col items-start gap-1">
+                            <span className="text-red-700 bg-red-50 border border-red-100 px-2 py-0.5 rounded-sm">Unavailable</span>
+                            <span className="text-[10px] text-red-500/90 leading-tight">
+                              Needs: {item.deficient_ingredients}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-1 rounded-sm">Available</span>
+                        )}
+                      </td>
                       <td className="py-4 px-6 text-right">
                         <div className="inline-flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-[#07008A] hover:bg-[#07008A]/10" onClick={() => openForEdit(item)}><Pencil className="h-4 w-4" /></Button>
-                          <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete this menu item?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={async () => { const token = localStorage.getItem("admin_token");  try { const res = await fetch(`/api/menu/${item.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); if (!res.ok) { toast.error("Failed to delete."); return; } setItems((prev) => prev.filter((m) => m.id !== item.id)); toast.success("Menu item deleted."); } catch { toast.error("Something went wrong."); } }}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+                          {hasPermission("restaurant.update") && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-[#07008A] hover:bg-[#07008A]/10" onClick={() => openForEdit(item)}><Pencil className="h-4 w-4" /></Button>
+                          )}
+                          {hasPermission("restaurant.delete") && (
+                            <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete this menu item?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={async () => { const token = localStorage.getItem("admin_token");  try { const res = await fetch(`/api/menu/${item.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); if (!res.ok) { toast.error("Failed to delete."); return; } setItems((prev) => prev.filter((m) => m.id !== item.id)); toast.success("Menu item deleted."); } catch { toast.error("Something went wrong."); } }}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -341,17 +364,19 @@ export default function AdminRestaurantPage() {
             Recent Orders
           </CardTitle>
           
-          <Dialog open={orderOpen} onOpenChange={setOrderOpen}>
-            <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={() => { setOrderOpen(true); }}><Plus className="h-4 w-4 mr-1" /> New Order</Button>
-            <DialogContent className="admin-modal-responsive [--admin-modal-width:90rem] flex h-[min(94vh,58rem)] flex-col gap-0 overflow-hidden p-5 sm:p-6">
-              <DialogHeader className="mb-4">
-                <DialogTitle className="text-[#07008A] text-xl">Add Restaurant Order</DialogTitle>
-              </DialogHeader>
-              <div className="min-h-0 flex-1 overflow-hidden">
-                <RestaurantOrderForm items={items} bookings={bookings} onSuccess={() => { setOrderOpen(false); loadOrders(); }} onCancel={() => setOrderOpen(false)} />
-              </div>
-            </DialogContent>
-          </Dialog>
+          {hasPermission("restaurant.create") && (
+            <Dialog open={orderOpen} onOpenChange={setOrderOpen}>
+              <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={() => { setOrderOpen(true); }}><Plus className="h-4 w-4 mr-1" /> New Order</Button>
+              <DialogContent className="admin-modal-responsive [--admin-modal-width:90rem] flex h-[min(94vh,58rem)] flex-col gap-0 overflow-hidden p-5 sm:p-6">
+                <DialogHeader className="mb-4">
+                  <DialogTitle className="text-[#07008A] text-xl">Add Restaurant Order</DialogTitle>
+                </DialogHeader>
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  <RestaurantOrderForm items={items} bookings={bookings} onSuccess={() => { setOrderOpen(false); loadOrders(); }} onCancel={() => setOrderOpen(false)} />
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
         </CardHeader>
         <CardContent className="p-0">
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between px-6 py-4 border-b bg-slate-50/60 gap-4">
@@ -382,7 +407,13 @@ export default function AdminRestaurantPage() {
                 icon={Receipt} 
                 title="No restaurant orders" 
                 description="There are currently no active restaurant or room service orders." 
-                action={<Button className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={() => setOrderOpen(true)}><Plus className="h-4 w-4 mr-1" /> New Order</Button>}
+                action={
+                  hasPermission("restaurant.create") && (
+                    <Button className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={() => setOrderOpen(true)}>
+                      <Plus className="h-4 w-4 mr-1" /> New Order
+                    </Button>
+                  )
+                }
                 borderless 
               />
             </div>
@@ -500,7 +531,7 @@ export default function AdminRestaurantPage() {
                                     </DropdownMenuItem>
                                   )}
 
-                                  {o.status === "Pending" && (
+                                  {o.status === "Pending" && hasPermission("restaurant.update") && (
                                     <>
                                       <DropdownMenuItem onClick={() => { setPaymentOrder(o); setPayMethod("Cash"); }} className="text-emerald-600 focus:text-emerald-700 focus:bg-emerald-50 cursor-pointer">
                                         <Banknote className="mr-2 h-4 w-4" /> Record Payment
@@ -511,35 +542,37 @@ export default function AdminRestaurantPage() {
                                     </>
                                   )}
 
-                                  {o.status === "Served" && (
+                                  {o.status === "Served" && hasPermission("restaurant.update") && (
                                     <DropdownMenuItem onClick={() => { setPaymentOrder(o); setPayMethod("Cash"); }} className="text-emerald-600 focus:text-emerald-700 focus:bg-emerald-50 cursor-pointer">
                                       <Banknote className="mr-2 h-4 w-4" /> Record Payment
                                     </DropdownMenuItem>
                                   )}
 
-                                  {o.status !== "Cancelled" && o.status !== "Paid" && o.status !== "Charged to Room" && (
+                                  {o.status !== "Cancelled" && o.status !== "Paid" && o.status !== "Charged to Room" && hasPermission("restaurant.update") && (
                                     <DropdownMenuItem onClick={() => updateOrderStatus(o.id, { status: "Cancelled" })} className="text-red-500 focus:text-red-600 focus:bg-red-50 cursor-pointer">
                                       <XCircle className="mr-2 h-4 w-4" /> Cancel Order
                                     </DropdownMenuItem>
                                   )}
 
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer">
-                                        <Trash2 className="mr-2 h-4 w-4" /> Delete Permanently
-                                      </DropdownMenuItem>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>Delete this order?</AlertDialogTitle>
-                                        <AlertDialogDescription>This will permanently remove the order from records. This action cannot be undone.</AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>Keep Order</AlertDialogCancel>
-                                        <AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={() => deleteOrder(o.id)}>Delete Permanently</AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
+                                  {hasPermission("restaurant.delete") && (
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer">
+                                          <Trash2 className="mr-2 h-4 w-4" /> Delete Permanently
+                                        </DropdownMenuItem>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Delete this order?</AlertDialogTitle>
+                                          <AlertDialogDescription>This will permanently remove the order from records. This action cannot be undone.</AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Keep Order</AlertDialogCancel>
+                                          <AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={() => deleteOrder(o.id)}>Delete Permanently</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  )}
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </td>

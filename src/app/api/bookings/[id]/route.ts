@@ -19,6 +19,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       "restaurant_charges_total",
       "is_lgu_booking", "is_special_booking", "special_booking_label",
       "extras_total", "extensions_total",
+      "discount_value", "discount_type", "discount_amount", "discount_id",
+      "cheque_number",
     ];
     const updateData: Record<string, unknown> = {};
     for (const key of allowedFields) {

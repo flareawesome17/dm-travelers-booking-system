@@ -4,7 +4,7 @@ import { motion, useInView } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, BedDouble, Users } from "lucide-react";
+import { ArrowRight, BedDouble, Hotel, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   PublicGlassPanel,
@@ -23,11 +23,7 @@ type RoomType = {
   available_rooms: number | null;
 };
 
-const STATIC_IMAGES: Record<string, string> = {
-  "Standard Room": "/images/room-standard.jpg",
-  "Deluxe Room": "/images/room-deluxe.jpg",
-  "Executive Suite": "/images/room-suite.jpg",
-};
+// STATIC_IMAGES removed
 
 const STATIC_DESCS: Record<string, string> = {
   "Standard Room": "A clean, relaxed room category for practical overnight comfort.",
@@ -35,15 +31,7 @@ const STATIC_DESCS: Record<string, string> = {
   "Executive Suite": "A higher-tier stay experience for guests who want extra room to unwind.",
 };
 
-function getFallbackImage(index: number) {
-  const fallbacks = [
-    "/images/room-standard.jpg",
-    "/images/room-deluxe.jpg",
-    "/images/room-suite.jpg",
-  ];
-
-  return fallbacks[index % fallbacks.length];
-}
+// getFallbackImage removed
 
 export default function FeaturedRoomsSection() {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -95,11 +83,7 @@ export default function FeaturedRoomsSection() {
                     <div className="aspect-[4/4.6] animate-pulse bg-white/6" />
                   </PublicGlassPanel>
                 ))
-              : rooms.map((room, index) => {
-                  const image =
-                    room.sample_image_url ||
-                    STATIC_IMAGES[room.room_type] ||
-                    getFallbackImage(index);
+                : rooms.map((room, index) => {
                   const description =
                     STATIC_DESCS[room.room_type] ||
                     "Comfortable accommodation with the essentials in place for a dependable stay.";
@@ -113,13 +97,27 @@ export default function FeaturedRoomsSection() {
                     >
                       <PublicGlassPanel className="group h-full overflow-hidden p-0">
                         <div className="relative aspect-[4/4.7] overflow-hidden">
-                          <Image
-                            alt={room.room_type}
-                            className="object-cover transition-transform duration-700 group-hover:scale-105"
-                            fill
-                            sizes="(max-width: 1024px) 100vw, 33vw"
-                            src={image}
-                          />
+                          {room.sample_image_url ? (
+                            <Image
+                              alt={room.room_type}
+                              className="object-cover transition-transform duration-700 group-hover:scale-105"
+                              fill
+                              sizes="(max-width: 1024px) 100vw, 33vw"
+                              src={room.sample_image_url}
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary/60 to-secondary/20 p-8 text-center backdrop-blur-md transition-all duration-700 group-hover:scale-105">
+                               <div className="flex flex-col items-center gap-3">
+                                <div className="rounded-full bg-white/10 p-4 backdrop-blur-sm">
+                                  <Hotel className="h-8 w-8 text-gold-light/40" />
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="font-heading text-lg font-medium text-white/40">No Preview</p>
+                                  <p className="text-[10px] uppercase tracking-[0.2em] text-white/20">Image coming soon</p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                           <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_24%,rgba(5,14,27,0.82)_100%)]" />
 
                           <div className="absolute left-4 top-4 rounded-full border border-white/14 bg-secondary/70 px-3 py-1 text-[0.68rem] uppercase tracking-[0.2em] text-gold-light/90 backdrop-blur-md sm:left-5 sm:top-5 sm:tracking-[0.28em]">
