@@ -175,11 +175,35 @@ export async function getOrCreateActiveShiftLog(adminId?: string) {
 
       if (autoCloseShifts) {
         // Auto-close the old orphaned shift
+        // Fetch calculations before auto-closing
+        const { data: transactions, error: txErr } = await supabase
+          .from("shift_transactions")
+          .select("type, amount")
+          .eq("shift_log_id", existingOpenLog.id);
+
+        let totalIncome = 0;
+        let totalExpense = 0;
+        let netTotal = 0;
+
+        if (!txErr && transactions) {
+          totalIncome = transactions
+            .filter((t: any) => t.type === "INCOME")
+            .reduce((s, t) => s + Number(t.amount || 0), 0);
+          totalExpense = transactions
+            .filter((t: any) => t.type === "EXPENSE")
+            .reduce((s, t) => s + Number(t.amount || 0), 0);
+          netTotal = totalIncome - totalExpense;
+        }
+
+        // Auto-close the old orphaned shift
         await supabase.from("shift_logs").update({
           status: "CLOSED",
           closed_at: new Date().toISOString(),
           close_notes: "Auto-closed due to shift timeout",
           closing_type: "AUTO",
+          total_income: totalIncome,
+          total_expense: totalExpense,
+          net_total: netTotal,
         }).eq("id", existingOpenLog.id);
         // Fall through to create the proper detected shift
       } else {

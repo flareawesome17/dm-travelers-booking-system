@@ -30,6 +30,39 @@ export async function GET(req: NextRequest) {
 
     if (logsErr) throw logsErr;
 
+    // Data Healing: Fix shifts that have zero totals but might have transactions (especially AUTO closed ones)
+    const logsToFix = (logs ?? []).filter(
+      (log: any) => log.net_total === 0 && log.total_income === 0 && log.total_expense === 0
+    );
+
+    if (logsToFix.length > 0) {
+      // We don't await this to keep the API responsive, but we do perform the updates
+      for (const log of logsToFix) {
+        const { data: txs } = await supabase
+          .from("shift_transactions")
+          .select("type, amount")
+          .eq("shift_log_id", log.id);
+
+        if (txs && txs.length > 0) {
+          const income = txs.filter((t) => t.type === "INCOME").reduce((s, t) => s + Number(t.amount || 0), 0);
+          const expense = txs.filter((t) => t.type === "EXPENSE").reduce((s, t) => s + Number(t.amount || 0), 0);
+          const net = income - expense;
+
+          if (income !== 0 || expense !== 0) {
+            await supabase
+              .from("shift_logs")
+              .update({ total_income: income, total_expense: expense, net_total: net })
+              .eq("id", log.id);
+            
+            // Update the local object so the user sees the fix immediately
+            log.total_income = income;
+            log.total_expense = expense;
+            log.net_total = net;
+          }
+        }
+      }
+    }
+
     return NextResponse.json({
       data: logs ?? [],
       pagination: {
