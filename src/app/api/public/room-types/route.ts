@@ -17,6 +17,7 @@ type RoomRow = {
   rate_5h_price?: number | null;
   rate_3h_enabled?: boolean | null;
   rate_3h_price?: number | null;
+  is_featured?: boolean | null;
 };
 
 function isYmd(s: string) {
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
     const { data: rooms, error: rErr } = await supabase
       .from("rooms")
       .select(
-        "id, room_number, room_type, is_active, status, image_urls, capacity, rate_24h_enabled, rate_24h_price, rate_12h_enabled, rate_12h_price, rate_5h_enabled, rate_5h_price, rate_3h_enabled, rate_3h_price"
+        "id, room_number, room_type, is_active, status, image_urls, capacity, rate_24h_enabled, rate_24h_price, rate_12h_enabled, rate_12h_price, rate_5h_enabled, rate_5h_price, rate_3h_enabled, rate_3h_price, is_featured"
       )
       .eq("is_active", true);
     if (rErr) return NextResponse.json({ error: rErr.message }, { status: 500 });
@@ -104,6 +105,7 @@ export async function GET(req: NextRequest) {
         total_rooms: number;
         available_rooms: number | null;
         max_capacity: number | null;
+        is_featured: boolean;
       }
     >();
 
@@ -138,6 +140,7 @@ export async function GET(req: NextRequest) {
         total_rooms: 0,
         available_rooms: checkIn && checkOut ? 0 : null,
         max_capacity: null as number | null,
+        is_featured: Boolean(room.is_featured),
       };
 
       existing.total_rooms = 1;

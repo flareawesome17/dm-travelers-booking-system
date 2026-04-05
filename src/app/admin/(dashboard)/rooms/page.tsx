@@ -23,7 +23,7 @@ import { usePermissions } from "@/context/PermissionsContext";
 type RoomRow = {
   id: string; room_number?: string; room_type?: string; floor?: number; capacity?: number;
   status?: string; rate_plans?: unknown; amenities?: string[]; image_urls?: string[];
-  is_active?: boolean;
+  is_active?: boolean; is_featured?: boolean;
   rate_24h_price?: number | null; rate_24h_early_checkin_fee?: number | null;
   rate_24h_late_checkout_fee?: number | null; rate_12h_price?: number | null;
   rate_12h_late_checkout_fee?: number | null; rate_5h_price?: number | null;
@@ -255,7 +255,19 @@ export default function AdminRoomsPage() {
                   ) : (
                     filteredRooms.map((r) => (
                       <tr key={r.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
-                      <td className="py-4 px-6 font-mono font-medium text-[#07008A]">{r.room_number ?? "—"}</td>
+                      <td className="py-4 px-6 font-mono font-medium text-[#07008A]">
+                        <div className="flex items-center gap-2">
+                          {r.room_number ?? "—"}
+                          {r.is_featured && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="text-yellow-500 cursor-help" role="img" aria-label="featured">⭐</span>
+                              </TooltipTrigger>
+                              <TooltipContent>Featured on landing page</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      </td>
                       <td className="py-4 px-6"><span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">{r.room_type ?? "—"}</span></td>
                       <td className="py-4 px-4 text-xs text-slate-700">{r.floor ?? "—"}</td>
                       <td className="py-4 px-4 text-xs text-slate-700">{r.capacity ?? "—"} guest{(r.capacity ?? 0) === 1 ? "" : "s"}</td>

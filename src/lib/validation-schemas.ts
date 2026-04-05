@@ -23,6 +23,7 @@ export const createRoomSchema = z.object({
   max_occupancy: z.number().int().min(1).max(20).optional().nullable(),
   status: z.enum(["Available", "Occupied", "Maintenance", "Reserved", "Dirty", "In Cleaning"]).default("Available"),
   is_active: z.boolean().default(true),
+  is_featured: z.boolean().default(false).optional(),
   
   rate_24h_enabled: z.boolean().optional(),
   rate_24h_price: nonNegativeNumber.optional().nullable(),

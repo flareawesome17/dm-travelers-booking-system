@@ -17,6 +17,7 @@ type RoomFormProps = {
     capacity?: number;
     amenities?: string[];
     rate_plans?: unknown;
+    is_featured?: boolean;
   };
   onSuccess: (room: unknown) => void;
   onClose: () => void;
@@ -113,7 +114,8 @@ export function RoomForm({ apiUrl, token, room, onSuccess, onClose }: RoomFormPr
   const [lguRate12Price, setLguRate12Price] = useState(anyRoom?.lgu_rate_12h_price != null ? String(anyRoom.lgu_rate_12h_price) : "");
   const [lguRate5Price, setLguRate5Price] = useState(anyRoom?.lgu_rate_5h_price != null ? String(anyRoom.lgu_rate_5h_price) : "");
   const [lguRate3Price, setLguRate3Price] = useState(anyRoom?.lgu_rate_3h_price != null ? String(anyRoom.lgu_rate_3h_price) : "");
-
+  
+  const [isFeatured, setIsFeatured] = useState(Boolean(room?.is_featured));
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -289,6 +291,7 @@ export function RoomForm({ apiUrl, token, room, onSuccess, onClose }: RoomFormPr
         lgu_rate_12h_price: lguRateEnabled && lguRate12Price ? Number(lguRate12Price) : null,
         lgu_rate_5h_price: lguRateEnabled && lguRate5Price ? Number(lguRate5Price) : null,
         lgu_rate_3h_price: lguRateEnabled && lguRate3Price ? Number(lguRate3Price) : null,
+        is_featured: isFeatured,
       };
 
       if (!isEdit) {
@@ -373,6 +376,22 @@ export function RoomForm({ apiUrl, token, room, onSuccess, onClose }: RoomFormPr
             placeholder="201"
             required
           />
+        </div>
+        <div className="space-y-4 pt-8">
+          <label className="flex items-center gap-2 text-sm font-semibold text-gold-dark cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isFeatured}
+              onChange={(e) => setIsFeatured(e.target.checked)}
+              className="h-4 w-4 rounded border-gold-dark text-gold-dark focus:ring-gold-dark/30"
+            />
+            <span className="flex items-center gap-1.5">
+              ⭐ Featured Room
+            </span>
+          </label>
+          <p className="text-[10px] text-slate-500 -mt-2 ml-6">
+            Featured rooms are displayed on the public landing page.
+          </p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="room-type">Room type</Label>
