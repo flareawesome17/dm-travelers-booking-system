@@ -34,6 +34,9 @@ type BookingRow = {
       line_total: number;
     }[];
   }[];
+  booking_extras?: {
+    id: string; extra_type: string; quantity: number; unit_price: number; total_price: number;
+  }[];
 };
 
 type ReceiptModalProps = {
@@ -177,15 +180,28 @@ export function ReceiptModal({ booking, onClose }: ReceiptModalProps) {
                     <td className="py-4 text-right font-medium text-emerald-700">- PHP {discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   </tr>
                 )}
-                {extrasTotal > 0 && (
-                  <tr>
-                    <td className="py-4 pr-4">
-                      <div className="font-semibold text-slate-800">Booking Extras</div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">Additional guest-requested add-ons</div>
-                    </td>
-                    <td className="py-4 text-center">--</td>
-                    <td className="py-4 text-right font-medium text-slate-900">PHP {extrasTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  </tr>
+                {(booking.booking_extras && booking.booking_extras.length > 0) ? (
+                  booking.booking_extras.map((extra) => (
+                    <tr key={extra.id}>
+                      <td className="py-4 pr-4">
+                        <div className="font-semibold text-slate-800">{extra.extra_type || "Extra Charge"}</div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">Additional charge (₱{Number(extra.unit_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} each)</div>
+                      </td>
+                      <td className="py-4 text-center">{extra.quantity}</td>
+                      <td className="py-4 text-right font-medium text-slate-900">PHP {Number(extra.total_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    </tr>
+                  ))
+                ) : (
+                  extrasTotal > 0 && (
+                    <tr>
+                      <td className="py-4 pr-4">
+                        <div className="font-semibold text-slate-800">Booking Extras</div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">Additional guest-requested add-ons</div>
+                      </td>
+                      <td className="py-4 text-center">--</td>
+                      <td className="py-4 text-right font-medium text-slate-900">PHP {extrasTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    </tr>
+                  )
                 )}
                 {extensionsTotal > 0 && (
                   <tr>

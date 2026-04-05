@@ -32,6 +32,7 @@ import { ReceiptModal } from "@/components/admin/bookings/ReceiptModal";
 import { CountdownTimer } from "@/components/admin/bookings/CountdownTimer";
 import { ExtendStayModal } from "@/components/admin/bookings/ExtendStayModal";
 import { ManageExtrasModal } from "@/components/admin/bookings/ManageExtrasModal";
+import { AddExtraChargeModal } from "@/components/admin/bookings/AddExtraChargeModal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "@/components/ui/sonner";
 import { getBookingChargeBreakdown } from "@/lib/bookingTotals";
@@ -59,6 +60,8 @@ type BookingRow = {
       unit_price: number;
       line_total: number;
     }[];
+  }[]; booking_extras?: {
+    id: string; extra_type: string; quantity: number; unit_price: number; total_price: number;
   }[]; actual_check_in_at?: string;
   total_amount?: number; deposit_paid?: number; balance_due?: number; restaurant_charges_total?: number;
   extras_total?: number; extensions_total?: number;
@@ -89,6 +92,7 @@ export default function AdminBookingsPage() {
   const [receiptBooking, setReceiptBooking] = useState<BookingRow | null>(null);
   const [extendBooking, setExtendBooking] = useState<BookingRow | null>(null);
   const [extrasBooking, setExtrasBooking] = useState<BookingRow | null>(null);
+  const [extraChargeBooking, setExtraChargeBooking] = useState<BookingRow | null>(null);
   const [checkInBooking, setCheckInBooking] = useState<BookingRow | null>(null);
   const [checkInAt, setCheckInAt] = useState<string>("");
   const [checkOutBooking, setCheckOutBooking] = useState<BookingRow | null>(null);
@@ -482,6 +486,11 @@ export default function AdminBookingsPage() {
                                   <Package className="mr-2 h-4 w-4" /> Manage Extras
                                 </DropdownMenuItem>
                               )}
+                              {canUpdate && b.status !== "Cancelled" && (
+                                <DropdownMenuItem onClick={() => setExtraChargeBooking(b)} className="text-pink-600 focus:text-pink-700 focus:bg-pink-50 cursor-pointer text-sm">
+                                  <Plus className="mr-2 h-4 w-4" /> Add Extra Charge
+                                </DropdownMenuItem>
+                              )}
                               
                               <DropdownMenuSeparator />
                               {canUpdate && b.status !== "Checked-In" && b.status !== "Checked-Out" && b.status !== "Cancelled" && (
@@ -638,6 +647,18 @@ export default function AdminBookingsPage() {
         />
       )}
 
+      {extraChargeBooking?.id && (
+        <AddExtraChargeModal
+          open={!!extraChargeBooking}
+          onClose={() => setExtraChargeBooking(null)}
+          onSuccess={() => {
+            setLoading(true);
+            fetchBookings();
+          }}
+          booking={extraChargeBooking as any}
+          token={token()}
+        />
+      )}
     </>
   );
 }

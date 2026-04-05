@@ -135,7 +135,7 @@ export function CollectPaymentModal({ open, onClose, receivable, token, onSucces
                     </div>
                   </div>
 
-                  <div className="mt-5 grid grid-cols-3 gap-3">
+                  <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
                       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Outstanding</p>
                       <p className="mt-2 text-lg font-bold text-slate-900">PHP {outstanding.toFixed(2)}</p>
@@ -225,21 +225,21 @@ export function CollectPaymentModal({ open, onClose, receivable, token, onSucces
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         placeholder="Reference number, collector note, or remittance detail"
-                        className="h-12 rounded-2xl border-white/10 bg-white/8 text-white placeholder:text-white/35"
+                        className="h-12 rounded-2xl border-white/20 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:ring-white/30"
                       />
                     </div>
 
-                    {method === "Cheque" && (
+                    {(method === "Cheque" || method === "GCash" || method === "Card" || method === "Bank Transfer") && (
                       <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
                         <Label htmlFor="cheque-number" className="text-xs font-semibold uppercase tracking-[0.16em] text-white/65">
-                          Cheque Number
+                          {method === "Cheque" ? "Cheque Number" : "Reference Number"}
                         </Label>
                         <Input
                           id="cheque-number"
                           value={chequeNumber}
                           onChange={(e) => setChequeNumber(e.target.value)}
-                          placeholder="Enter cheque number..."
-                          className="h-12 rounded-2xl border-white/10 bg-white/8 text-white placeholder:text-white/35"
+                          placeholder={`Enter ${method === "Cheque" ? "cheque" : "reference"} number...`}
+                          className="h-12 rounded-2xl border-white/20 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:ring-white/30"
                         />
                       </div>
                     )}

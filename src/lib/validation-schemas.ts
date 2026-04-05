@@ -231,7 +231,7 @@ export const createExtensionSchema = z.object({
 
 export const createBookingExtrasSchema = z.object({
   extras: z.array(z.object({
-    extra_type: z.enum(["Extra Bed", "Extra Pillow", "Extra Blanket", "Extra Towel - Bath", "Extra Towel - Hand", "Extra Person"]),
+    extra_type: z.string().trim().min(1, "Extra type is required").max(100),
     quantity: z.number().int().min(1).max(20),
     unit_price: nonNegativeNumber,
   })).min(1, "At least one extra item required"),
