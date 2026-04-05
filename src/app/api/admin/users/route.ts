@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from("admin_users")
-      .select("id, name, email, role_id, is_active, created_at")
+      .select("id, name, email, role_id, is_active, created_at, last_seen_at")
       .order("created_at", { ascending: false });
     if (error) return dbError(error, "Failed to load users");
     return NextResponse.json(data ?? []);

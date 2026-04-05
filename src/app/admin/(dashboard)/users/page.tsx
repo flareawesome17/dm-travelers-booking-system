@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
 import { Users as UsersIcon, Plus, Eye, EyeOff, Edit, Trash2, AlertTriangle, Zap } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,10 +17,11 @@ import { toast } from "@/components/ui/sonner";
 import { getErrorMessage } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { cn } from "@/lib/utils";
 import { usePermissions } from "@/context/PermissionsContext";
 
 type AdminRole = { id: number; name: string; description?: string | null };
-type AdminUser = { id: string; name?: string | null; email?: string; role_id?: number; is_active?: boolean; created_at?: string };
+type AdminUser = { id: string; name?: string | null; email?: string; role_id?: number; is_active?: boolean; created_at?: string; last_seen_at?: string | null };
 const generateStrongPassword = (length = 16) => {
   const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+~`|}{[]:;?><,./-=";
   let retVal = "";
@@ -192,7 +194,14 @@ export default function AdminUsersPage() {
   };
 
   const filteredUsers = users.filter((u) => {
-    const matchesStatus = statusFilter === "all" ? true : statusFilter === "active" ? u.is_active : !u.is_active;
+    let matchesStatus = true;
+    if (statusFilter === "active") matchesStatus = !!u.is_active;
+    else if (statusFilter === "inactive") matchesStatus = !u.is_active;
+    else if (statusFilter === "online") {
+      const isOnline = u.last_seen_at ? (new Date().getTime() - new Date(u.last_seen_at).getTime()) < 5 * 60 * 1000 : false;
+      matchesStatus = isOnline;
+    }
+
     const term = search.trim().toLowerCase();
     if (!term) return matchesStatus;
     const roleName = roles.find(r => r.id === u.role_id)?.name || String(u.role_id || "");
@@ -312,6 +321,7 @@ export default function AdminUsersPage() {
                 <option value="all">All statuses</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
+                <option value="online">Online Now</option>
               </select>
             </div>
           </div>
@@ -343,9 +353,35 @@ export default function AdminUsersPage() {
                     ) : (
                       paginatedUsers.map((u) => {
                         const role = roles.find(r => r.id === u.role_id);
+                        const isOnline = u.last_seen_at ? (new Date().getTime() - new Date(u.last_seen_at).getTime()) < 5 * 60 * 1000 : false;
+                        
                         return (
                           <tr key={u.id} className="border-b last:border-0 hover:bg-slate-50/50 transition-colors">
-                            <td className="py-4 px-6 font-medium text-slate-800">{u.name ?? "—"}</td>
+                            <td className="py-4 px-6">
+                              <div className="flex items-center gap-3">
+                                <div className="relative">
+                                  <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center text-[#07008A] font-bold text-xs border border-slate-200">
+                                    {(u.name?.[0] || u.email?.[0] || "?").toUpperCase()}
+                                  </div>
+                                  <div className={cn(
+                                    "absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full border-2 border-white",
+                                    isOnline ? "bg-green-500 animate-pulse" : "bg-slate-300"
+                                  )} />
+                                </div>
+                                <div>
+                                  <p className="font-medium text-slate-800 leading-tight">{u.name ?? "—"}</p>
+                                  <p className="text-[10px] text-slate-400 mt-0.5">
+                                    {isOnline ? (
+                                      <span className="text-green-600 font-medium tracking-wide uppercase text-[9px]">Online Now</span>
+                                    ) : u.last_seen_at ? (
+                                      `online ${formatDistanceToNow(new Date(u.last_seen_at), { addSuffix: true })}`
+                                    ) : (
+                                      "Never seen online"
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+                            </td>
                             <td className="py-4 px-6 font-medium text-[#07008A]">{u.email ?? "—"}</td>
                             <td className="py-4 px-6 text-sm text-slate-600">{role?.name || u.role_id || "—"}</td>
                             <td className="py-4 px-6"><Badge variant={u.is_active ? "default" : "secondary"}>{u.is_active ? "Yes" : "No"}</Badge></td>

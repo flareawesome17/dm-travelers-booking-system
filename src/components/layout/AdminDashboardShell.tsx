@@ -100,6 +100,30 @@ export default function AdminDashboardShell({
     }
   }, [pathname, permissions, permissionsLoaded, router]);
 
+  // Heartbeat to track online status
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem("admin_token") : null;
+    if (!token) return;
+
+    const sendHeartbeat = async () => {
+      try {
+        await fetch("/api/admin/heartbeat", { 
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } catch {
+        // silent
+      }
+    };
+
+    // Send immediately on mount
+    sendHeartbeat();
+
+    // Then every 60 seconds
+    const interval = setInterval(sendHeartbeat, 60000);
+    return () => clearInterval(interval);
+  }, [pathname]); // Re-run or stay alive across navigation
+
   const handleMobileClose = useCallback(() => setIsMobileOpen(false), []);
 
   return (

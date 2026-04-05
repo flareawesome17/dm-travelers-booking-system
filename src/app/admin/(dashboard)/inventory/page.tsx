@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import {
   PackageSearch, Plus, Activity, ArrowRightLeft, UtensilsCrossed,
   Settings2, History, Search, AlertTriangle, TrendingDown, TrendingUp,
-  Package, ChevronLeft, ChevronRight, Filter
+  Package, ChevronLeft, ChevronRight, Filter, Pencil, Trash2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,9 +14,17 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from "@/components/ui/alert-dialog";
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger
+} from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StockAdjustmentModal } from "@/components/admin/inventory/StockAdjustmentModal";
+import { EditItemModal } from "@/components/admin/inventory/EditItemModal";
 import { RecipeEditorModal } from "@/components/admin/inventory/RecipeEditorModal";
 import { toast } from "@/components/ui/sonner";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -33,6 +41,8 @@ export default function InventoryPage() {
 
   const [adjustItem, setAdjustItem] = useState<any | null>(null);
   const [recipeItem, setRecipeItem] = useState<any | null>(null);
+  const [editItem, setEditItem] = useState<any | null>(null);
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<any | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [createSubmitting, setCreateSubmitting] = useState(false);
   const [newItemName, setNewItemName] = useState("");
@@ -153,6 +163,23 @@ export default function InventoryPage() {
   // Reset page when filters change
   useEffect(() => { setStockPage(1); }, [stockSearch, stockFilter]);
   useEffect(() => { setMovementPage(1); }, [movementSearch, movementFilter]);
+
+  const handleDeleteItem = async (id: string) => {
+    try {
+      const token = localStorage.getItem("admin_token");
+      const res = await fetch(`/api/inventory/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Failed to delete item");
+      toast.success("Item deleted successfully");
+      await fetchItems();
+    } catch {
+      toast.error("Failed to delete item");
+    } finally {
+      setDeleteConfirmItem(null);
+    }
+  };
 
   return (
     <>
@@ -349,11 +376,38 @@ export default function InventoryPage() {
                               )}
                             </td>
                             <td className="py-3.5 px-5 text-slate-500 text-xs capitalize">{i.category}</td>
-                            <td className="py-3.5 px-5 text-right">
-                              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setAdjustItem(i)}>
-                                <ArrowRightLeft className="mr-1.5 h-3 w-3" /> Adjust
-                              </Button>
-                            </td>
+                             <td className="py-3.5 px-5 text-right">
+                               <div className="flex items-center justify-end gap-1.5">
+                                 <TooltipProvider>
+                                   <Tooltip>
+                                     <TooltipTrigger asChild>
+                                       <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => setAdjustItem(i)}>
+                                         <ArrowRightLeft className="h-3.5 w-3.5" />
+                                       </Button>
+                                     </TooltipTrigger>
+                                     <TooltipContent>Adjust Stock Levels</TooltipContent>
+                                   </Tooltip>
+
+                                   <Tooltip>
+                                     <TooltipTrigger asChild>
+                                       <Button variant="outline" size="sm" className="h-8 px-2 text-xs border-blue-100 hover:border-blue-200 hover:bg-blue-50 text-blue-600" onClick={() => setEditItem(i)}>
+                                         <Pencil className="h-3.5 w-3.5" />
+                                       </Button>
+                                     </TooltipTrigger>
+                                     <TooltipContent>Edit Item Details</TooltipContent>
+                                   </Tooltip>
+
+                                   <Tooltip>
+                                     <TooltipTrigger asChild>
+                                       <Button variant="outline" size="sm" className="h-8 px-2 text-xs border-red-100 hover:border-red-200 hover:bg-red-50 text-red-600" onClick={() => setDeleteConfirmItem(i)}>
+                                         <Trash2 className="h-3.5 w-3.5" />
+                                       </Button>
+                                     </TooltipTrigger>
+                                     <TooltipContent>Delete Item</TooltipContent>
+                                   </Tooltip>
+                                 </TooltipProvider>
+                               </div>
+                             </td>
                           </tr>
                         );
                       })}
@@ -518,9 +572,33 @@ export default function InventoryPage() {
       {adjustItem && (
         <StockAdjustmentModal item={adjustItem} onClose={() => setAdjustItem(null)} onSuccess={() => fetchItems()} />
       )}
+      {editItem && (
+        <EditItemModal item={editItem} onClose={() => setEditItem(null)} onSuccess={() => fetchItems()} />
+      )}
       {recipeItem && (
         <RecipeEditorModal menuItem={recipeItem} onClose={() => setRecipeItem(null)} />
       )}
+
+      {/* Delete Confirmation Alert Dialog */}
+      <AlertDialog open={!!deleteConfirmItem} onOpenChange={(open) => !open && setDeleteConfirmItem(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-600 flex items-center gap-2">
+              <Trash2 className="h-5 w-5" />
+              Delete {deleteConfirmItem?.name}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this inventory item? This will archive the item and prevent it from appearing in current stock lists, but historical records will be preserved.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deleteConfirmItem && handleDeleteItem(deleteConfirmItem.id)} className="bg-red-600 hover:bg-red-700">
+              Delete Item
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

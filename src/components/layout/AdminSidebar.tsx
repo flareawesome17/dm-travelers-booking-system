@@ -174,8 +174,10 @@ export default function AdminSidebar({
   const [logoUrl, setLogoUrl] = useState<string>("/logo.png");
   const [newBookingCount, setNewBookingCount] = useState(0);
   const [expiringCount, setExpiringCount] = useState(0);
+  const [onlineUsersCount, setOnlineUsersCount] = useState(0);
   const bookingPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const expiringPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const onlineUsersPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastExpiringIdsRef = useRef<Set<string>>(new Set());
 
   const LAST_SEEN_KEY = "admin_bookings_last_seen";
@@ -244,6 +246,32 @@ export default function AdminSidebar({
       if (expiringPollRef.current) clearInterval(expiringPollRef.current);
     };
   }, [fetchExpiringBookings]);
+
+  const fetchOnlineUsersCount = useCallback(async () => {
+    try {
+      const tokenStr = localStorage.getItem("admin_token");
+      if (!tokenStr) return;
+
+      const res = await fetch("/api/admin/users/online-count", {
+        headers: { Authorization: `Bearer ${tokenStr}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOnlineUsersCount(data.count || 0);
+      }
+    } catch {
+      // silent
+    }
+  }, []);
+
+  // Poll for online users every 60 seconds
+  useEffect(() => {
+    fetchOnlineUsersCount();
+    onlineUsersPollRef.current = setInterval(fetchOnlineUsersCount, 60_000);
+    return () => {
+      if (onlineUsersPollRef.current) clearInterval(onlineUsersPollRef.current);
+    };
+  }, [fetchOnlineUsersCount]);
 
   // When the admin navigates to the bookings page, mark as seen
   useEffect(() => {
@@ -419,6 +447,8 @@ export default function AdminSidebar({
                 icon={icon}
                 isActive={isItemActive(path)}
                 isCollapsed={isCollapsed && !isMobileOpen}
+                badge={path === "/admin/users" && onlineUsersCount > 0 ? onlineUsersCount : undefined}
+                badgeVariant="amber"
               />
             ))}
           </div>
