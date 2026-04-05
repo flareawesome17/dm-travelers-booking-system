@@ -128,7 +128,7 @@ export default function AdminDashboardShell({
   const handleMobileClose = useCallback(() => setIsMobileOpen(false), []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-[#07008A]/[0.02]">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-[#07008A]/[0.02] touch-pan-x touch-pan-y">
       <AdminSidebar
         isCollapsed={isCollapsed}
         onToggle={() => setIsCollapsed(!isCollapsed)}
