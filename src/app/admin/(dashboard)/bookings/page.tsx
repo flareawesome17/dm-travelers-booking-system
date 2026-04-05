@@ -369,10 +369,10 @@ export default function AdminBookingsPage() {
                                const balance = Number(b.balance_due ?? 0);
                                return (
                                  <>
-                                   <span className="font-semibold text-[#07008A] text-sm">₱{total.toFixed(0)}</span>
-                                   {!total ? null : balance <= 0 && total > 0 ? (
+                                   <span className="font-semibold text-[#07008A] text-sm">₱{total.toFixed(2)}</span>
+                                   {!total ? null : balance < 0.01 && total > 0 ? (
                                      <span className="inline-flex rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700 border border-emerald-100">Paid full</span>
-                                   ) : deposit > 0 && balance > 0 ? (
+                                   ) : deposit > 0 && balance >= 0.01 ? (
                                      <span className="inline-flex rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-medium text-amber-700 border border-amber-100">Partial</span>
                                    ) : (
                                      <span className="inline-flex rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium text-slate-700 border border-slate-200">Unpaid</span>
@@ -382,23 +382,23 @@ export default function AdminBookingsPage() {
                              })()}
                            </div>
                            {Number(b.restaurant_charges_total || 0) > 0 && (
-                             <span className="text-[10px] text-amber-700 font-medium">+ ₱{Number(b.restaurant_charges_total || 0).toFixed(0)} Restaurant</span>
+                             <span className="text-[10px] text-amber-700 font-medium">+ ₱{Number(b.restaurant_charges_total || 0).toFixed(2)} Restaurant</span>
                            )}
                            {Number(b.extras_total || 0) > 0 && (
-                             <span className="text-[10px] text-blue-700 font-medium">+ PHP {Number(b.extras_total || 0).toFixed(0)} Extras</span>
+                             <span className="text-[10px] text-blue-700 font-medium">+ PHP {Number(b.extras_total || 0).toFixed(2)} Extras</span>
                            )}
                            {Number(b.extensions_total || 0) > 0 && (
-                             <span className="text-[10px] text-violet-700 font-medium">+ PHP {Number(b.extensions_total || 0).toFixed(0)} Extension</span>
+                             <span className="text-[10px] text-violet-700 font-medium">+ PHP {Number(b.extensions_total || 0).toFixed(2)} Extension</span>
                            )}
                            {(Number(b.balance_due) > 0 || Number(b.deposit_paid) > 0) && (
                              <div className="flex flex-col gap-0.5 text-[10px] text-slate-500">
-                               {Number(b.deposit_paid) > 0 && <span>Dep: ₱{Number(b.deposit_paid).toFixed(0)}</span>}
-                               {Number(b.balance_due) > 0 && <span className="font-medium text-amber-700">Bal: ₱{Number(b.balance_due).toFixed(0)}</span>}
+                               {Number(b.deposit_paid) > 0 && <span>Dep: ₱{Number(b.deposit_paid).toFixed(2)}</span>}
+                               {Number(b.balance_due) > 0 && <span className="font-medium text-amber-700">Bal: ₱{Number(b.balance_due).toFixed(2)}</span>}
                              </div>
                            )}
                            {((Number(b.early_checkin_fee_applied) || 0) > 0 || (Number(b.late_checkout_fee_applied) || 0) > 0) && (
                              <span className="text-[10px] text-slate-400 mt-0.5">
-                               {[(Number(b.early_checkin_fee_applied) || 0) > 0 && `+₱${Number(b.early_checkin_fee_applied).toFixed(0)} Early`, (Number(b.late_checkout_fee_applied) || 0) > 0 && `+₱${Number(b.late_checkout_fee_applied).toFixed(0)} Late`].filter(Boolean).join(", ")}
+                               {[(Number(b.early_checkin_fee_applied) || 0) > 0 && `+₱${Number(b.early_checkin_fee_applied).toFixed(2)} Early`, (Number(b.late_checkout_fee_applied) || 0) > 0 && `+₱${Number(b.late_checkout_fee_applied).toFixed(2)} Late`].filter(Boolean).join(", ")}
                              </span>
                            )}
                          </div>
@@ -551,9 +551,9 @@ export default function AdminBookingsPage() {
             <label className="text-sm font-medium text-slate-700">Actual check-in time</label>
             <input type="datetime-local" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={checkInAt} onChange={(e) => setCheckInAt(e.target.value)} />
             {checkInBooking?.check_in_date && <p className="text-xs text-slate-500">Reserved: <span className="font-medium">{`${String(checkInBooking.check_in_date).slice(0, 10)} 14:00`}</span></p>}
-            {(() => { const p = computeEarlyCheckInPreview(); return <p className={cn("text-xs", p.fee > 0 ? "text-slate-700" : "text-slate-500")}>Breakdown: <span className="font-semibold text-[#07008A]">₱{p.fee.toFixed(0)}</span> (<span className="font-mono">₱{p.rate.toFixed(0)}</span> × <span className="font-mono">{p.hoursEarly}</span> hour{p.hoursEarly !== 1 ? "s" : ""} early) — {p.reason}</p>; })()}
+            {(() => { const p = computeEarlyCheckInPreview(); return <p className={cn("text-xs", p.fee > 0 ? "text-slate-700" : "text-slate-500")}>Breakdown: <span className="font-semibold text-[#07008A]">₱{p.fee.toFixed(2)}</span> (<span className="font-mono">₱{p.rate.toFixed(2)}</span> × <span className="font-mono">{p.hoursEarly}</span> hour{p.hoursEarly !== 1 ? "s" : ""} early) — {p.reason}</p>; })()}
           </div>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel>                  <AlertDialogAction className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={async () => { const b = checkInBooking; if (!b?.id) return; try { const actual = checkInAt ? new Date(`${checkInAt}+08:00`).toISOString() : new Date().toISOString(); const res = await api(`/api/bookings/${b.id}/check-in`, { method: "POST", body: JSON.stringify({ actual_check_in_at: actual }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Check-in failed."); return; } const fee = Number((data as { early_checkin_fee_applied?: number }).early_checkin_fee_applied || 0); toast.success(fee > 0 ? `Checked in. Early fee: ₱${fee.toFixed(0)}.` : "Checked in."); setCheckInBooking(null); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }}>Confirm check-in</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel>                  <AlertDialogAction className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={async () => { const b = checkInBooking; if (!b?.id) return; try { const actual = checkInAt ? new Date(`${checkInAt}+08:00`).toISOString() : new Date().toISOString(); const res = await api(`/api/bookings/${b.id}/check-in`, { method: "POST", body: JSON.stringify({ actual_check_in_at: actual }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Check-in failed."); return; } const fee = Number((data as { early_checkin_fee_applied?: number }).early_checkin_fee_applied || 0); toast.success(fee > 0 ? `Checked in. Early fee: ₱${fee.toFixed(2)}.` : "Checked in."); setCheckInBooking(null); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }}>Confirm check-in</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
@@ -588,9 +588,9 @@ export default function AdminBookingsPage() {
                 </span>
               </p>
             )}
-            {(() => { const p = computeLateCheckOutPreview(); return <p className={cn("text-xs", p.fee > 0 ? "text-slate-700" : "text-slate-500")}>Breakdown: <span className="font-semibold text-[#07008A]">₱{p.fee.toFixed(0)}</span> (<span className="font-mono">₱{p.rate.toFixed(0)}</span> × <span className="font-mono">{p.hoursLate}</span> hour{p.hoursLate !== 1 ? "s" : ""} late) — {p.reason}</p>; })()}
+            {(() => { const p = computeLateCheckOutPreview(); return <p className={cn("text-xs", p.fee > 0 ? "text-slate-700" : "text-slate-500")}>Breakdown: <span className="font-semibold text-[#07008A]">₱{p.fee.toFixed(2)}</span> (<span className="font-mono">₱{p.rate.toFixed(2)}</span> × <span className="font-mono">{p.hoursLate}</span> hour{p.hoursLate !== 1 ? "s" : ""} late) — {p.reason}</p>; })()}
           </div>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-amber-600 hover:bg-amber-700 text-white" onClick={async () => { const b = checkOutBooking; if (!b?.id) return; try { const actual = checkOutAt ? new Date(`${checkOutAt}+08:00`).toISOString() : new Date().toISOString(); const res = await api(`/api/bookings/${b.id}/check-out`, { method: "POST", body: JSON.stringify({ actual_check_out_at: actual }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Check-out failed."); return; } const fee = Number((data as { late_checkout_fee_applied?: number }).late_checkout_fee_applied || 0); toast.success(fee > 0 ? `Checked out. Late fee: ₱${fee.toFixed(0)}.` : "Checked out."); setCheckOutBooking(null); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }}>Confirm check-out</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-amber-600 hover:bg-amber-700 text-white" onClick={async () => { const b = checkOutBooking; if (!b?.id) return; try { const actual = checkOutAt ? new Date(`${checkOutAt}+08:00`).toISOString() : new Date().toISOString(); const res = await api(`/api/bookings/${b.id}/check-out`, { method: "POST", body: JSON.stringify({ actual_check_out_at: actual }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Check-out failed."); return; } const fee = Number((data as { late_checkout_fee_applied?: number }).late_checkout_fee_applied || 0); toast.success(fee > 0 ? `Checked out. Late fee: ₱${fee.toFixed(2)}.` : "Checked out."); setCheckOutBooking(null); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }}>Confirm check-out</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 

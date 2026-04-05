@@ -40,7 +40,7 @@ export function getReceivableTypeForBooking(booking: BookingReceivableShape): "L
 export function getReceivableStatus(amountDue: number | string | null | undefined, amountPaid: number | string | null | undefined) {
   const due = toMoneyNumber(amountDue);
   const paid = toMoneyNumber(amountPaid);
-  if (due <= 0) return "Settled" as const;
+  if (due < 0.01) return "Settled" as const;
   if (paid > 0) return "Partial" as const;
   return "Outstanding" as const;
 }
@@ -87,7 +87,8 @@ export async function findLatestReceivableForBooking(supabase: SupabaseAdmin, bo
 
 export async function syncReceivableForBooking(supabase: SupabaseAdmin, booking: BookingReceivableShape): Promise<ReceivableSyncResult> {
   const targetType = getReceivableTypeForBooking(booking);
-  const outstandingAmount = Math.max(0, toMoneyNumber(booking.balance_due));
+  const rawOutstanding = Math.max(0, toMoneyNumber(booking.balance_due));
+  const outstandingAmount = Math.round(rawOutstanding * 100) / 100;
   const { active, archived, supportsArchiveColumns } = await findLatestReceivableForBooking(supabase, booking.id);
 
   if (!targetType) {

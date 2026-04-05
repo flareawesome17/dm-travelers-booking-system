@@ -193,7 +193,7 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="space-y-8 pb-12">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
           <h1 className="text-2xl lg:text-3xl font-bold text-[#07008A] tracking-tight">Hotel Settings</h1>
           <p className="text-muted-foreground mt-1 text-sm">Manage your property details and system preferences</p>
@@ -212,212 +212,220 @@ export default function AdminSettingsPage() {
       </div>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="bg-slate-100 p-1 border mb-6">
-          <TabsTrigger value="general" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <Building2 className="h-4 w-4 mr-2" /> General
-          </TabsTrigger>
-          <TabsTrigger value="operations" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <Clock className="h-4 w-4 mr-2" /> Operations
-          </TabsTrigger>
-          <TabsTrigger value="financial" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <Banknote className="h-4 w-4 mr-2" /> Financial
-          </TabsTrigger>
-          <TabsTrigger value="social" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <Share2 className="h-4 w-4 mr-2" /> Social
-          </TabsTrigger>
-          <TabsTrigger value="extras" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <Package className="h-4 w-4 mr-2" /> Extras
-          </TabsTrigger>
-          <TabsTrigger value="security" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <SettingsIcon className="h-4 w-4 mr-2" /> Security
-          </TabsTrigger>
-        </TabsList>
+        <div className="w-full overflow-x-auto pb-1 mb-6 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
+          <TabsList className="flex w-max min-w-full bg-slate-100 p-1 border">
+            <TabsTrigger value="general" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <Building2 className="h-4 w-4 mr-2" /> General
+            </TabsTrigger>
+            <TabsTrigger value="operations" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <Clock className="h-4 w-4 mr-2" /> Operations
+            </TabsTrigger>
+            <TabsTrigger value="financial" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <Banknote className="h-4 w-4 mr-2" /> Financial
+            </TabsTrigger>
+            <TabsTrigger value="social" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <Share2 className="h-4 w-4 mr-2" /> Social
+            </TabsTrigger>
+            <TabsTrigger value="extras" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <Package className="h-4 w-4 mr-2" /> Extras
+            </TabsTrigger>
+            <TabsTrigger value="security" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <SettingsIcon className="h-4 w-4 mr-2" /> Security
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* General Settings */}
         <TabsContent value="general">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-2 border-0 shadow-sm">
-              <CardHeader className="border-b bg-slate-50/30">
-                <CardTitle className="text-base font-bold">Property Information</CardTitle>
-                <CardDescription>Basic details about D&M Travellers Inn</CardDescription>
-              </CardHeader>
-              <CardContent className="p-6 space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="hotel_name">Hotel Name</Label>
-                  <div className="relative">
-                    <Building2 className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                    <Input 
-                      id="hotel_name" 
-                      value={settings.hotel_name || ""} 
-                      onChange={e => handleUpdate("hotel_name", e.target.value)} 
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="hotel_address">Address</Label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                    <Textarea 
-                      id="hotel_address" 
-                      value={settings.hotel_address || ""} 
-                      onChange={e => handleUpdate("hotel_address", e.target.value)} 
-                      className="pl-10 min-h-[80px]"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            {/* Left Column: Main Property Info */}
+            <div className="lg:col-span-2">
+              <Card className="border-0 shadow-sm">
+                <CardHeader className="border-b bg-slate-50/30">
+                  <CardTitle className="text-base font-bold">Property Information</CardTitle>
+                  <CardDescription>Basic details about D&M Travellers Inn</CardDescription>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-6 space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="hotel_phone">Phone Number</Label>
+                    <Label htmlFor="hotel_name">Hotel Name</Label>
                     <div className="relative">
-                      <Phone className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                      <Building2 className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                       <Input 
-                        id="hotel_phone" 
-                        value={settings.hotel_phone || ""} 
-                        onChange={e => handleUpdate("hotel_phone", e.target.value)} 
+                        id="hotel_name" 
+                        value={settings.hotel_name || ""} 
+                        onChange={e => handleUpdate("hotel_name", e.target.value)} 
                         className="pl-10"
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="hotel_email">Contact Email</Label>
+                    <Label htmlFor="hotel_address">Address</Label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                      <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                      <Textarea 
+                        id="hotel_address" 
+                        value={settings.hotel_address || ""} 
+                        onChange={e => handleUpdate("hotel_address", e.target.value)} 
+                        className="pl-10 min-h-[80px]"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="hotel_phone">Phone Number</Label>
+                      <div className="relative">
+                        <Phone className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                        <Input 
+                          id="hotel_phone" 
+                          value={settings.hotel_phone || ""} 
+                          onChange={e => handleUpdate("hotel_phone", e.target.value)} 
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="hotel_email">Contact Email</Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                        <Input 
+                          id="hotel_email" 
+                          value={settings.hotel_email || ""} 
+                          onChange={e => handleUpdate("hotel_email", e.target.value)} 
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="hotel_website">Website URL</Label>
+                    <div className="relative">
+                      <Globe className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                       <Input 
-                        id="hotel_email" 
-                        value={settings.hotel_email || ""} 
-                        onChange={e => handleUpdate("hotel_email", e.target.value)} 
+                        id="hotel_website" 
+                        value={settings.hotel_website || ""} 
+                        onChange={e => handleUpdate("hotel_website", e.target.value)} 
                         className="pl-10"
                       />
                     </div>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="hotel_website">Website URL</Label>
-                  <div className="relative">
-                    <Globe className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                    <Input 
-                      id="hotel_website" 
-                      value={settings.hotel_website || ""} 
-                      onChange={e => handleUpdate("hotel_website", e.target.value)} 
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
 
-            <Card className="border-0 shadow-sm bg-[#07008A] text-white overflow-hidden relative">
-              <CardHeader>
-                <CardTitle className="text-base font-bold flex items-center gap-2">
-                  <Info className="h-4 w-4" />
-                  Branding
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div 
-                  className="relative group flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/20 rounded-2xl bg-white/5 cursor-pointer hover:bg-white/10 transition-colors"
-                  onClick={() => document.getElementById("logo-upload")?.click()}
-                >
-                   {uploadingLogo && (
-                     <div className="absolute inset-0 bg-[#07008A]/80 flex items-center justify-center z-10 rounded-xl flex-col gap-2">
-                       <Loader2 className="h-6 w-6 animate-spin text-white" />
-                       <p className="text-xs text-white/80 font-medium">Uploading...</p>
-                     </div>
-                   )}
-                   <input
-                     id="logo-upload"
-                     type="file"
-                     accept="image/*"
-                     className="hidden"
-                     disabled={!hasPermission("settings.write")}
-                     onChange={async (e) => {
-                       const file = e.target.files?.[0];
-                       if (!file) return;
-
-                       setUploadingLogo(true);
-                       try {
-                         const token = localStorage.getItem("admin_token");
-                         const reader = new FileReader();
-                         reader.onload = async () => {
-                           const filePayload = {
-                             name: file.name,
-                             type: file.type || "image/jpeg",
-                             data: String(reader.result ?? ""),
-                           };
-
-                           const uploadRes = await fetch(`/api/rooms/upload-image`, {
-                             method: "POST",
-                             headers: {
-                               "Content-Type": "application/json",
-                               Authorization: `Bearer ${token}`,
-                             },
-                             body: JSON.stringify({ files: [filePayload] }),
-                           });
-
-                           const uploadData = await uploadRes.json();
-                           if (!uploadRes.ok) throw new Error(uploadData.error || "Failed to upload logo.");
-
-                           const newLogoUrl = uploadData.urls[0];
-                           handleUpdate("hotel_logo", newLogoUrl);
-                           toast.success("Logo uploaded temporarily. Click Save Changes to apply.");
-                           
-                           setUploadingLogo(false);
-                         };
-                         reader.onerror = () => {
-                           toast.error("Failed to read file");
-                           setUploadingLogo(false);
-                         };
-                         reader.readAsDataURL(file);
-                       } catch (err: any) {
-                         toast.error(err.message || "An error occurred");
-                         setUploadingLogo(false);
-                       }
-                     }}
-                   />
-                   <img src={settings.hotel_logo || "/logo.png"} alt="Hotel Logo" className="h-20 w-auto object-contain mb-4" />
-                   <p className="text-[10px] text-white/60 text-center uppercase tracking-widest font-bold group-hover:text-white transition-colors">
-                     {hasPermission("settings.write") ? "Click to Upload Logo" : "Logo Preview"}
-                   </p>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-xs text-white/80 leading-relaxed italic">
-                    The logo and property details are used across all receipts, invoices, and booking confirmations.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm bg-slate-50 border border-slate-200">
-              <CardHeader className="border-b bg-white">
-                <CardTitle className="text-base font-bold flex items-center gap-2">
-                  <ShieldAlert className="h-4 w-4 text-amber-600" />
-                  Site Status
-                </CardTitle>
-                <CardDescription>Control public access to the website</CardDescription>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="space-y-3">
-                  <Label htmlFor="site_status">Current Status</Label>
-                  <Select 
-                    value={settings.site_status || "live"} 
-                    onValueChange={(value) => handleUpdate("site_status", value)}
+            {/* Right Column: Secondary Settings */}
+            <div className="space-y-6">
+              <Card className="border-0 shadow-sm bg-[#07008A] text-white overflow-hidden relative">
+                <CardHeader>
+                  <CardTitle className="text-base font-bold flex items-center gap-2">
+                    <Info className="h-4 w-4" />
+                    Branding
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div 
+                    className="relative group flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/20 rounded-2xl bg-white/5 cursor-pointer hover:bg-white/10 transition-colors"
+                    onClick={() => document.getElementById("logo-upload")?.click()}
                   >
-                    <SelectTrigger id="site_status" className="w-full bg-white">
-                      <SelectValue placeholder="Select site status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="live">Live (Publicly Accessible)</SelectItem>
-                      <SelectItem value="development">Under Development</SelectItem>
-                      <SelectItem value="maintenance">Under Maintenance</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Changing this from "Live" will prevent visitors from accessing the website.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+                    {uploadingLogo && (
+                      <div className="absolute inset-0 bg-[#07008A]/80 flex items-center justify-center z-10 rounded-xl flex-col gap-2">
+                        <Loader2 className="h-6 w-6 animate-spin text-white" />
+                        <p className="text-xs text-white/80 font-medium">Uploading...</p>
+                      </div>
+                    )}
+                    <input
+                      id="logo-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={!hasPermission("settings.write")}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+
+                        setUploadingLogo(true);
+                        try {
+                          const token = localStorage.getItem("admin_token");
+                          const reader = new FileReader();
+                          reader.onload = async () => {
+                            const filePayload = {
+                              name: file.name,
+                              type: file.type || "image/jpeg",
+                              data: String(reader.result ?? ""),
+                            };
+
+                            const uploadRes = await fetch(`/api/rooms/upload-image`, {
+                              method: "POST",
+                              headers: {
+                                "Content-Type": "application/json",
+                                Authorization: `Bearer ${token}`,
+                              },
+                              body: JSON.stringify({ files: [filePayload] }),
+                            });
+
+                            const uploadData = await uploadRes.json();
+                            if (!uploadRes.ok) throw new Error(uploadData.error || "Failed to upload logo.");
+
+                            const newLogoUrl = uploadData.urls[0];
+                            handleUpdate("hotel_logo", newLogoUrl);
+                            toast.success("Logo uploaded temporarily. Click Save Changes to apply.");
+                            
+                            setUploadingLogo(false);
+                          };
+                          reader.onerror = () => {
+                            toast.error("Failed to read file");
+                            setUploadingLogo(false);
+                          };
+                          reader.readAsDataURL(file);
+                        } catch (err: any) {
+                          toast.error(err.message || "An error occurred");
+                          setUploadingLogo(false);
+                        }
+                      }}
+                    />
+                    <img src={settings.hotel_logo || "/logo.png"} alt="Hotel Logo" className="h-20 w-auto object-contain mb-4" />
+                    <p className="text-[10px] text-white/60 text-center uppercase tracking-widest font-bold group-hover:text-white transition-colors">
+                      {hasPermission("settings.write") ? "Click to Upload Logo" : "Logo Preview"}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs text-white/80 leading-relaxed italic">
+                      The logo and property details are used across all receipts, invoices, and booking confirmations.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-sm bg-slate-50 border border-slate-200">
+                <CardHeader className="border-b bg-white">
+                  <CardTitle className="text-base font-bold flex items-center gap-2">
+                    <ShieldAlert className="h-4 w-4 text-amber-600" />
+                    Site Status
+                  </CardTitle>
+                  <CardDescription>Control public access to the website</CardDescription>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="space-y-3">
+                    <Label htmlFor="site_status">Current Status</Label>
+                    <Select 
+                      value={settings.site_status || "live"} 
+                      onValueChange={(value) => handleUpdate("site_status", value)}
+                    >
+                      <SelectTrigger id="site_status" className="w-full bg-white">
+                        <SelectValue placeholder="Select site status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="live">Live (Publicly Accessible)</SelectItem>
+                        <SelectItem value="development">Under Development</SelectItem>
+                        <SelectItem value="maintenance">Under Maintenance</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Changing this from "Live" will prevent visitors from accessing the website.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </TabsContent>
 
@@ -429,7 +437,7 @@ export default function AdminSettingsPage() {
                 <CardTitle className="text-base font-bold">Stay Preferences</CardTitle>
                 <CardDescription>Configure check-in times and guest-facing policies</CardDescription>
               </CardHeader>
-              <CardContent className="p-6 space-y-6">
+              <CardContent className="p-4 sm:p-6 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="check_in_time">Default Check-in Time</Label>
@@ -452,7 +460,7 @@ export default function AdminSettingsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="late_checkout_grace_period">Late Check-out Grace Period (Minutes)</Label>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                     <Input 
                       id="late_checkout_grace_period" 
                       type="number"
@@ -481,7 +489,7 @@ export default function AdminSettingsPage() {
                 <CardTitle className="text-base font-bold">Shift Schedule</CardTitle>
                 <CardDescription>Set the exact time window for each shift. These values drive active-shift detection and ledger close timing on the Shifts page.</CardDescription>
               </CardHeader>
-              <CardContent className="p-6 space-y-4">
+              <CardContent className="p-4 sm:p-6 space-y-4">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-4 border-b border-slate-100 mb-2">
                   <div className="space-y-1">
                     <p className="text-sm font-semibold text-slate-900">Automatic Shift Ledger Closing</p>
@@ -508,13 +516,13 @@ export default function AdminSettingsPage() {
                             </div>
                             <p className="text-xs text-muted-foreground">Use 24-hour time. Overnight shifts are supported automatically.</p>
                           </div>
-                          <div className="flex items-center gap-3 rounded-full border border-slate-200 bg-slate-50 px-3 py-2">
-                            <span className="text-xs font-medium text-slate-600">Active</span>
-                            <Switch
-                              checked={shift.is_active}
-                              onCheckedChange={(checked) => handleShiftUpdate(shift.id, "is_active", checked)}
-                            />
-                          </div>
+                          <div className="flex items-center justify-between w-full md:w-auto gap-3 rounded-full border border-slate-200 bg-slate-50 px-3 py-2">
+                             <span className="text-xs font-medium text-slate-600">Active</span>
+                             <Switch
+                               checked={shift.is_active}
+                               onCheckedChange={(checked) => handleShiftUpdate(shift.id, "is_active", checked)}
+                             />
+                           </div>
                         </div>
                         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                           <div className="space-y-2">
@@ -551,7 +559,7 @@ export default function AdminSettingsPage() {
               <CardTitle className="text-base font-bold">Accounting & Billing</CardTitle>
               <CardDescription>Tax rates and payment preferences</CardDescription>
             </CardHeader>
-            <CardContent className="p-6 space-y-6">
+            <CardContent className="p-4 sm:p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="currency">Base Currency</Label>
@@ -621,7 +629,7 @@ export default function AdminSettingsPage() {
               <CardTitle className="text-base font-bold">Extras Pricing</CardTitle>
               <CardDescription>Configure standard pricing for predefined booking extras items</CardDescription>
             </CardHeader>
-            <CardContent className="p-6 space-y-6">
+            <CardContent className="p-4 sm:p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="extra_bed_price">Extra Bed Price (₱)</Label>
@@ -659,16 +667,23 @@ export default function AdminSettingsPage() {
                     onChange={e => handleUpdate("extra_blanket_price", e.target.value)} 
                   />
                 </div>
-                <div className="space-y-2  md:col-span-2">
-                  <Label htmlFor="extra_towel_price">Extra Towel Price (₱)</Label>
-                  <div className="max-w-[calc(50%-12px)]">
-                    <Input 
-                      id="extra_towel_price" 
-                      type="number"
-                      value={settings.extra_towel_price || "0"} 
-                      onChange={e => handleUpdate("extra_towel_price", e.target.value)} 
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="extra_towel_price">Extra Towel - Bath Price (₱)</Label>
+                  <Input 
+                    id="extra_towel_price" 
+                    type="number"
+                    value={settings.extra_towel_price || "0"} 
+                    onChange={e => handleUpdate("extra_towel_price", e.target.value)} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="extra_towel_hand_price">Extra Towel - Hand Price (₱)</Label>
+                  <Input 
+                    id="extra_towel_hand_price" 
+                    type="number"
+                    value={settings.extra_towel_hand_price || "0"} 
+                    onChange={e => handleUpdate("extra_towel_hand_price", e.target.value)} 
+                  />
                 </div>
               </div>
             </CardContent>
@@ -682,7 +697,7 @@ export default function AdminSettingsPage() {
               <CardTitle className="text-base font-bold">Change Password</CardTitle>
               <CardDescription>Update your own admin password</CardDescription>
             </CardHeader>
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <form className="space-y-4" onSubmit={handleChangePassword}>
                 <div className="space-y-2">
                   <Label htmlFor="current-password">Current password</Label>

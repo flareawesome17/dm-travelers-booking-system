@@ -1,7 +1,15 @@
+import { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import AdminDashboardShell from "@/components/layout/AdminDashboardShell";
 import { ADMIN_AUTH_COOKIE, verifyAdminTokenValue } from "@/lib/auth";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
 
 export default function AdminDashboardLayout({
   children,

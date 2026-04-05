@@ -102,7 +102,8 @@ export async function POST(req: NextRequest) {
       .eq("status", "Success");
 
     const totalPaid = (allPayments || []).reduce((sum, p) => sum + Number(p.amount), 0);
-    const newBalanceDue = Math.max(0, grandTotal - totalPaid);
+    const rawBalanceDue = Math.max(0, grandTotal - totalPaid);
+    const newBalanceDue = Math.round(rawBalanceDue * 100) / 100;
 
     // 4. Determine if status should auto-update
     let newStatus = booking.status;
@@ -116,7 +117,7 @@ export async function POST(req: NextRequest) {
       .update({
         deposit_paid: newDepositPaid,
         balance_due: newBalanceDue,
-        status: newStatus,
+        status: (newBalanceDue < 0.01 && booking.status === "Pending Payment") ? "Confirmed" : booking.status,
         updated_at: new Date().toISOString(),
       })
       .eq("id", booking_id);

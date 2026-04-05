@@ -98,36 +98,36 @@ export function RecordPaymentModal({ booking, onSuccess, onClose }: Props) {
         <div className="space-y-2.5">
           <div className="flex justify-between text-sm text-slate-600">
             <span>Room Total:</span>
-            <span>PHP {breakdown.roomTotal.toFixed(0)}</span>
+            <span>PHP {breakdown.roomTotal.toFixed(2)}</span>
           </div>
           {breakdown.restaurantTotal > 0 && (
             <div className="flex justify-between text-sm text-amber-600 font-medium">
               <span>Restaurant Orders:</span>
-              <span>+ PHP {breakdown.restaurantTotal.toFixed(0)}</span>
+              <span>+ PHP {breakdown.restaurantTotal.toFixed(2)}</span>
             </div>
           )}
           {breakdown.extrasTotal > 0 && (
             <div className="flex justify-between text-sm text-blue-600 font-medium">
               <span>Extras:</span>
-              <span>+ PHP {breakdown.extrasTotal.toFixed(0)}</span>
+              <span>+ PHP {breakdown.extrasTotal.toFixed(2)}</span>
             </div>
           )}
           {breakdown.extensionsTotal > 0 && (
             <div className="flex justify-between text-sm text-violet-600 font-medium">
               <span>Extensions:</span>
-              <span>+ PHP {breakdown.extensionsTotal.toFixed(0)}</span>
+              <span>+ PHP {breakdown.extensionsTotal.toFixed(2)}</span>
             </div>
           )}
           {breakdown.earlyCheckInFee > 0 && (
             <div className="flex justify-between text-sm text-slate-600 font-medium">
               <span>Early Check-in Fee:</span>
-              <span>+ PHP {breakdown.earlyCheckInFee.toFixed(0)}</span>
+              <span>+ PHP {breakdown.earlyCheckInFee.toFixed(2)}</span>
             </div>
           )}
           {breakdown.lateCheckOutFee > 0 && (
             <div className="flex justify-between text-sm text-slate-600 font-medium">
               <span>Late Check-out Fee:</span>
-              <span>+ PHP {breakdown.lateCheckOutFee.toFixed(0)}</span>
+              <span>+ PHP {breakdown.lateCheckOutFee.toFixed(2)}</span>
             </div>
           )}
         </div>
@@ -137,17 +137,17 @@ export function RecordPaymentModal({ booking, onSuccess, onClose }: Props) {
         <div className="space-y-2.5">
           <div className="flex justify-between text-sm font-semibold text-slate-800">
             <span>Grand Total:</span>
-            <span>PHP {breakdown.grandTotal.toFixed(0)}</span>
+            <span>PHP {breakdown.grandTotal.toFixed(2)}</span>
           </div>
           {totalPaidSoFar > 0 && (
             <div className="flex justify-between text-sm text-emerald-600 font-medium pt-1">
               <span>Total Paid So Far:</span>
-              <span>- PHP {totalPaidSoFar.toFixed(0)}</span>
+              <span>- PHP {totalPaidSoFar.toFixed(2)}</span>
             </div>
           )}
           <div className="flex justify-between items-center text-base font-bold text-[#07008A] bg-blue-50/50 -mx-5 -mb-5 p-5 border-t border-blue-100 rounded-b-xl mt-4">
             <span>Current Balance Due:</span>
-            <span className="text-lg">PHP {Number(booking.balance_due || 0).toFixed(0)}</span>
+            <span className="text-lg">PHP {Number(booking.balance_due || 0).toFixed(2)}</span>
           </div>
         </div>
       </div>
@@ -166,11 +166,11 @@ export function RecordPaymentModal({ booking, onSuccess, onClose }: Props) {
               </button>
             )}
           </div>
-          <Input
-            id="pay-amount"
-            type="number"
-            min="1"
-            step="0.01"
+            <Input
+              id="pay-amount"
+              type="number"
+              min="0"
+              step="0.01"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder={`e.g. ${Number(booking.balance_due || 0).toFixed(2)}`}
@@ -228,7 +228,7 @@ export function RecordPaymentModal({ booking, onSuccess, onClose }: Props) {
             Cancel
           </Button>
           <Button type="submit" className="bg-[#07008A] hover:bg-[#05006a]" disabled={loading || !amount}>
-            {loading ? "Recording..." : `Record PHP ${amount ? Number(amount).toFixed(0) : "0"}`}
+            {loading ? "Recording..." : `Record PHP ${amount ? Number(amount).toFixed(2) : "0.00"}`}
           </Button>
         </div>
       </form>

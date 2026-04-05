@@ -138,15 +138,15 @@ export function CollectPaymentModal({ open, onClose, receivable, token, onSucces
                   <div className="mt-5 grid grid-cols-3 gap-3">
                     <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
                       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Outstanding</p>
-                      <p className="mt-2 text-lg font-bold text-slate-900">PHP {outstanding.toFixed(0)}</p>
+                      <p className="mt-2 text-lg font-bold text-slate-900">PHP {outstanding.toFixed(2)}</p>
                     </div>
                     <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3">
                       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-600">Collected</p>
-                      <p className="mt-2 text-lg font-bold text-emerald-700">PHP {collected.toFixed(0)}</p>
+                      <p className="mt-2 text-lg font-bold text-emerald-700">PHP {collected.toFixed(2)}</p>
                     </div>
                     <div className="rounded-2xl border border-[#07008A]/10 bg-[#07008A]/[0.05] p-3">
                       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#07008A]/65">After payment</p>
-                      <p className="mt-2 text-lg font-bold text-[#07008A]">PHP {Math.max(0, outstanding - paymentAmount).toFixed(0)}</p>
+                      <p className="mt-2 text-lg font-bold text-[#07008A]">PHP {Math.max(0, outstanding - paymentAmount).toFixed(2)}</p>
                     </div>
                   </div>
 
@@ -161,12 +161,11 @@ export function CollectPaymentModal({ open, onClose, receivable, token, onSucces
                       <Input
                         id="collect-amount"
                         type="number"
-                        min={1}
-                        max={outstanding}
+                        min="0"
                         step="0.01"
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
-                        placeholder={`Up to PHP ${outstanding.toFixed(0)}`}
+                        placeholder={`Up to PHP ${outstanding.toFixed(2)}`}
                         className="h-14 rounded-2xl border-slate-200 bg-white pr-28 text-lg font-semibold shadow-sm focus-visible:ring-[#07008A]/30"
                       />
                       <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
@@ -183,7 +182,7 @@ export function CollectPaymentModal({ open, onClose, receivable, token, onSucces
                           className="h-8 rounded-full border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:border-[#07008A]/30 hover:bg-[#07008A]/5 hover:text-[#07008A]"
                           onClick={() => setAmount(String(value))}
                         >
-                          PHP {value.toFixed(0)}
+                          PHP {value.toFixed(2)}
                         </Button>
                       ))}
                     </div>
@@ -274,7 +273,7 @@ export function CollectPaymentModal({ open, onClose, receivable, token, onSucces
                     disabled={submitting || paymentAmount <= 0}
                     className="rounded-full bg-emerald-600 px-5 text-white hover:bg-emerald-700"
                   >
-                    {submitting ? "Recording..." : `Collect PHP ${paymentAmount.toFixed(0)}`}
+                    {submitting ? "Recording..." : `Collect PHP ${paymentAmount.toFixed(2)}`}
                   </Button>
                 </div>
               </DialogFooter>

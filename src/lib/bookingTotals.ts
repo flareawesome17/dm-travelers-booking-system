@@ -33,12 +33,15 @@ export function getBookingChargeBreakdown(booking: BookingFinancialFields) {
     lateCheckOutFee,
     discountAmount,
     grandTotal:
-      roomTotal +
-      restaurantTotal +
-      extrasTotal +
-      extensionsTotal +
-      earlyCheckInFee +
-      lateCheckOutFee,
+      Math.round(
+        (roomTotal +
+          restaurantTotal +
+          extrasTotal +
+          extensionsTotal +
+          earlyCheckInFee +
+          lateCheckOutFee) *
+          100,
+      ) / 100,
   };
 }
 

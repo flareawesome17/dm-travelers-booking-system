@@ -20,13 +20,14 @@ import {
   Percent
 } from "lucide-react";
 
-const EXTRA_TYPES = ["Extra Bed", "Extra Pillow", "Extra Blanket", "Extra Towel", "Extra Person"] as const;
+const EXTRA_TYPES = ["Extra Bed", "Extra Pillow", "Extra Blanket", "Extra Towel - Bath", "Extra Towel - Hand", "Extra Person"] as const;
 type ExtraType = (typeof EXTRA_TYPES)[number];
 const TYPE_TO_KEY: Record<ExtraType, string> = {
   "Extra Bed": "extra_bed_price",
   "Extra Pillow": "extra_pillow_price",
   "Extra Blanket": "extra_blanket_price",
-  "Extra Towel": "extra_towel_price",
+  "Extra Towel - Bath": "extra_towel_price",
+  "Extra Towel - Hand": "extra_towel_hand_price",
   "Extra Person": "extra_person_price",
 };
 
@@ -94,7 +95,8 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
     "Extra Bed": { checked: false, quantity: 1 },
     "Extra Pillow": { checked: false, quantity: 1 },
     "Extra Blanket": { checked: false, quantity: 1 },
-    "Extra Towel": { checked: false, quantity: 1 },
+    "Extra Towel - Bath": { checked: false, quantity: 1 },
+    "Extra Towel - Hand": { checked: false, quantity: 1 },
     "Extra Person": { checked: false, quantity: 1 },
   });
 
@@ -301,8 +303,8 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName.trim() || !email.trim()) {
-      toast.error("Guest name and email are required.");
+    if (!fullName.trim()) {
+      toast.error("Guest name is required.");
       return;
     }
     if (!roomId) {
@@ -358,7 +360,7 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
         body: JSON.stringify({
           guest: {
             full_name: fullName.trim(),
-            email: email.trim(),
+            email: email.trim() || null,
             phone_number: phone.trim() || null,
           },
           room_id: roomId,
@@ -423,14 +425,14 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="email">Email *</Label>
+            <Label htmlFor="email">Email</Label>
             <Input
               id="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="guest@example.com"
-              required
+              placeholder="email@example.com"
+              className="bg-slate-50 border-slate-200 focus:bg-white focus:ring-[#07008A] transition-all"
             />
           </div>
         </div>
@@ -517,7 +519,7 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
                   {is24h ? `${Math.max(1, nights || 0)} night(s)` : `${ratePlan} block`}
                 </div>
                 <div>
-                  Total <span className="font-semibold text-[#07008A]">₱{Number(totalAmount).toFixed(0)}</span>
+                  Total <span className="font-semibold text-[#07008A]">₱{Number(totalAmount).toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -559,7 +561,7 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
                           </div>
                         </div>
                       </div>
-                      <div className="text-sm font-semibold text-[#07008A]">₱{r.price.toFixed(0)}</div>
+                      <div className="text-sm font-semibold text-[#07008A]">₱{r.price.toFixed(2)}</div>
                     </div>
                   </button>
                 );
@@ -686,7 +688,7 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
                 <div className="font-medium">Per guest price</div>
                 <div>
                   {perGuestPrice != null && perGuestPrice > 0
-                    ? `₱${perGuestPrice.toFixed(0)} per guest`
+                    ? `₱${perGuestPrice.toFixed(2)} per guest`
                     : "This room has no per guest rate configured."}
                 </div>
               </div>
@@ -823,7 +825,7 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
                     />
                     <div className="space-y-0.5">
                       <div className="text-sm font-medium text-slate-700 leading-none">{type}</div>
-                      <div className="text-[10px] text-slate-400">₱{price.toFixed(0)}</div>
+                      <div className="text-[10px] text-slate-400">₱{price.toFixed(2)}</div>
                     </div>
                   </label>
                   {isChecked && (
@@ -895,8 +897,8 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
             {usePerGuestRate && perGuestPrice != null && perGuestPrice > 0 ? (
               <>
                 <p>
-                  Per guest: {totalGuests} guest(s) × ₱{perGuestPrice.toFixed(0)} = ₱
-                  {(perGuestPrice * totalGuests).toFixed(0)}
+                  Per guest: {totalGuests} guest(s) × ₱{perGuestPrice.toFixed(2)} = ₱
+                  {(perGuestPrice * totalGuests).toFixed(2)}
                 </p>
                 <p className="text-xs text-slate-500">
                   Using the room&apos;s per guest rate instead of the standard {ratePlan} room rate.
@@ -905,12 +907,12 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
             ) : (
               <p>
                 {ratePlan === "24h" ? `${nights} night(s)` : `${blocks} block(s)`} × ₱
-                {selectedRate?.price.toFixed(0) ?? "0"} = ₱{baseAmount.toFixed(0)}
+                {selectedRate?.price.toFixed(0) ?? "0"} = ₱{baseAmount.toFixed(2)}
               </p>
             )}
             {extrasTotal > 0 && (
               <p className="text-slate-500">
-                Booking extras = ₱{extrasTotal.toFixed(0)}
+                Booking extras = ₱{extrasTotal.toFixed(2)}
               </p>
             )}
           </div>
@@ -984,7 +986,7 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
             )}
             <div className="flex justify-between items-center bg-[#07008A]/[0.04] border border-[#07008A]/10 rounded-lg px-4 py-2.5">
               <span className="text-sm font-medium text-slate-700">Balance due</span>
-              <span className="text-base font-bold text-[#07008A]">₱{balanceDue.toFixed(0)}</span>
+              <span className="text-base font-bold text-[#07008A]">₱{balanceDue.toFixed(2)}</span>
             </div>
           </div>
         </div>

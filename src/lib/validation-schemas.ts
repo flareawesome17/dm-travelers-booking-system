@@ -65,7 +65,7 @@ export const createBookingSchema = z.object({
   guest_id: z.string().uuid().optional(),
   guest: z.object({
     full_name: safeString,
-    email: email,
+    email: z.string().email("Invalid email address").optional().nullable().or(z.literal("").transform(() => null)),
     phone_number: z.string().trim().max(30).optional().nullable(),
   }).optional(),
   room_id: z.string().uuid().optional(),
@@ -231,7 +231,7 @@ export const createExtensionSchema = z.object({
 
 export const createBookingExtrasSchema = z.object({
   extras: z.array(z.object({
-    extra_type: z.enum(["Extra Bed", "Extra Pillow", "Extra Blanket", "Extra Towel", "Extra Person"]),
+    extra_type: z.enum(["Extra Bed", "Extra Pillow", "Extra Blanket", "Extra Towel - Bath", "Extra Towel - Hand", "Extra Person"]),
     quantity: z.number().int().min(1).max(20),
     unit_price: nonNegativeNumber,
   })).min(1, "At least one extra item required"),

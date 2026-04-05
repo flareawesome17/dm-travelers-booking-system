@@ -8,7 +8,7 @@ import { toast } from "@/components/ui/sonner";
 import { getErrorMessage } from "@/lib/utils";
 import { Plus, Trash2, Package } from "lucide-react";
 
-const EXTRA_TYPES = ["Extra Bed", "Extra Pillow", "Extra Blanket", "Extra Towel", "Extra Person"] as const;
+const EXTRA_TYPES = ["Extra Bed", "Extra Pillow", "Extra Blanket", "Extra Towel - Bath", "Extra Towel - Hand", "Extra Person"] as const;
 type ExtraType = (typeof EXTRA_TYPES)[number];
 
 type ExtraRow = {
@@ -31,7 +31,8 @@ const TYPE_TO_KEY: Record<ExtraType, string> = {
   "Extra Bed": "extra_bed_price",
   "Extra Pillow": "extra_pillow_price",
   "Extra Blanket": "extra_blanket_price",
-  "Extra Towel": "extra_towel_price",
+  "Extra Towel - Bath": "extra_towel_price",
+  "Extra Towel - Hand": "extra_towel_hand_price",
   "Extra Person": "extra_person_price",
 };
 
@@ -189,8 +190,8 @@ export function BookingExtrasSection({ bookingId, token, onTotalChange, onSucces
                 <tr key={e.id || i} className="border-t border-slate-100">
                   <td className="py-2 px-3 font-medium text-slate-700">{e.extra_type}</td>
                   <td className="py-2 px-3 text-center text-slate-600">{e.quantity}</td>
-                  <td className="py-2 px-3 text-right text-slate-600">₱{Number(e.unit_price).toFixed(0)}</td>
-                  <td className="py-2 px-3 text-right font-semibold text-[#07008A]">₱{Number(e.total_price).toFixed(0)}</td>
+                  <td className="py-2 px-3 text-right text-slate-600">₱{Number(e.unit_price).toFixed(2)}</td>
+                  <td className="py-2 px-3 text-right font-semibold text-[#07008A]">₱{Number(e.total_price).toFixed(2)}</td>
                   <td className="py-2 px-1">
                     <button type="button" onClick={() => deleteExtra(e)} className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500 transition-colors">
                       <Trash2 className="h-3 w-3" />
@@ -227,7 +228,7 @@ export function BookingExtrasSection({ bookingId, token, onTotalChange, onSucces
             <Input type="number" min={0} value={pe.unit_price} onChange={(e) => updatePending(idx, "unit_price", e.target.value)} className="h-8 text-xs" />
           </div>
           <div className="col-span-2 text-right text-xs font-semibold text-[#07008A] pb-1">
-            ₱{(pe.quantity * pe.unit_price).toFixed(0)}
+            ₱{(pe.quantity * pe.unit_price).toFixed(2)}
           </div>
           <div className="col-span-1 pb-1">
             <button type="button" onClick={() => removePending(idx)} className="p-1 hover:bg-red-50 rounded text-red-400 hover:text-red-600">
@@ -241,7 +242,7 @@ export function BookingExtrasSection({ bookingId, token, onTotalChange, onSucces
       {(extras.length > 0 || pendingExtras.length > 0) && (
         <div className="flex items-center justify-between rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
           <span className="text-xs font-semibold text-slate-600">
-            Extras Total: <span className="text-[#07008A]">₱{(extrasTotal + pendingTotal).toFixed(0)}</span>
+            Extras Total: <span className="text-[#07008A]">₱{(extrasTotal + pendingTotal).toFixed(2)}</span>
           </span>
           {pendingExtras.length > 0 && (
             <Button type="button" size="sm" onClick={savePending} disabled={saving} className="h-7 text-xs bg-[#07008A] hover:bg-[#05006a] text-white">
