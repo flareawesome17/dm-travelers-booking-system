@@ -49,7 +49,17 @@ function getStatusVariant(status?: string) {
 
 type BookingRow = {
   id?: string; reference_number?: string; status?: string; room_id?: string;
-  check_in_date?: string; check_out_date?: string; actual_check_in_at?: string;
+  check_in_date?: string; check_out_date?: string; restaurant_orders?: { 
+    id: string; 
+    total_amount: number; 
+    status: string;
+    restaurant_order_items?: {
+      name: string;
+      quantity: number;
+      unit_price: number;
+      line_total: number;
+    }[];
+  }[]; actual_check_in_at?: string;
   total_amount?: number; deposit_paid?: number; balance_due?: number; restaurant_charges_total?: number;
   extras_total?: number; extensions_total?: number;
   rate_plan_kind?: string; special_requests?: string | null;

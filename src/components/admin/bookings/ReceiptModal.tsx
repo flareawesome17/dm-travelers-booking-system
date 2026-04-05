@@ -23,7 +23,17 @@ type BookingRow = {
   is_lgu_booking?: boolean;
   guests?: { full_name?: string; email?: string; phone_number?: string };
   rooms?: { room_number?: string; room_type?: string } | null;
-  restaurant_orders?: { id: string; total_amount: number; status: string }[];
+  restaurant_orders?: { 
+    id: string; 
+    total_amount: number; 
+    status: string;
+    restaurant_order_items?: {
+      name: string;
+      quantity: number;
+      unit_price: number;
+      line_total: number;
+    }[];
+  }[];
 };
 
 type ReceiptModalProps = {
@@ -207,16 +217,41 @@ export function ReceiptModal({ booking, onClose }: ReceiptModalProps) {
                     <td className="py-4 text-right font-medium text-slate-900">PHP {lateCheckOutFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   </tr>
                 )}
-                {restaurantTotal > 0 && (
-                  <tr>
-                    <td className="py-4 pr-4">
-                      <div className="font-semibold text-slate-800">Restaurant Orders</div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">Charged to room from hotel restaurant</div>
-                    </td>
-                    <td className="py-4 text-center">--</td>
-                    <td className="py-4 text-right font-medium text-slate-900">PHP {restaurantTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  </tr>
-                )}
+                {(() => {
+                  const ordersToRoom = booking.restaurant_orders?.filter(o => o.status === "Charged to Room") || [];
+                  if (ordersToRoom.length === 0) return null;
+
+                  const allItems = ordersToRoom.flatMap(o => o.restaurant_order_items || []);
+                  
+                  if (allItems.length > 0) {
+                    return (
+                      <>
+                        {allItems.map((item, idx) => (
+                          <tr key={idx}>
+                            <td className="py-4 pr-4">
+                              <div className="font-semibold text-slate-800">{item.name}</div>
+                              <div className="text-[11px] text-slate-500 mt-0.5">Restaurant Charge</div>
+                            </td>
+                            <td className="py-4 text-center">{item.quantity}</td>
+                            <td className="py-4 text-right font-medium text-slate-900">PHP {Number(item.line_total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          </tr>
+                        ))}
+                      </>
+                    );
+                  }
+
+                  // Fallback to summary if no items data
+                  return (
+                    <tr>
+                      <td className="py-4 pr-4">
+                        <div className="font-semibold text-slate-800">Restaurant Orders</div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">Charged to room from hotel restaurant</div>
+                      </td>
+                      <td className="py-4 text-center">--</td>
+                      <td className="py-4 text-right font-medium text-slate-900">PHP {restaurantTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    </tr>
+                  );
+                })()}
               </tbody>
             </table>
           </div>

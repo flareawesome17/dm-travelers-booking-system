@@ -19,6 +19,17 @@ type BookingType = {
   late_checkout_fee_applied?: string | number | null;
   status?: string;
   guests?: { full_name?: string | null };
+  restaurant_orders?: { 
+    id: string; 
+    total_amount: number; 
+    status: string;
+    restaurant_order_items?: {
+      name: string;
+      quantity: number;
+      unit_price: number;
+      line_total: number;
+    }[];
+  }[];
 };
 
 type Props = {
@@ -101,9 +112,23 @@ export function RecordPaymentModal({ booking, onSuccess, onClose }: Props) {
             <span>PHP {breakdown.roomTotal.toFixed(2)}</span>
           </div>
           {breakdown.restaurantTotal > 0 && (
-            <div className="flex justify-between text-sm text-amber-600 font-medium">
-              <span>Restaurant Orders:</span>
-              <span>+ PHP {breakdown.restaurantTotal.toFixed(2)}</span>
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-sm text-amber-600 font-bold">
+                <span>Restaurant Orders Total:</span>
+                <span>+ PHP {breakdown.restaurantTotal.toFixed(2)}</span>
+              </div>
+              <div className="bg-amber-50/50 rounded-lg p-3 space-y-1.5 border border-amber-100/50">
+                {(booking.restaurant_orders?.filter(o => o.status === "Charged to Room") || []).flatMap(o => o.restaurant_order_items || []).map((item, idx) => (
+                  <div key={idx} className="flex justify-between text-[11px] text-amber-700/80 leading-snug">
+                    <span className="shrink-0 mr-2">{item.quantity}x</span>
+                    <span className="flex-1 truncate">{item.name}</span>
+                    <span className="shrink-0 ml-3">₱{Number(item.line_total).toFixed(2)}</span>
+                  </div>
+                ))}
+                {(!booking.restaurant_orders || booking.restaurant_orders.filter(o => o.status === "Charged to Room").flatMap(o => o.restaurant_order_items || []).length === 0) && (
+                  <p className="text-[10px] text-amber-600/60 italic">Breakdown unavailable</p>
+                )}
+              </div>
             </div>
           )}
           {breakdown.extrasTotal > 0 && (

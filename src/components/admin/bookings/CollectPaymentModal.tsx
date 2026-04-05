@@ -81,7 +81,7 @@ export function CollectPaymentModal({ open, onClose, receivable, token, onSucces
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-2xl overflow-hidden border-0 bg-transparent p-0 shadow-none">
+      <DialogContent className="sm:max-w-2xl max-h-[95vh] overflow-y-auto border-0 bg-transparent p-0 shadow-none scrollbar-hide">
         <div className="rounded-[28px] border border-[#07008A]/10 bg-[linear-gradient(145deg,rgba(255,255,255,0.98),rgba(248,248,255,0.94))] shadow-[0_30px_90px_rgba(7,0,138,0.12)] backdrop-blur">
           <div className="relative overflow-hidden rounded-[28px]">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(7,0,138,0.12),transparent_38%),radial-gradient(circle_at_bottom_left,rgba(245,158,11,0.12),transparent_30%)]" />
