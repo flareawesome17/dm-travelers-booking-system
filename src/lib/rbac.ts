@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { verifyAdminToken } from "@/lib/auth";
+import { apiError, dbError } from "@/lib/api-security";
 
 async function loadPermissions(args: { roleId: number; adminId: string }) {
   const supabase = getSupabaseAdmin();
@@ -40,6 +41,24 @@ export async function requirePermission(req: NextRequest, permission: string) {
     return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) } as const;
   }
 
+  // Check if admin is still active
+  const supabase = getSupabaseAdmin();
+  const { data: admin, error: adminErr } = await supabase
+    .from("admin_users")
+    .select("is_active")
+    .eq("id", adminId)
+    .single();
+
+  if (adminErr || !admin) {
+    return { error: apiError("unauthorized", "Authentication required", 401) } as const;
+  }
+
+  if (!admin.is_active) {
+    return { 
+      error: apiError("forbidden", "Sorry, your account is disabled, please contact your administrator.", 403) 
+    } as const;
+  }
+
   if (roleId === 1) return { payload: auth.payload } as const;
 
   try {
@@ -61,6 +80,24 @@ export async function getCurrentAdminPermissions(req: NextRequest) {
   const adminId = typeof auth.payload.sub === "string" ? auth.payload.sub : null;
   if (!adminId || !Number.isFinite(roleId)) {
     return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) } as const;
+  }
+
+  // Check if admin is still active
+  const supabase = getSupabaseAdmin();
+  const { data: admin, error: adminErr } = await supabase
+    .from("admin_users")
+    .select("is_active")
+    .eq("id", adminId)
+    .single();
+
+  if (adminErr || !admin) {
+    return { error: apiError("unauthorized", "Authentication required", 401) } as const;
+  }
+
+  if (!admin.is_active) {
+    return { 
+      error: apiError("forbidden", "Sorry, your account is disabled, please contact your administrator.", 403) 
+    } as const;
   }
 
   if (roleId === 1) {

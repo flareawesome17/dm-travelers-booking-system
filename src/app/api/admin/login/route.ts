@@ -49,11 +49,14 @@ export async function POST(req: NextRequest) {
       .from("admin_users")
       .select("*")
       .eq("email", email)
-      .eq("is_active", true)
       .single();
 
     if (error || !user) {
       return apiError("invalid_credentials", "Invalid email or password", 401);
+    }
+
+    if (!user.is_active) {
+      return apiError("forbidden", "Sorry, your account is disabled, please contact your administrator.", 403);
     }
 
     const passwordMatch = await bcrypt.compare(password, user.password_hash);
