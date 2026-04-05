@@ -32,8 +32,9 @@ export function middleware(request: NextRequest) {
   // Public Domain Logic
   if (hostname === publicDomain || hostname.endsWith(`.${publicDomain}`)) {
     if (url.pathname.startsWith("/admin")) {
-      // Force rewrite to 404 OR redirect. User previously wanted redirect to admin.
-      return NextResponse.redirect(`https://${adminDomain}${url.pathname}`);
+      // Force rewrite to 404 so the admin panel is completely invisible and inaccessible directly on the public domain
+      url.pathname = "/404";
+      return NextResponse.rewrite(url);
     }
   }
 
