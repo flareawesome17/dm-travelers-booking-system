@@ -34,6 +34,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { toast } from "@/components/ui/sonner";
 
 const operationsItems = [
   { label: "Dashboard", path: "/admin", icon: LayoutDashboard },
@@ -84,12 +85,14 @@ interface NavItemProps {
   isActive: boolean;
   isCollapsed: boolean;
   badge?: number;
+  badgeVariant?: "red" | "amber";
 }
 
-function NavItem({ label, path, icon: Icon, isActive, isCollapsed, badge }: NavItemProps) {
+function NavItem({ label, path, icon: Icon, isActive, isCollapsed, badge, badgeVariant = "red" }: NavItemProps) {
   const badgeEl = badge && badge > 0 ? (
     <span className={cn(
-      "flex items-center justify-center rounded-full bg-red-500 text-white font-bold leading-none animate-in fade-in zoom-in-75 duration-200",
+      "flex items-center justify-center rounded-full text-white font-bold leading-none animate-in fade-in zoom-in-75 duration-200",
+      badgeVariant === "red" ? "bg-red-500" : "bg-amber-500",
       isCollapsed
         ? "absolute -top-1 -right-1 h-[18px] min-w-[18px] px-1 text-[10px]"
         : "h-5 min-w-5 px-1.5 text-[11px]"
@@ -135,7 +138,10 @@ function NavItem({ label, path, icon: Icon, isActive, isCollapsed, badge }: NavI
           <span className="flex items-center gap-2">
             {label}
             {badge && badge > 0 ? (
-              <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+              <span className={cn(
+                "inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full text-white text-[10px] font-bold leading-none",
+                badgeVariant === "red" ? "bg-red-500" : "bg-amber-500"
+              )}>
                 {badge > 99 ? "99+" : badge}
               </span>
             ) : null}
@@ -167,7 +173,10 @@ export default function AdminSidebar({
   const [token, setToken] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string>("/logo.png");
   const [newBookingCount, setNewBookingCount] = useState(0);
+  const [expiringCount, setExpiringCount] = useState(0);
   const bookingPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const expiringPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastExpiringIdsRef = useRef<Set<string>>(new Set());
 
   const LAST_SEEN_KEY = "admin_bookings_last_seen";
 
@@ -184,7 +193,6 @@ export default function AdminSidebar({
     }
   }, []);
 
-  // Poll for new public bookings every 30 seconds
   useEffect(() => {
     fetchNewBookingCount();
     bookingPollRef.current = setInterval(fetchNewBookingCount, 30_000);
@@ -192,6 +200,50 @@ export default function AdminSidebar({
       if (bookingPollRef.current) clearInterval(bookingPollRef.current);
     };
   }, [fetchNewBookingCount]);
+
+  const fetchExpiringBookings = useCallback(async () => {
+    try {
+      const tokenStr = localStorage.getItem("admin_token");
+      if (!tokenStr) return;
+
+      const res = await fetch("/api/bookings/expiring", {
+        headers: { Authorization: `Bearer ${tokenStr}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const currentCount = data.count || 0;
+        setExpiringCount(currentCount);
+
+        const currentIds = new Set<string>((data.bookings || []).map((b: any) => b.id));
+        
+        // Find new IDs that weren't in the last poll (to avoid duplicate toasts)
+        const newIds = [...currentIds].filter(id => !lastExpiringIdsRef.current.has(id));
+        
+        if (newIds.length > 0) {
+          const newBookings = data.bookings.filter((b: any) => newIds.includes(b.id));
+          newBookings.forEach((b: any) => {
+            toast.warning(`Checkout Reminder: Room ${b.room_number}`, {
+              description: `${b.guest_name} is due for checkout soon.`,
+              duration: 10000,
+            });
+          });
+        }
+        
+        lastExpiringIdsRef.current = currentIds;
+      }
+    } catch (err) {
+      console.error("[EXPIRING_POLL_ERROR]", err);
+    }
+  }, []);
+
+  // Poll for expiring bookings every 60 seconds
+  useEffect(() => {
+    fetchExpiringBookings();
+    expiringPollRef.current = setInterval(fetchExpiringBookings, 60_000);
+    return () => {
+      if (expiringPollRef.current) clearInterval(expiringPollRef.current);
+    };
+  }, [fetchExpiringBookings]);
 
   // When the admin navigates to the bookings page, mark as seen
   useEffect(() => {
@@ -341,7 +393,8 @@ export default function AdminSidebar({
                 icon={icon}
                 isActive={isItemActive(path)}
                 isCollapsed={isCollapsed && !isMobileOpen}
-                badge={path === "/admin/bookings" ? newBookingCount : undefined}
+                badge={path === "/admin/bookings" ? newBookingCount : path === "/admin" ? expiringCount : undefined}
+                badgeVariant={path === "/admin" ? "amber" : "red"}
               />
             ))}
           </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   CalendarCheck, Plus, Pencil, Trash2, LogIn, LogOut, XCircle, Search, ChevronLeft, ChevronRight, Banknote, MoreHorizontal, CalendarPlus, Package
@@ -88,6 +88,8 @@ export default function AdminBookingsPage() {
   const [page, setPage] = useState<number>(1);
   const pageSize = 10;
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
   const token = () => localStorage.getItem("admin_token") || "";
 
   const api = (path: string, options?: RequestInit) =>
@@ -115,6 +117,24 @@ export default function AdminBookingsPage() {
       .catch(() => setList([]))
       .finally(() => setLoading(false));
   }, [router]);
+ 
+  useEffect(() => {
+    if (highlightId && !loading) {
+      // Small delay to ensure the row is rendered and the list is stable
+      const timer = setTimeout(() => {
+        const el = document.getElementById(`booking-row-${highlightId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.classList.add("animate-highlight-amber");
+          // Remove class after animation finishes (4s)
+          setTimeout(() => {
+            el.classList.remove("animate-highlight-amber");
+          }, 4500);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightId, loading]);
 
   useEffect(() => {
     if (!checkInBooking) return;
@@ -302,7 +322,11 @@ export default function AdminBookingsPage() {
                     </tr>
                   ) : (
                     pageItems.map((b) => (
-                      <tr key={b.reference_number ?? b.id ?? Math.random()} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
+                      <tr 
+                        key={b.id || b.reference_number || Math.random()} 
+                        id={b.id ? `booking-row-${b.id}` : undefined}
+                        className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors"
+                      >
                       <td className="py-4 px-6 align-top">
                         <div className="flex flex-col">
                           <span className="font-semibold text-slate-800 text-sm">{b.guests?.full_name ?? "—"}</span>

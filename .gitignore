@@ -6,6 +6,8 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+.devserver.out.log
+.devserver.err.log
 
 # dependencies
 node_modules
@@ -55,3 +57,7 @@ missed.txt
 screnshots/
 audit.md
 test-results.json
+
+# Documentation
+dm_hotel_booking_and_management_system_*.md
+nextjs_fullstack_architecture.md
