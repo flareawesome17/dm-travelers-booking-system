@@ -3,10 +3,12 @@ import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
   const url = request.nextUrl;
-  const hostname = request.headers.get("host") || "";
+  let hostname = request.headers.get("host") || "";
+  hostname = hostname.split(":")[0]; // Strip port to ensure exact match
 
-  const adminDomain = process.env.ADMIN_SUBDOMAIN; // e.g. admindm.erniecodev.win
-  const publicDomain = process.env.NEXT_PUBLIC_APP_DOMAIN; // e.g. dm.erniecodev.win
+  // Fallback to hardcoded domains if env vars are missing in Edge runtime
+  const adminDomain = process.env.ADMIN_SUBDOMAIN || "admindm.erniecodev.win";
+  const publicDomain = process.env.NEXT_PUBLIC_APP_DOMAIN || "dm.erniecodev.win";
 
   // Ignore localhost and development hostnames so dev server is unaffected
   if (hostname.includes("localhost") || hostname.includes("127.0.0.1") || hostname.includes("ts.net")) {
@@ -14,26 +16,19 @@ export function middleware(request: NextRequest) {
   }
 
   // Admin Domain Logic
-  if (adminDomain && hostname === adminDomain) {
-    // If they explicitly type /admin in the URL (e.g. admindm.../admin/bookings),
-    // redirect them to the clean root-level URL to enforce strict separation.
-    if (url.pathname.startsWith("/admin")) {
-      const cleanPath = url.pathname.replace("/admin", "") || "/";
-      return NextResponse.redirect(new URL(cleanPath, request.url));
+  // Any hit on the root of the admin domain immediately redirects strictly to the /admin route.
+  if (hostname === adminDomain) {
+    if (url.pathname === "/") {
+      return NextResponse.redirect(new URL("/admin", request.url));
     }
-
-    // Rewrite all remaining traffic internally to the /admin folder
-    url.pathname = `/admin${url.pathname === "/" ? "" : url.pathname}`;
-    return NextResponse.rewrite(url);
+    return NextResponse.next();
   }
 
   // Public Domain Logic
-  if (publicDomain && hostname === publicDomain) {
-    // Strictly isolate the admin panel.
-    // If anyone tries to access /admin on the public site, act as if it doesn't exist.
+  // Any hit accessing /admin on the public domain gets physically redirected to the exact same path on the Admin Domain.
+  if (hostname === publicDomain) {
     if (url.pathname.startsWith("/admin")) {
-      url.pathname = "/404";
-      return NextResponse.rewrite(url);
+      return NextResponse.redirect(`https://${adminDomain}${url.pathname}`);
     }
   }
 
