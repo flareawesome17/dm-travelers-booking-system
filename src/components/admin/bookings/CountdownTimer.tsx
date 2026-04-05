@@ -22,7 +22,7 @@ export function CountdownTimer({ checkInDateStr, checkOutDateStr, actualCheckInA
     if (!ratePlanKind || ratePlanKind === "24h") {
       if (checkOutDateStr) {
         // Assume 12:00 PM on the check-out date for standard bookings
-        expirationDate = new Date(`${checkOutDateStr.slice(0, 10)}T12:00:00`);
+        expirationDate = new Date(`${checkOutDateStr.slice(0, 10)}T12:00:00+08:00`);
       }
     } else {
       // Short-time booking (3h, 5h, 12h)
@@ -34,7 +34,7 @@ export function CountdownTimer({ checkInDateStr, checkOutDateStr, actualCheckInA
       } else if (checkInDateStr) {
         // Fallback if actual_check_in_at wasn't recorded (legacy data)
         const hoursToAdd = parseInt(ratePlanKind.replace(/\D/g, ""), 10) || 0;
-        expirationDate = new Date(`${checkInDateStr.slice(0, 10)}T14:00:00`); // Assuming 2PM standard check-in as fallback
+        expirationDate = new Date(`${checkInDateStr.slice(0, 10)}T14:00:00+08:00`); // Assuming 2PM standard check-in as fallback
         expirationDate.setHours(expirationDate.getHours() + hoursToAdd);
       }
     }

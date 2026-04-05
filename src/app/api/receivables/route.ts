@@ -151,7 +151,7 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => a.date.localeCompare(b.date))
       .map((item) => ({
         ...item,
-        label: new Date(`${item.date}T00:00:00`).toLocaleDateString("en-PH", { month: "short", day: "numeric" }),
+        label: new Date(`${item.date}T00:00:00+08:00`).toLocaleDateString("en-PH", { month: "short", day: "numeric" }),
       }));
 
     const aging = Array.from(agingMap.values()).sort((a, b) => b.amount - a.amount);

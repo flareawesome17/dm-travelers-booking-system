@@ -533,7 +533,7 @@ export default function ReceivablesPage() {
                       ))
                     : filtered.map((row) => {
                         const checkout = row.bookings?.check_out_date
-                          ? new Date(`${row.bookings.check_out_date}T00:00:00`).toLocaleDateString("en-PH", {
+                          ? new Date(`${row.bookings.check_out_date}T00:00:00+08:00`).toLocaleDateString("en-PH", {
                               month: "short",
                               day: "numeric",
                               year: "numeric",

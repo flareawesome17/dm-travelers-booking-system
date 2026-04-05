@@ -160,7 +160,7 @@ export default function AdminBookingsPage() {
     const actual = new Date(checkInAt);
     if (Number.isNaN(actual.getTime())) return { rate: 0, hoursEarly: 0, fee: 0, reason: "Invalid actual check-in time." as const };
     const checkInDateStr = String(b.check_in_date || "").slice(0, 10);
-    const reserved = checkInDateStr ? new Date(`${checkInDateStr}T14:00:00`) : new Date("");
+    const reserved = checkInDateStr ? new Date(`${checkInDateStr}T14:00:00+08:00`) : new Date("");
     if (Number.isNaN(reserved.getTime())) return { rate: 0, hoursEarly: 0, fee: 0, reason: "Reserved check-in time is not set correctly." as const };
     const rate = Number(b.rooms?.rate_24h_early_checkin_fee || 0);
     if (!Number.isFinite(rate) || rate <= 0) return { rate: 0, hoursEarly: 0, fee: 0, reason: "No early check-in fee rate is set for this room." as const };
@@ -182,7 +182,7 @@ export default function AdminBookingsPage() {
     if (rateKind === "24h") {
       const checkOutDateStr = String(b.check_out_date || "").slice(0, 10);
       if (!checkOutDateStr) return { rate: 0, hoursLate: 0, fee: 0, reason: "Check-out date is not set." as const };
-      reserved = new Date(`${checkOutDateStr}T12:00:00`);
+      reserved = new Date(`${checkOutDateStr}T12:00:00+08:00`);
     } else {
       const hoursToAdd = parseInt(rateKind.replace(/\D/g, ""), 10) || 0;
       if (b.actual_check_in_at) {
@@ -190,7 +190,7 @@ export default function AdminBookingsPage() {
         reserved.setHours(reserved.getHours() + hoursToAdd);
       } else {
         const fallbackCheckIn = b.check_in_date ? String(b.check_in_date).slice(0, 10) : new Date().toISOString().slice(0, 10);
-        reserved = new Date(`${fallbackCheckIn}T14:00:00`);
+        reserved = new Date(`${fallbackCheckIn}T14:00:00+08:00`);
         reserved.setHours(reserved.getHours() + hoursToAdd);
       }
     }
@@ -553,7 +553,7 @@ export default function AdminBookingsPage() {
             {checkInBooking?.check_in_date && <p className="text-xs text-slate-500">Reserved: <span className="font-medium">{`${String(checkInBooking.check_in_date).slice(0, 10)} 14:00`}</span></p>}
             {(() => { const p = computeEarlyCheckInPreview(); return <p className={cn("text-xs", p.fee > 0 ? "text-slate-700" : "text-slate-500")}>Breakdown: <span className="font-semibold text-[#07008A]">₱{p.fee.toFixed(0)}</span> (<span className="font-mono">₱{p.rate.toFixed(0)}</span> × <span className="font-mono">{p.hoursEarly}</span> hour{p.hoursEarly !== 1 ? "s" : ""} early) — {p.reason}</p>; })()}
           </div>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={async () => { const b = checkInBooking; if (!b?.id) return; try { const actual = checkInAt ? new Date(checkInAt).toISOString() : new Date().toISOString(); const res = await api(`/api/bookings/${b.id}/check-in`, { method: "POST", body: JSON.stringify({ actual_check_in_at: actual }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Check-in failed."); return; } const fee = Number((data as { early_checkin_fee_applied?: number }).early_checkin_fee_applied || 0); toast.success(fee > 0 ? `Checked in. Early fee: ₱${fee.toFixed(0)}.` : "Checked in."); setCheckInBooking(null); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }}>Confirm check-in</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel>                  <AlertDialogAction className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={async () => { const b = checkInBooking; if (!b?.id) return; try { const actual = checkInAt ? new Date(`${checkInAt}+08:00`).toISOString() : new Date().toISOString(); const res = await api(`/api/bookings/${b.id}/check-in`, { method: "POST", body: JSON.stringify({ actual_check_in_at: actual }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Check-in failed."); return; } const fee = Number((data as { early_checkin_fee_applied?: number }).early_checkin_fee_applied || 0); toast.success(fee > 0 ? `Checked in. Early fee: ₱${fee.toFixed(0)}.` : "Checked in."); setCheckInBooking(null); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }}>Confirm check-in</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
@@ -576,7 +576,7 @@ export default function AdminBookingsPage() {
                       exp = new Date(checkOutBooking.actual_check_in_at);
                     } else {
                       const fallbackCheckInStr = String(checkOutBooking.check_in_date || "").slice(0, 10);
-                      exp = new Date(`${fallbackCheckInStr}T14:00:00`);
+                      exp = new Date(`${fallbackCheckInStr}T14:00:00+08:00`);
                     }
                     exp.setHours(exp.getHours() + hoursToAdd);
                     if (isNaN(exp.getTime())) return "Unknown";
@@ -590,7 +590,7 @@ export default function AdminBookingsPage() {
             )}
             {(() => { const p = computeLateCheckOutPreview(); return <p className={cn("text-xs", p.fee > 0 ? "text-slate-700" : "text-slate-500")}>Breakdown: <span className="font-semibold text-[#07008A]">₱{p.fee.toFixed(0)}</span> (<span className="font-mono">₱{p.rate.toFixed(0)}</span> × <span className="font-mono">{p.hoursLate}</span> hour{p.hoursLate !== 1 ? "s" : ""} late) — {p.reason}</p>; })()}
           </div>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-amber-600 hover:bg-amber-700 text-white" onClick={async () => { const b = checkOutBooking; if (!b?.id) return; try { const actual = checkOutAt ? new Date(checkOutAt).toISOString() : new Date().toISOString(); const res = await api(`/api/bookings/${b.id}/check-out`, { method: "POST", body: JSON.stringify({ actual_check_out_at: actual }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Check-out failed."); return; } const fee = Number((data as { late_checkout_fee_applied?: number }).late_checkout_fee_applied || 0); toast.success(fee > 0 ? `Checked out. Late fee: ₱${fee.toFixed(0)}.` : "Checked out."); setCheckOutBooking(null); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }}>Confirm check-out</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-amber-600 hover:bg-amber-700 text-white" onClick={async () => { const b = checkOutBooking; if (!b?.id) return; try { const actual = checkOutAt ? new Date(`${checkOutAt}+08:00`).toISOString() : new Date().toISOString(); const res = await api(`/api/bookings/${b.id}/check-out`, { method: "POST", body: JSON.stringify({ actual_check_out_at: actual }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Check-out failed."); return; } const fee = Number((data as { late_checkout_fee_applied?: number }).late_checkout_fee_applied || 0); toast.success(fee > 0 ? `Checked out. Late fee: ₱${fee.toFixed(0)}.` : "Checked out."); setCheckOutBooking(null); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }}>Confirm check-out</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 

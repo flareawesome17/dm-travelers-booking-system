@@ -25,7 +25,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     let reserved: Date;
 
     if (rateKind === "24h") {
-      reserved = new Date(`${String(booking.check_out_date || "").slice(0, 10)}T12:00:00`);
+      reserved = new Date(`${String(booking.check_out_date || "").slice(0, 10)}T12:00:00+08:00`);
     } else {
       const hoursToAdd = parseInt(rateKind.replace(/\D/g, ""), 10) || 0;
       if (booking.actual_check_in_at) {
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         reserved.setHours(reserved.getHours() + hoursToAdd);
       } else {
         const fallbackCheckIn = booking.check_in_date ? String(booking.check_in_date).slice(0, 10) : new Date().toISOString().slice(0, 10);
-        reserved = new Date(`${fallbackCheckIn}T14:00:00`);
+        reserved = new Date(`${fallbackCheckIn}T14:00:00+08:00`);
         reserved.setHours(reserved.getHours() + hoursToAdd);
       }
     }

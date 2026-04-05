@@ -47,7 +47,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     let earlyFee = 0;
     if (booking.rate_plan_kind === "24h" && booking.check_in_date) {
-      const reserved = new Date(`${String(booking.check_in_date).slice(0, 10)}T14:00:00`);
+      const reserved = new Date(`${String(booking.check_in_date).slice(0, 10)}T14:00:00+08:00`);
       const rate = Number(booking.rooms?.rate_24h_early_checkin_fee || 0);
       if (rate > 0 && actualCheckIn < reserved) {
         const hoursEarly = Math.max(1, Math.ceil((reserved.getTime() - actualCheckIn.getTime()) / (1000 * 60 * 60)));
