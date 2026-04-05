@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(_req: NextRequest) {
   try {
     const supabase = getSupabaseAdmin();
     const now = new Date().toISOString();
+
+    console.log("[PUBLIC_MENU] Fetching dishes at", now);
 
     const { data: activeDiscounts } = await supabase
       .from("discounts")
@@ -25,9 +29,11 @@ export async function GET(_req: NextRequest) {
       .order("name", { ascending: true });
 
     if (mErr) {
-      console.error("[PUBLIC_MENU_GET_ERROR]", mErr);
+      console.error("[PUBLIC_MENU] Error fetching menuItems:", mErr);
       return NextResponse.json({ error: mErr.message }, { status: 500 });
     }
+
+    console.log("[PUBLIC_MENU] Found items:", menuItems?.length || 0);
 
     const data = (menuItems ?? []).map((item: any) => {
       const p = Number(item.price);

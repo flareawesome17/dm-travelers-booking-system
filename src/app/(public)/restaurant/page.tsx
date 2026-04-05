@@ -88,7 +88,7 @@ export default function RestaurantPage() {
   return (
     <>
       <PublicPageHero
-        description="Browse the restaurant with clearer category filters, brighter contrast, and a more welcoming presentation that feels connected to the full guest journey."
+        description="Browse our selection of thoughtfully prepared meals, crafted to suit guests looking for warm, satisfying dining options during their stay."
         eyebrow="Restaurant"
         imageAlt="Dining at D&M Travellers Inn"
         imageSrc="/images/restaurant.jpg"
@@ -119,68 +119,81 @@ export default function RestaurantPage() {
         <PublicGrid>
           <div ref={ref}>
             <div className="flex flex-wrap gap-3">
-              {categories.map((category) => (
-                <button
-                  key={category}
-                  className={
-                    filter === category
-                      ? "rounded-full border border-gold-light/30 bg-gradient-gold px-5 py-3 font-body text-sm font-semibold text-secondary"
-                      : "rounded-full border border-white/14 bg-white/8 px-5 py-3 font-body text-sm text-white/88 transition-colors duration-300 hover:bg-white/10 hover:text-white"
-                  }
-                  onClick={() => setFilter(category)}
-                  type="button"
-                >
-                  {category}
-                </button>
-              ))}
+              {loading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="h-10 w-24 animate-pulse rounded-full bg-white/5" />
+                ))
+              ) : categories.length > 1 ? (
+                categories.map((category) => (
+                  <button
+                    key={category}
+                    className={
+                      filter === category
+                        ? "rounded-full border border-gold-light/30 bg-gradient-gold px-5 py-3 font-body text-sm font-semibold text-secondary"
+                        : "rounded-full border border-white/14 bg-white/8 px-5 py-3 font-body text-sm text-white/88 transition-colors duration-300 hover:bg-white/10 hover:text-white"
+                    }
+                    onClick={() => setFilter(category)}
+                    type="button"
+                  >
+                    {category}
+                  </button>
+                ))
+              ) : null}
             </div>
 
-            <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-10 min-h-[400px]">
               {loading ? (
-                Array.from({ length: 6 }).map((_, index) => (
-                  <PublicGlassPanel key={index} className="overflow-hidden p-0">
-                    <div className="aspect-[4/4.2] animate-pulse bg-white/6" />
-                  </PublicGlassPanel>
-                ))
+                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <PublicGlassPanel key={index} className="overflow-hidden p-0">
+                      <div className="aspect-[4/4.2] animate-pulse bg-white/6" />
+                    </PublicGlassPanel>
+                  ))}
+                </div>
               ) : filteredItems.length === 0 ? (
-                <PublicGlassPanel className="md:col-span-2 xl:col-span-3">
-                  <p className="font-body text-sm text-white/76">
-                    No menu items are available in this category right now.
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/5">
+                    <UtensilsCrossed className="h-8 w-8 text-white/20" />
+                  </div>
+                  <h3 className="mb-2 font-heading text-xl text-white">No items found</h3>
+                  <p className="mx-auto max-w-xs font-body text-white/60">
+                    Our menu is currently being updated. Please check back soon!
                   </p>
-                </PublicGlassPanel>
+                </div>
               ) : (
-                filteredItems.map((item, index) => (
-                  <motion.div
-                    key={item.id}
-                    animate={isInView ? { opacity: 1, y: 0 } : {}}
-                    initial={{ opacity: 0, y: 24 }}
-                    transition={{ duration: 0.5, delay: index * 0.04 }}
-                  >
-                    <PublicGlassPanel className="group h-full overflow-hidden p-0">
-                      <div className="relative aspect-[4/2.6]">
-                        <Image
-                          alt={item.name || "Menu item"}
-                          className="object-cover transition-transform duration-700 group-hover:scale-105"
-                          fill
-                          sizes="(max-width: 1280px) 100vw, 33vw"
-                          src={item.image_url || "/images/restaurant.jpg"}
-                        />
-                        <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_18%,rgba(5,14,27,0.86)_100%)]" />
-                        <div className="absolute left-5 top-5 rounded-full border border-white/14 bg-secondary/68 px-3 py-1 text-[0.68rem] uppercase tracking-[0.24em] text-gold-light/84 backdrop-blur-md">
-                          {item.category || "Menu"}
-                        </div>
-                      </div>
-
-                      <div className="p-5 sm:p-6">
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <h2 className="font-heading text-2xl font-semibold text-white">
-                              {item.name || "Menu item"}
-                            </h2>
-                            <p className="mt-3 font-body text-sm leading-7 text-white/78">
-                              {item.description || "Prepared to suit guests looking for warm, satisfying dining options."}
-                            </p>
+                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                  {filteredItems.map((item, index) => (
+                    <motion.div
+                      key={item.id}
+                      animate={isInView ? { opacity: 1, y: 0 } : {}}
+                      initial={{ opacity: 0, y: 24 }}
+                      transition={{ duration: 0.5, delay: index * 0.04 }}
+                    >
+                      <PublicGlassPanel className="group h-full overflow-hidden p-0">
+                        <div className="relative aspect-[4/2.6]">
+                          <Image
+                            alt={item.name || "Menu item"}
+                            className="object-cover transition-transform duration-700 group-hover:scale-105"
+                            fill
+                            sizes="(max-width: 1280px) 100vw, 33vw"
+                            src={item.image_url || "/images/restaurant.jpg"}
+                          />
+                          <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_18%,rgba(5,14,27,0.86)_100%)]" />
+                          <div className="absolute left-5 top-5 rounded-full border border-white/14 bg-secondary/68 px-3 py-1 text-[0.68rem] uppercase tracking-[0.24em] text-gold-light/84 backdrop-blur-md">
+                            {item.category || "Menu"}
                           </div>
+                        </div>
+
+                        <div className="p-5 sm:p-6">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <h2 className="font-heading text-2xl font-semibold text-white">
+                                {item.name || "Menu item"}
+                              </h2>
+                              <p className="mt-3 font-body text-sm leading-7 text-white/78">
+                                {item.description || "Prepared to suit guests looking for warm, satisfying dining options."}
+                              </p>
+                            </div>
                             <div className="flex flex-col items-end gap-1">
                               {item.discount && (
                                 <span className="text-[10px] text-white/40 line-through font-medium">
@@ -196,16 +209,17 @@ export default function RestaurantPage() {
                                 )}
                               </div>
                             </div>
-                        </div>
+                          </div>
 
-                        <div className="mt-6 flex items-center gap-2 text-[0.7rem] uppercase tracking-[0.22em] text-white/62 sm:tracking-[0.28em]">
-                          <Sparkles className="h-3.5 w-3.5 text-gold-light" />
-                          Refined presentation
+                          <div className="mt-6 flex items-center gap-2 text-[0.7rem] uppercase tracking-[0.22em] text-white/62 sm:tracking-[0.28em]">
+                            <Sparkles className="h-3.5 w-3.5 text-gold-light" />
+                            Refined presentation
+                          </div>
                         </div>
-                      </div>
-                    </PublicGlassPanel>
-                  </motion.div>
-                ))
+                      </PublicGlassPanel>
+                    </motion.div>
+                  ))}
+                </div>
               )}
             </div>
           </div>
