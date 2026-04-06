@@ -155,7 +155,7 @@ export default function AdminDashboardShell({
   const handleMobileClose = useCallback(() => setIsMobileOpen(false), []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-[#07008A]/[0.02]">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-[#07008A]/[0.02] overflow-x-hidden relative">
       <AdminSidebar
         isCollapsed={isCollapsed}
         onToggle={() => setIsCollapsed(!isCollapsed)}
@@ -182,7 +182,7 @@ export default function AdminDashboardShell({
       </div>
 
       <main className={cn(
-        "min-h-screen transition-all duration-300 ease-in-out",
+        "min-h-screen transition-all duration-300 ease-in-out overflow-x-hidden",
         "pt-14 tablet:pt-0",
         isCollapsed ? "tablet:ml-[72px]" : "tablet:ml-[260px]"
       )}>

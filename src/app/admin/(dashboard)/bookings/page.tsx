@@ -306,7 +306,7 @@ export default function AdminBookingsPage() {
             <div className="p-6 space-y-4">{[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
           ) : (
             <>
-              <div className="overflow-y-auto max-h-[calc(100vh-270px)] w-full custom-scrollbar">
+              <div className="responsive-table-wrapper overflow-x-auto overflow-y-auto max-h-[calc(100vh-270px)] w-full custom-scrollbar">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-slate-50 shadow-sm ring-1 ring-slate-100">
                   <tr className="border-b border-slate-100 bg-slate-50">
