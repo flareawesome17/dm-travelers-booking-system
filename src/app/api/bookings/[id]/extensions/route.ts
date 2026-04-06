@@ -11,7 +11,50 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   try {
     const { id } = await params;
+    const url = new URL(req.url);
+    const checkOnly = url.searchParams.get("check_only") === "true";
+    const newCheckout = url.searchParams.get("new_checkout");
+
     const supabase = getSupabaseAdmin();
+
+    if (checkOnly && newCheckout) {
+      // Perform availability check
+      const { data: booking, error: bErr } = await supabase
+        .from("bookings")
+        .select("id, room_id, check_out_date, reserved_checkout_datetime")
+        .eq("id", id)
+        .single();
+      
+      if (bErr || !booking) return dbError(bErr, "Booking not found");
+      if (!booking.room_id) {
+        return NextResponse.json({ available: true, conflict_count: 0 });
+      }
+
+      const currentCheckout = booking.reserved_checkout_datetime || (booking.check_out_date ? `${booking.check_out_date}T12:00:00+08:00` : null);
+      if (!currentCheckout) {
+         return NextResponse.json({ available: true, conflict_count: 0 });
+      }
+
+      const { count, error: cErr } = await supabase
+        .from("bookings")
+        .select("*", { count: "exact", head: true })
+        .eq("room_id", booking.room_id)
+        .neq("id", id)
+        .in("status", ["Confirmed", "Checked-In"])
+        .lt("reserved_checkin_datetime", newCheckout)
+        .gt("reserved_checkout_datetime", currentCheckout);
+
+      if (cErr) {
+        console.error("[AVAILABILITY_CHECK_ERROR]", cErr);
+        return dbError(cErr, "Failed to check availability");
+      }
+
+      return NextResponse.json({ 
+        available: (count ?? 0) === 0,
+        conflict_count: count ?? 0 
+      });
+    }
+
     const { data, error } = await supabase
       .from("booking_extensions")
       .select("*")
@@ -40,7 +83,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Verify booking exists and is Checked-In
     const { data: booking, error: bErr } = await supabase
       .from("bookings")
-      .select("id, status, extensions_total, balance_due, check_out_date, reserved_checkout_datetime")
+      .select("id, status, room_id, extensions_total, balance_due, check_out_date, reserved_checkout_datetime")
       .eq("id", id)
       .single();
 
@@ -48,6 +91,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (booking.status !== "Checked-In") {
       return NextResponse.json(
         { error: { code: "invalid_state", message: "Only checked-in bookings can be extended" } },
+        { status: 422 }
+      );
+    }
+
+    // New Conflict Check
+    const { count: conflictCount, error: conflictErr } = await supabase
+      .from("bookings")
+      .select("*", { count: "exact", head: true })
+      .eq("room_id", booking.room_id)
+      .neq("id", id)
+      .in("status", ["Confirmed", "Checked-In"])
+      .lt("reserved_checkin_datetime", body.new_checkout_date)
+      .gt("reserved_checkout_datetime", booking.reserved_checkout_datetime);
+
+    if (conflictErr) return dbError(conflictErr, "Failed to verify room availability");
+    
+    // Safety check for nulls
+    const currentCheckout = booking.reserved_checkout_datetime || (booking.check_out_date ? `${booking.check_out_date}T12:00:00+08:00` : null);
+    
+    if (currentCheckout && (conflictCount ?? 0) > 0) {
+      return NextResponse.json(
+        { error: { code: "room_conflict", message: "Room is already reserved for a future guest during this extension period." } },
         { status: 422 }
       );
     }

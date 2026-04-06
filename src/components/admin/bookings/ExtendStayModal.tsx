@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ type ExtendStayModalProps = {
   onClose: () => void;
   booking: {
     id: string;
+    room_id?: string;
     check_out_date?: string;
     reserved_checkout_datetime?: string;
     rate_plan_kind?: string;
@@ -38,6 +39,7 @@ export function ExtendStayModal({ open, onClose, booking, token, onSuccess }: Ex
   const [durationType, setDurationType] = useState<"hours" | "days">("hours");
   const [durationValue, setDurationValue] = useState("3");
   const [submitting, setSubmitting] = useState(false);
+  const [availability, setAvailability] = useState<"checking" | "available" | "conflict" | "idle">("idle");
 
   const ratePlan = booking.rate_plan_kind || "24h";
   const room = booking.rooms;
@@ -82,6 +84,33 @@ export function ExtendStayModal({ open, onClose, booking, token, onSuccess }: Ex
     else d.setDate(d.getDate() + dv);
     return d.toISOString();
   })();
+
+  const checkRoomAvailability = async (checkout: string) => {
+    if (!checkout || !booking.id) return;
+    setAvailability("checking");
+    try {
+      const res = await fetch(`/api/bookings/${booking.id}/extensions?check_only=true&new_checkout=${encodeURIComponent(checkout)}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.available) setAvailability("available");
+      else setAvailability("conflict");
+    } catch {
+      setAvailability("idle");
+    }
+  };
+
+  // Debounce availability check
+  useEffect(() => {
+    if (!newCheckout || !dv || dv <= 0) {
+      setAvailability("idle");
+      return;
+    }
+    const timer = setTimeout(() => {
+      checkRoomAvailability(newCheckout);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [newCheckout, dv]);
 
   const formatDate = (iso: string) => {
     if (!iso) return "—";
@@ -183,10 +212,31 @@ export function ExtendStayModal({ open, onClose, booking, token, onSuccess }: Ex
               <span className="text-lg font-bold text-[#07008A]">₱{additionalCost.toFixed(0)}</span>
             </div>
             {newCheckout && (
-              <div className="flex items-center gap-2 text-xs text-slate-600 pt-1">
-                <span>New checkout</span>
-                <ArrowRight className="h-3 w-3" />
-                <span className="font-semibold text-slate-800">{formatDate(newCheckout)}</span>
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center gap-2 text-xs text-slate-600">
+                  <span>New checkout</span>
+                  <ArrowRight className="h-3 w-3" />
+                  <span className="font-semibold text-slate-800">{formatDate(newCheckout)}</span>
+                </div>
+                
+                {availability === "checking" && (
+                  <div className="flex items-center gap-2 text-[10px] text-slate-500 animate-pulse">
+                    <div className="h-2 w-2 rounded-full bg-slate-400" />
+                    Checking room availability...
+                  </div>
+                )}
+                {availability === "available" && (
+                  <div className="flex items-center gap-2 text-[10px] text-emerald-600 font-medium">
+                    <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                    Room is available for this extension
+                  </div>
+                )}
+                {availability === "conflict" && (
+                  <div className="flex items-center gap-2 text-[10px] text-rose-600 font-bold bg-rose-50 p-2 rounded border border-rose-100">
+                    <div className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
+                    Conflict detected: Room is reserved for another guest. Extension prohibited.
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -197,10 +247,10 @@ export function ExtendStayModal({ open, onClose, booking, token, onSuccess }: Ex
           <Button
             type="button"
             onClick={handleSubmit}
-            disabled={submitting || !dv || dv <= 0}
+            disabled={submitting || !dv || dv <= 0 || availability === "conflict" || availability === "checking"}
             className="bg-[#07008A] hover:bg-[#05006a] text-white"
           >
-            {submitting ? "Extending..." : "Confirm Extension"}
+            {submitting ? "Extending..." : availability === "conflict" ? "Room Unavailable" : "Confirm Extension"}
           </Button>
         </DialogFooter>
       </DialogContent>

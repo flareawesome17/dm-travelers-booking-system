@@ -7,6 +7,7 @@ import { createBookingSchema } from "@/lib/validation-schemas";
 import { syncReceivableForBooking } from "@/lib/receivables";
 import { addShiftTransaction } from "@/lib/shiftUtils";
 import { broadcastSystemMessage } from "@/lib/activity-hub";
+import { computeReservedDatetimes } from "@/lib/booking-dates";
 
 export async function GET(req: NextRequest) {
   const auth = await requirePermission(req, "bookings.read");
@@ -59,6 +60,12 @@ export async function POST(req: NextRequest) {
           ? "Confirmed"
           : "Pending Payment";
 
+    const { reservedCheckin, reservedCheckout } = computeReservedDatetimes(
+      body.check_in_date,
+      body.check_out_date,
+      body.rate_plan_kind
+    );
+
     const bookingData = {
       guest_id: guestId,
       room_id: body.room_id,
@@ -70,6 +77,8 @@ export async function POST(req: NextRequest) {
       room_type_requested: body.room_type_requested || "Standard",
       check_in_date: body.check_in_date,
       check_out_date: body.check_out_date,
+      reserved_checkin_datetime: reservedCheckin,
+      reserved_checkout_datetime: reservedCheckout,
       num_adults: body.num_adults,
       num_children: body.num_children,
       special_requests: body.special_requests,

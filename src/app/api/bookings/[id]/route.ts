@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { requirePermission } from "@/lib/rbac";
 import { dbError, internalError } from "@/lib/api-security";
 import { syncReceivableForBooking } from "@/lib/receivables";
+import { computeReservedDatetimes } from "@/lib/booking-dates";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requirePermission(req, "bookings.update");
@@ -29,6 +30,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     updateData.updated_at = new Date().toISOString();
 
     const supabase = getSupabaseAdmin();
+    
+    // If dates changed, we must update reserved_datetimes too
+    if ("check_in_date" in body || "check_out_date" in body || "rate_plan_kind" in body) {
+      const { data: existing } = await supabase.from("bookings").select("check_in_date, check_out_date, rate_plan_kind, actual_check_in_at").eq("id", id).single();
+      if (existing) {
+        const cin = body.check_in_date || existing.check_in_date;
+        const cout = body.check_out_date || existing.check_out_date;
+        const rpk = body.rate_plan_kind || existing.rate_plan_kind;
+        const { reservedCheckin, reservedCheckout } = computeReservedDatetimes(cin, cout, rpk, existing.actual_check_in_at);
+        updateData.reserved_checkin_datetime = reservedCheckin;
+        updateData.reserved_checkout_datetime = reservedCheckout;
+      }
+    }
     const { data, error } = await supabase
       .from("bookings")
       .update(updateData)
