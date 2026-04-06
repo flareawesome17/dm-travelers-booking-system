@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     const { order_source, customer_name, payment_method, booking_reference, notes, items, is_lgu_order } = body;
     const supabase = getSupabaseAdmin();
 
-    const today = manilaDateString();
+    const today = await manilaDateString();
     const accountingDate = await findNextOpenLedgerDate(supabase, today);
 
     if (!items || !items.length) {

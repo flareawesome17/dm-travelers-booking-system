@@ -5,13 +5,10 @@ import { addShiftTransaction } from "@/lib/shiftUtils";
 import { apiError, dbError, internalError } from "@/lib/api-security";
 import { toMoneyNumber } from "@/lib/bookingTotals";
 
-function manilaDateString(d: Date): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Manila",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(d);
+import { manilaDateString as getManilaDate } from "@/lib/shiftUtils";
+
+async function manilaDateString(d: Date, supabase?: any): Promise<string> {
+    return await getManilaDate(d, supabase);
 }
 
 async function ensureLedgerOpen(supabase: ReturnType<typeof getSupabaseAdmin>, orderDate: string | null) {
@@ -104,7 +101,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const orderDate =
       existingOrder.accounting_date ||
-      (existingOrder.created_at ? manilaDateString(new Date(existingOrder.created_at)) : null);
+      (existingOrder.created_at ? await manilaDateString(new Date(existingOrder.created_at), supabase) : null);
 
     const ledgerError = await ensureLedgerOpen(supabase, orderDate);
     if (ledgerError) return ledgerError;
@@ -175,7 +172,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
     const orderDate =
       existingOrder.accounting_date ||
-      (existingOrder.created_at ? manilaDateString(new Date(existingOrder.created_at)) : null);
+      (existingOrder.created_at ? await manilaDateString(new Date(existingOrder.created_at), supabase) : null);
 
     const ledgerError = await ensureLedgerOpen(supabase, orderDate);
     if (ledgerError) return ledgerError;

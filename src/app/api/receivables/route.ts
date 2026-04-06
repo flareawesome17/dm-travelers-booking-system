@@ -89,7 +89,7 @@ export async function GET(req: NextRequest) {
     if (error) return dbError(error, "Failed to load receivables");
 
     const receivables = data ?? [];
-    const today = manilaDateString();
+    const today = await manilaDateString();
 
     const summary = receivables.reduce(
       (acc, row) => {
@@ -147,11 +147,15 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    const { getGlobalTimeConfig } = await import("@/lib/settings");
+    const { offset } = await getGlobalTimeConfig(supabase);
+    const tzOffset = offset || "+08:00";
+
     const forecast = Array.from(forecastMap.values())
       .sort((a, b) => a.date.localeCompare(b.date))
       .map((item) => ({
         ...item,
-        label: new Date(`${item.date}T00:00:00+08:00`).toLocaleDateString("en-PH", { month: "short", day: "numeric" }),
+        label: new Date(`${item.date}T00:00:00${tzOffset}`).toLocaleDateString("en-PH", { month: "short", day: "numeric" }),
       }));
 
     const aging = Array.from(agingMap.values()).sort((a, b) => b.amount - a.amount);

@@ -438,6 +438,40 @@ export default function AdminSettingsPage() {
                 <CardDescription>Configure check-in times and guest-facing policies</CardDescription>
               </CardHeader>
               <CardContent className="p-4 sm:p-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 border-b border-dashed">
+                  <div className="space-y-2">
+                    <Label htmlFor="timezone">System Timezone</Label>
+                    <Select 
+                      value={settings.timezone || "Asia/Manila"} 
+                      onValueChange={(value) => handleUpdate("timezone", value)}
+                      disabled={!hasPermission("settings.write")}
+                    >
+                      <SelectTrigger id="timezone" className="w-full">
+                        <SelectValue placeholder="Select timezone" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Asia/Manila">Asia/Manila (PHT)</SelectItem>
+                        <SelectItem value="Asia/Singapore">Asia/Singapore (SGT)</SelectItem>
+                        <SelectItem value="Asia/Hong_Kong">Asia/Hong_Kong (HKT)</SelectItem>
+                        <SelectItem value="Asia/Tokyo">Asia/Tokyo (JST)</SelectItem>
+                        <SelectItem value="UTC">UTC (Universal Time)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Standard timezone identifier</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="timezone_offset">Timezone Offset</Label>
+                    <Input 
+                      id="timezone_offset" 
+                      placeholder="+08:00"
+                      value={settings.timezone_offset || "+08:00"} 
+                      onChange={e => handleUpdate("timezone_offset", e.target.value)} 
+                      disabled={!hasPermission("settings.write")}
+                    />
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">ISO 8601 offset (e.g., +08:00, -05:00)</p>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="check_in_time">Default Check-in Time</Label>

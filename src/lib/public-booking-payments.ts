@@ -74,7 +74,7 @@ export async function settlePublicBookingPayment(params: SettlePublicBookingPaym
     .maybeSingle();
 
   if (!existingPayment) {
-    const accountingDate = await findNextOpenLedgerDate(params.supabase, manilaDateString());
+    const accountingDate = await findNextOpenLedgerDate(params.supabase, await manilaDateString(new Date(), params.supabase));
     const balanceDueNow = toMoney(booking.balance_due);
     const paymentType = amount >= balanceDueNow ? "Balance" : "Deposit";
     const paymentTimestamp = params.paidAtIso && !Number.isNaN(new Date(params.paidAtIso).getTime())

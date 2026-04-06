@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
     const netTotal = totalIncome - totalExpense;
 
     // Calculate time remaining
-    const currentTime = manilaTimeString();
+    const currentTime = await manilaTimeString();
     const minsRemaining = minutesUntilShiftEnd(shift as ShiftDefinition, currentTime);
     const isEndingSoon = minsRemaining <= 30;
 

@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   try {
     const supabase = getSupabaseAdmin();
     const adminId = typeof auth.payload.sub === "string" ? auth.payload.sub : null;
-    const today = manilaDateString();
+    const today = await manilaDateString();
     let expenseDate = parsed.data.date || today;
 
     const { data: ledger, error: lErr } = await supabase

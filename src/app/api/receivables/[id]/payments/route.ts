@@ -46,7 +46,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (bk?.reference_number) refIdentifier = bk.reference_number;
     }
 
-    const today = manilaDateString();
+    const today = await manilaDateString();
     const accountingDate = await findNextOpenLedgerDate(supabase, today);
 
     // Insert payment

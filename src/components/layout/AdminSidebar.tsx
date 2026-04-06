@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   CalendarCheck,
+  CalendarRange,
   BedDouble,
   Sparkles,
   UtensilsCrossed,
@@ -40,6 +41,7 @@ import { toast } from "@/components/ui/sonner";
 const operationsItems = [
   { label: "Dashboard", path: "/admin", icon: LayoutDashboard },
   { label: "Bookings", path: "/admin/bookings", icon: CalendarCheck, permission: "bookings.read" },
+  { label: "Calendar", path: "/admin/calendar", icon: CalendarRange, permission: "bookings.calendar" },
   { label: "Receivables", path: "/admin/receivables", icon: Building2, permission: "receivables.read" },
   { label: "Rooms", path: "/admin/rooms", icon: BedDouble, permission: "rooms.read" },
   { label: "Housekeeping", path: "/admin/housekeeping", icon: Sparkles, permission: "housekeeping.read" },

@@ -20,14 +20,18 @@ export async function GET(req: NextRequest) {
     const now = new Date();
     const alertThreshold = new Date(now.getTime() + 30 * 60 * 1000); // 30 minutes from now
 
+    const { getGlobalTimeConfig } = await import("@/lib/settings");
+    const { offset } = await getGlobalTimeConfig(supabase);
+    const tzOffset = offset || "+08:00";
+
     const expiring = (bookings || []).map((b) => {
       let checkoutTime: Date | null = null;
       const rateKind = b.rate_plan_kind || "24h";
 
       if (rateKind === "24h") {
         if (b.check_out_date) {
-            // Standard check-out is 12:00 PM Manila time
-            checkoutTime = new Date(`${b.check_out_date}T12:00:00+08:00`);
+            // Standard check-out is 12:00 PM based on timezone 
+            checkoutTime = new Date(`${b.check_out_date}T12:00:00${tzOffset}`);
         }
       } else {
         // Hourly: actual_check_in_at + N hours

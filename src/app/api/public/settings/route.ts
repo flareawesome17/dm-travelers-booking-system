@@ -15,6 +15,8 @@ const PUBLIC_KEYS = [
   "facebook_url",
   "instagram_url",
   "cancellation_policy",
+  "timezone",
+  "timezone_offset",
 ];
 
 export async function GET() {

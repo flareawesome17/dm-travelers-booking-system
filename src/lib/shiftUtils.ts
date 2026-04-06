@@ -1,11 +1,13 @@
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { getGlobalTimeConfig } from "./settings";
 
 /**
- * Get the current Manila time as HH:MM:SS string.
+ * Get the current time as HH:MM:SS string based on global settings.
  */
-export function manilaTimeString(d: Date = new Date()): string {
+export async function manilaTimeString(d: Date = new Date(), supabaseClient?: ReturnType<typeof getSupabaseAdmin>): Promise<string> {
+  const { timezone } = await getGlobalTimeConfig(supabaseClient);
   return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Manila",
+    timeZone: timezone || "Asia/Manila",
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
@@ -14,11 +16,12 @@ export function manilaTimeString(d: Date = new Date()): string {
 }
 
 /**
- * Get the current Manila date as YYYY-MM-DD string.
+ * Get the current date as YYYY-MM-DD string based on global settings.
  */
-export function manilaDateString(d: Date = new Date()): string {
+export async function manilaDateString(d: Date = new Date(), supabaseClient?: ReturnType<typeof getSupabaseAdmin>): Promise<string> {
+  const { timezone } = await getGlobalTimeConfig(supabaseClient);
   return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Manila",
+    timeZone: timezone || "Asia/Manila",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -98,21 +101,25 @@ export function minutesUntilShiftEnd(
  * Get the date to use for a shift_log entry.
  * For overnight shifts past midnight, use yesterday's date.
  */
-export function getShiftDate(
+export async function getShiftDate(
   shift: ShiftDefinition,
   manilaDate: string,
-  manilaTime: string
-): string {
+  manilaTime: string,
+  supabaseClient?: ReturnType<typeof getSupabaseAdmin>
+): Promise<string> {
   const start = timeToMinutes(shift.start_time);
   const end = timeToMinutes(shift.end_time);
   const now = timeToMinutes(manilaTime);
 
   // Overnight shift and we're in the after-midnight portion
   if (start > end && now < end) {
-    const d = new Date(`${manilaDate}T00:00:00+08:00`);
+    const { offset, timezone } = await getGlobalTimeConfig(supabaseClient);
+    const tzOffset = offset || "+08:00";
+    const tzName = timezone || "Asia/Manila";
+    const d = new Date(`${manilaDate}T00:00:00${tzOffset}`);
     d.setDate(d.getDate() - 1);
     return new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Manila",
+      timeZone: tzName,
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
@@ -141,13 +148,13 @@ export async function getOrCreateActiveShiftLog(adminId?: string) {
 
   // 2. Detect current theoretical shift based on physical time
   const now = new Date();
-  const currentTime = manilaTimeString(now);
-  const currentDate = manilaDateString(now);
+  const currentTime = await manilaTimeString(now, supabase);
+  const currentDate = await manilaDateString(now, supabase);
 
   const detectedShift = detectShift(shifts as ShiftDefinition[], currentTime);
   if (!detectedShift) throw new Error("No shift matches the current time.");
 
-  const targetShiftDate = getShiftDate(detectedShift, currentDate, currentTime);
+  const targetShiftDate = await getShiftDate(detectedShift, currentDate, currentTime, supabase);
 
   // 3. Find if there's any OPEN shift log currently (to handle manual overtime)
   const { data: openLogs, error: openErr } = await supabase

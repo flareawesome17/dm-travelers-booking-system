@@ -95,6 +95,7 @@ export default function AdminDashboardShell({
       ["/admin/roles", "roles.manage"],
       ["/admin/settings", "settings.read"],
       ["/admin/reviews", "reviews.read"],
+      ["/admin/calendar", "bookings.calendar"],
     ];
 
     const permSet = new Set(permissions);
@@ -129,6 +130,27 @@ export default function AdminDashboardShell({
     const interval = setInterval(sendHeartbeat, 60000);
     return () => clearInterval(interval);
   }, [pathname]); // Re-run or stay alive across navigation
+
+  // Fetch and cache global timezone settings
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch("/api/public/settings");
+        if (res.ok) {
+          const settings = await res.json();
+          // The API now returns a Record<string, string>
+          const tz = settings.timezone || "Asia/Manila";
+          const offset = settings.timezone_offset || "+08:00";
+          
+          localStorage.setItem("app_timezone", tz);
+          localStorage.setItem("app_timezone_offset", offset);
+        }
+      } catch (error) {
+        console.error("Failed to fetch global settings:", error);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   const handleMobileClose = useCallback(() => setIsMobileOpen(false), []);
 

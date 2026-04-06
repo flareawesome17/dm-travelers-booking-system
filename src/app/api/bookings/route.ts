@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
 
     if (depositPaid > 0 && data?.id) {
       const method = body.deposit_method && ["Cash", "GCash", "Card", "Stripe", "PayPal", "Cheque"].includes(body.deposit_method) ? body.deposit_method : "Cash";
-      const today = manilaDateString();
+      const today = await manilaDateString();
       const accountingDate = await findNextOpenLedgerDate(supabase, today);
       const transactionId = `DEP-${Date.now()}-${Math.floor(Math.random() * 1000)}-${String(data.reference_number || "REF").replace(/[^A-Z0-9_-]/gi, "")}`;
 

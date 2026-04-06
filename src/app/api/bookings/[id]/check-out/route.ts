@@ -21,12 +21,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .single();
     if (bErr || !booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
 
+    const { getGlobalTimeConfig } = await import("@/lib/settings");
+    const { offset } = await getGlobalTimeConfig(supabase);
+    const tzOffset = offset || "+08:00";
+
     let lateFee = 0;
     const rateKind = booking.rate_plan_kind || "24h";
     let reserved: Date;
 
     if (rateKind === "24h") {
-      reserved = new Date(`${String(booking.check_out_date || "").slice(0, 10)}T12:00:00+08:00`);
+      reserved = new Date(`${String(booking.check_out_date || "").slice(0, 10)}T12:00:00${tzOffset}`);
     } else {
       const hoursToAdd = parseInt(rateKind.replace(/\D/g, ""), 10) || 0;
       if (booking.actual_check_in_at) {
@@ -34,7 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         reserved.setHours(reserved.getHours() + hoursToAdd);
       } else {
         const fallbackCheckIn = booking.check_in_date ? String(booking.check_in_date).slice(0, 10) : new Date().toISOString().slice(0, 10);
-        reserved = new Date(`${fallbackCheckIn}T14:00:00+08:00`);
+        reserved = new Date(`${fallbackCheckIn}T14:00:00${tzOffset}`);
         reserved.setHours(reserved.getHours() + hoursToAdd);
       }
     }

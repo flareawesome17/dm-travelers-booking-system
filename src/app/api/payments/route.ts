@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const supabase = getSupabaseAdmin();
-    const today = manilaDateString();
+    const today = await manilaDateString();
     const accountingDate = await findNextOpenLedgerDate(supabase, today);
 
     const { booking_id, amount, method, type, transaction_id } = parsed.data;

@@ -532,8 +532,9 @@ export default function ReceivablesPage() {
                         </tr>
                       ))
                     : filtered.map((row) => {
+                        const tzOffset = localStorage.getItem("app_timezone_offset") || "+08:00";
                         const checkout = row.bookings?.check_out_date
-                          ? new Date(`${row.bookings.check_out_date}T00:00:00+08:00`).toLocaleDateString("en-PH", {
+                          ? new Date(`${row.bookings.check_out_date}T00:00:00${tzOffset}`).toLocaleDateString("en-PH", {
                               month: "short",
                               day: "numeric",
                               year: "numeric",
