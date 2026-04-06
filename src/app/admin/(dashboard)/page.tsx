@@ -326,22 +326,27 @@ export default function AdminDashboardPage() {
               "border border-slate-100 shadow-elevation-card hover:shadow-md transition-all duration-300 cursor-default group bg-white card-hover-lift",
               urgent && "border-red-200/60 shadow-red-100/50"
             )}>
-              <CardContent className="p-4 tablet:p-5 flex items-start gap-3 tablet:gap-4">
+              <CardContent className="p-3 xs:p-4 tablet:p-5 flex items-center gap-2.5 tablet:gap-4">
                 <div className={cn(
-                  "flex h-10 w-10 tablet:h-11 tablet:w-11 items-center justify-center rounded-xl ring-1 transition-transform duration-200 group-hover:scale-105 shrink-0",
+                  "flex h-9 w-9 tablet:h-11 tablet:w-11 items-center justify-center rounded-xl ring-1 transition-transform duration-200 group-hover:scale-105 shrink-0",
                   bgColor, color, ringColor
                 )}>
-                  <Icon className="h-5 w-5" />
+                  <Icon className="h-4 w-4 tablet:h-5 tablet:w-5" />
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   {loading ? (
-                    <Skeleton className="h-7 w-16 mb-1" />
+                    <Skeleton className="h-6 tablet:h-7 w-16 mb-1" />
                   ) : (
-                    <p className="text-xl tablet:text-2xl font-bold text-slate-900 leading-tight">{value}</p>
+                    <p className={cn(
+                      "font-bold text-slate-900 leading-tight truncate",
+                      String(value).length > 8 ? "text-sm xs:text-base tablet:text-2xl" : "text-lg tablet:text-2xl"
+                    )} title={String(value)}>
+                      {value}
+                    </p>
                   )}
-                  <p className="text-[10px] tablet:text-[11px] text-muted-foreground font-semibold uppercase tracking-wider mt-0.5">{label}</p>
+                  <p className="text-[9px] tablet:text-[11px] text-muted-foreground font-semibold uppercase tracking-wider mt-0.5 truncate">{label}</p>
                   {subtitle && !loading && (
-                    <p className="text-[10px] text-slate-400 mt-0.5">{subtitle}</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5 truncate">{subtitle}</p>
                   )}
                 </div>
               </CardContent>
