@@ -217,6 +217,16 @@ export default function ActivityHub({
   const [unreadCount, setUnreadCount] = useState(0);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [replyTo, setReplyTo] = useState<{ id: string; content: string; sender: string } | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [mentionSearch, setMentionSearch] = useState<string | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default");
+  const [msgToDelete, setMsgToDelete] = useState<string | null>(null);
+
+  const adminRole = useMemo(() => {
+    return teamMembers.find((m) => m.id === currentAdminId)?.role_id || null;
+  }, [teamMembers, currentAdminId]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -262,6 +272,36 @@ export default function ActivityHub({
       if (saved === "false") setSoundEnabled(false);
     } catch { /* silent */ }
   }, []);
+
+  // Notification setup
+  useEffect(() => {
+    if ("Notification" in window) {
+      setNotificationPermission(Notification.permission);
+    }
+  }, []);
+
+  const requestNotificationPermission = useCallback(async () => {
+    if (!("Notification" in window)) return;
+    const permission = await Notification.requestPermission();
+    setNotificationPermission(permission);
+  }, []);
+
+  const showNotification = useCallback((msg: Message) => {
+    if (notificationPermission !== "granted" || document.hasFocus()) return;
+    try {
+      const n = new Notification(msg.sender_name || "New Message", {
+        body: msg.content,
+        icon: "/favicon.ico",
+        tag: msg.recipient_id ? "dm" : "broadcast",
+      });
+      n.onclick = () => {
+        window.focus();
+        setOpen(true);
+        if (msg.recipient_id) setTab("chat");
+        n.close();
+      };
+    } catch { /* silent */ }
+  }, [notificationPermission]);
 
   const toggleSound = useCallback(() => {
     setSoundEnabled((prev) => {
@@ -480,17 +520,40 @@ export default function ActivityHub({
         if (soundEnabledRef.current && !isMyMessage) {
           if (!msg.recipient_id || msg.recipient_id === currentAdminId) {
             playNotificationSound();
+            showNotification(msg);
           }
         }
       }
+    };
+
+    const handleUpdate = (payload: any) => {
+      const msg = payload.new as Message;
+      const setter = msg.recipient_id ? setDmMessages : setBroadcastMsgs;
+      setter((prev) => prev.map((m) => (m.id === msg.id ? msg : m)));
+    };
+
+    const handleDelete = (payload: any) => {
+      const id = payload.old.id;
+      setBroadcastMsgs((prev) => prev.filter((m) => m.id !== id));
+      setDmMessages((prev) => prev.filter((m) => m.id !== id));
     };
 
     const channel = supabase
       .channel("admin_messages_realtime")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "admin_messages" },
+        { event: "INSERT", schema: "public", table: "admin_messages" },
         handlePayload
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "admin_messages" },
+        handleUpdate
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "admin_messages" },
+        handleDelete
       )
       .subscribe();
 
@@ -561,6 +624,48 @@ export default function ActivityHub({
       inputRef.current?.focus();
     }
   }, [draft, sending, activeDmPartner, replyTo]);
+
+  // Mentions logic
+  const filteredMentionMembers = useMemo(() => {
+    if (mentionSearch === null) return [];
+    const search = mentionSearch.toLowerCase();
+    return teamMembers.filter((m) => m.name.toLowerCase().includes(search));
+  }, [mentionSearch, teamMembers]);
+
+  const insertMention = useCallback((member: TeamMember) => {
+    if (mentionSearch === null) return;
+    const before = draft.substring(0, draft.lastIndexOf("@", draft.length - (draft.length - draft.lastIndexOf("@"))));
+    const after = draft.substring(draft.lastIndexOf("@") + mentionSearch.length + 1);
+    const newDraft = `${before}@${member.name} ${after}`;
+    setDraft(newDraft);
+    setMentionSearch(null);
+    inputRef.current?.focus();
+  }, [draft, mentionSearch]);
+
+  const handleUpdateMessage = useCallback(async (id: string, content: string) => {
+    if (!content.trim() || sending) return;
+    setSending(true);
+    try {
+      await fetch(`/api/admin/messages/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ content }),
+      });
+      setEditingId(null);
+    } finally {
+      setSending(false);
+    }
+  }, [sending]);
+
+  const deleteMessage = useCallback(async (id: string) => {
+    try {
+      await fetch(`/api/admin/messages/${id}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+      setMsgToDelete(null);
+    } catch { /* silent */ }
+  }, []);
 
   const onlineCount = useMemo(() => teamMembers.filter((m) => m.is_online).length, [teamMembers]);
   const onlineMembers = useMemo(() => teamMembers.filter((m) => m.is_online), [teamMembers]);
@@ -670,6 +775,15 @@ export default function ActivityHub({
                 <VolumeX className="h-4 w-4 text-slate-400" />
               )}
             </button>
+            {notificationPermission === "default" && (
+                <button
+                  onClick={requestNotificationPermission}
+                  className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  title="Enable browser notifications"
+                >
+                  <Bell className="h-4 w-4 text-indigo-500" />
+                </button>
+            )}
             <button
               onClick={() => setOpen(false)}
               className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -900,6 +1014,7 @@ export default function ActivityHub({
                     isMe={msg.sender_id === currentAdminId}
                     isSystem={msg.type === "system"}
                     currentAdminId={currentAdminId}
+                    adminRole={adminRole}
                     teamMembers={teamMembers}
                     onReply={() =>
                       setReplyTo({
@@ -908,10 +1023,39 @@ export default function ActivityHub({
                         sender: msg.sender_name,
                       })
                     }
+                    onEdit={(newContent) => handleUpdateMessage(msg.id, newContent)}
+                    onDelete={() => setMsgToDelete(msg.id)}
                     showDateSep={showDateSep}
                   />
                 )
               })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Mentions dropdown ── */}
+        {mentionSearch !== null && filteredMentionMembers.length > 0 && (
+          <div className="absolute bottom-[80px] left-4 right-4 z-[60] bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-in slide-in-from-bottom-2">
+            <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-800/50">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Mention Team Member</p>
+            </div>
+            <div className="max-h-[200px] overflow-y-auto modal-scrollbar">
+              {filteredMentionMembers.map((member, i) => (
+                <button
+                  key={member.id}
+                  onClick={() => insertMention(member)}
+                  className={cn(
+                    "w-full flex items-center gap-2 px-3 py-2.5 text-left transition-colors",
+                    mentionIndex === i ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400" : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                  )}
+                >
+                  <div className="h-6 w-6 rounded bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold">
+                    {getInitials(member.name)}
+                  </div>
+                  <span className="text-sm font-medium">{member.name}</span>
+                  {member.is_online && <Circle className="h-1.5 w-1.5 fill-emerald-500 text-emerald-500 ml-auto" />}
+                </button>
+              ))}
             </div>
           </div>
         )}
@@ -959,8 +1103,21 @@ export default function ActivityHub({
                 ref={inputRef}
                 value={draft}
                 onChange={(e) => {
-                  setDraft(e.target.value);
-                  if (e.target.value === "") {
+                  const val = e.target.value;
+                  setDraft(val);
+                  
+                  // Mention detection
+                  const cursor = e.target.selectionStart || 0;
+                  const textBeforeCursor = val.substring(0, cursor);
+                  const lastAt = textBeforeCursor.lastIndexOf("@");
+                  if (lastAt !== -1 && !textBeforeCursor.substring(lastAt).includes(" ")) {
+                     setMentionSearch(textBeforeCursor.substring(lastAt + 1));
+                     setMentionIndex(0);
+                  } else {
+                     setMentionSearch(null);
+                  }
+
+                  if (val === "") {
                      e.target.style.height = "auto";
                   }
                 }}
@@ -970,7 +1127,20 @@ export default function ActivityHub({
                   target.style.height = `${Math.min(target.scrollHeight, 100)}px`;
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  if (mentionSearch !== null && filteredMentionMembers.length > 0) {
+                     if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        setMentionIndex(i => (i + 1) % filteredMentionMembers.length);
+                     } else if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setMentionIndex(i => (i - 1 + filteredMentionMembers.length) % filteredMentionMembers.length);
+                     } else if (e.key === "Enter" || e.key === "Tab") {
+                        e.preventDefault();
+                        insertMention(filteredMentionMembers[mentionIndex]);
+                     } else if (e.key === "Escape") {
+                        setMentionSearch(null);
+                     }
+                  } else if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
                     if (draft.trim()) handleSend();
                   }
@@ -1002,11 +1172,46 @@ export default function ActivityHub({
             </form>
           </div>
         )}
-        {/* ...form replaced... */}
+         {/* ── Deletion Confirmation ── */}
+        <AlertDialog open={!!msgToDelete} onOpenChange={(open) => !open && setMsgToDelete(null)}>
+          <AlertDialogContent className="max-w-[400px] rounded-2xl border-slate-200 dark:border-slate-700/60 p-6 shadow-2xl">
+            <AlertDialogHeader>
+              <div className="mx-auto w-12 h-12 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center mb-2">
+                <Trash2 className="h-6 w-6 text-red-500" />
+              </div>
+              <AlertDialogTitle className="text-center text-xl font-bold text-slate-900 dark:text-white">Delete Message?</AlertDialogTitle>
+              <AlertDialogDescription className="text-center text-slate-500 dark:text-slate-400">
+                Are you sure you want to delete this message? This action will remove it for everyone in the chat and cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col sm:flex-row gap-2 mt-4">
+              <AlertDialogCancel className="w-full sm:flex-1 rounded-xl border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={() => msgToDelete && deleteMessage(msgToDelete)}
+                className="w-full sm:flex-1 rounded-xl bg-red-600 hover:bg-red-700 text-white border-none shadow-lg shadow-red-600/20 active:scale-95 transition-all"
+              >
+                Delete Message
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </>
   );
 }
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 /* ------------------------------------------------------------------ */
 /*  Sub-components                                                      */
@@ -1085,22 +1290,46 @@ function MessageBubble({
   isMe,
   isSystem,
   currentAdminId,
+  adminRole,
   teamMembers,
   onReply,
+  onEdit,
+  onDelete,
   showDateSep,
 }: {
   msg: Message;
   isMe: boolean;
   isSystem: boolean;
   currentAdminId?: string;
+  adminRole: number | null;
   teamMembers: TeamMember[];
   onReply: () => void;
+  onEdit: (content: string) => void;
+  onDelete: () => void;
   showDateSep: boolean;
 }) {
   const [swiping, setSwiping] = useState(false);
   const [swipeX, setSwipeX] = useState(0);
   const [showReactions, setShowReactions] = useState(false);
-  
+  const [isEditing, setIsEditing] = useState(false);
+  const [editVal, setEditVal] = useState(msg.content);
+
+  // Sync editing state
+  useEffect(() => {
+    setIsEditing(false);
+    setEditVal(msg.content);
+  }, [msg.content]);
+
+  const handleUpdateLocal = async () => {
+    if (editVal.trim() === msg.content) {
+      setIsEditing(false);
+      return;
+    }
+    // We call the parent update but optimistically close
+    setIsEditing(false);
+    onEdit(editVal);
+  };
+
   const startX = useRef(0);
   const startDrag = (e: React.TouchEvent | React.MouseEvent) => {
     if (isSystem) return;
@@ -1148,7 +1377,7 @@ function MessageBubble({
       {showDateSep && (
         <div className="flex items-center gap-3 my-3">
           <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
-          <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+          <span className="text-[10px] font-semibold text-slate-400 dark:bg-slate-500 uppercase tracking-wider">
             {new Date(msg.created_at).toLocaleDateString([], {
               weekday: "short",
               month: "short",
@@ -1212,10 +1441,12 @@ function MessageBubble({
                 </span>
               </div>
               
-              {/* Desktop quick actions */}
-              <div className="absolute right-full top-3 mr-2 bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700 rounded-lg px-1 flex opacity-0 group-hover/bubble:opacity-100 transition-opacity z-10 hidden tablet:flex">
+              {/* Desktop quick actions - Floating above the bubble to avoid viewport issues */}
+              <div className="absolute right-0 top-0 -translate-y-[90%] bg-white dark:bg-slate-800 shadow-md border border-slate-100 dark:border-slate-700 rounded-lg px-1 flex opacity-0 group-hover/bubble:opacity-100 transition-all z-20 hidden tablet:flex hover:!-translate-y-full scale-90 origin-bottom-right">
                 <button onClick={() => setShowReactions(!showReactions)} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-amber-400"><SmilePlus className="h-3.5 w-3.5" /></button>
                 <button onClick={onReply} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-indigo-400"><ReplyIcon className="h-3.5 w-3.5 scale-x-[-1]" /></button>
+                <button onClick={() => setIsEditing(true)} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-amber-600"><Pencil className="h-3.5 w-3.5" /></button>
+                <button onClick={onDelete} className="p-1.5 text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
               </div>
 
               {msg.metadata?.reply_to && (
@@ -1225,12 +1456,40 @@ function MessageBubble({
               )}
               
               <div className="relative z-10 w-full flex justify-end">
-                <p 
-                  onClick={() => setShowReactions(!showReactions)}
-                  className="text-[13px] text-white leading-snug bg-[#07008A] rounded-lg rounded-br-sm px-3 py-2 whitespace-pre-wrap flex-initial break-words max-w-full cursor-pointer active:scale-[0.98] transition-transform"
-                >
-                  {msg.content === "👍" ? <span className="text-4xl leading-none block py-1">👍</span> : msg.content}
-                </p>
+                {isEditing ? (
+                  <div className="w-full flex flex-col gap-2 bg-[#07008A] rounded-lg p-2 min-w-[200px]">
+                    <textarea 
+                      autoFocus
+                      className="w-full bg-white/10 text-white text-[13px] border-none rounded p-2 focus:ring-1 focus:ring-white/30 resize-none min-h-[60px]"
+                      value={editVal}
+                      onChange={(e) => setEditVal(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                           e.preventDefault();
+                           handleUpdateLocal();
+                        } else if (e.key === "Escape") {
+                           setIsEditing(false);
+                        }
+                      }}
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button onClick={() => setIsEditing(false)} className="text-[10px] text-white/70 hover:text-white">Cancel</button>
+                      <button onClick={handleUpdateLocal} className="bg-white text-[#07008A] text-[10px] font-bold px-3 py-1 rounded">Save Changes</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-end">
+                    <p 
+                      onClick={() => setShowReactions(!showReactions)}
+                      className="text-[13px] text-white leading-snug bg-[#07008A] rounded-lg rounded-br-sm px-3 py-2 whitespace-pre-wrap flex-initial break-words max-w-full cursor-pointer active:scale-[0.98] transition-transform"
+                    >
+                      <MessageContent content={msg.content} teamMembers={teamMembers} />
+                    </p>
+                    {msg.metadata?.is_edited && (
+                      <span className="text-[9px] text-indigo-300/70 mt-0.5 italic">edited</span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Reactions Bar */}
@@ -1272,10 +1531,11 @@ function MessageBubble({
                 </span>
               </div>
               
-              {/* Desktop quick actions */}
-              <div className="absolute left-full top-3 ml-2 bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700 rounded-lg px-1 flex opacity-0 group-hover/bubble:opacity-100 transition-opacity z-10 hidden tablet:flex">
+              {/* Desktop quick actions - Floating above the bubble to avoid viewport issues */}
+              <div className="absolute left-0 top-0 -translate-y-[90%] bg-white dark:bg-slate-800 shadow-md border border-slate-100 dark:border-slate-700 rounded-lg px-1 flex opacity-0 group-hover/bubble:opacity-100 transition-all z-20 hidden tablet:flex hover:!-translate-y-full scale-90 origin-bottom-left">
                 <button onClick={() => setShowReactions(!showReactions)} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-amber-400"><SmilePlus className="h-3.5 w-3.5" /></button>
                 <button onClick={onReply} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-indigo-400"><ReplyIcon className="h-3.5 w-3.5 scale-x-[-1]" /></button>
+                <button onClick={onDelete} className="p-1.5 text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
               </div>
 
               {msg.metadata?.reply_to && (
@@ -1289,7 +1549,7 @@ function MessageBubble({
                     onClick={() => setShowReactions(!showReactions)}
                     className="text-[13px] text-slate-800 dark:text-slate-200 leading-snug bg-slate-100 dark:bg-slate-800 rounded-lg rounded-tl-sm px-3 py-2 whitespace-pre-wrap flex-initial break-words max-w-full cursor-pointer active:scale-[0.98] transition-transform"
                   >
-                    {msg.content === "👍" ? <span className="text-4xl leading-none block py-1">👍</span> : msg.content}
+                    <MessageContent content={msg.content} teamMembers={teamMembers} />
                   </p>
                </div>
 
@@ -1329,4 +1589,31 @@ function MessageBubble({
 }
 
 // Map alias for Reply
-import { CornerUpLeft as ReplyIcon } from "lucide-react";
+import { CornerUpLeft as ReplyIcon, Pencil, Trash2 } from "lucide-react";
+
+/* ------------------------------------------------------------------ */
+/*  Message Component with Mentions Support                             */
+/* ------------------------------------------------------------------ */
+
+function MessageContent({ content, teamMembers }: { content: string, teamMembers: TeamMember[] }) {
+  if (content === "👍") return <span className="text-4xl leading-none block py-1">👍</span>;
+
+  // Split by whitespace to check for @mentions
+  const tokens = content.split(/(\s+)/);
+  
+  return (
+    <>
+      {tokens.map((token, i) => {
+        if (token.startsWith("@")) {
+          const namePart = token.substring(1);
+          // Check if this matches a member name
+          const isMention = teamMembers.some(m => namePart.toLowerCase().startsWith(m.name.toLowerCase()));
+          if (isMention) {
+            return <span key={i} className="text-blue-400 dark:text-[#FED501] font-bold">{token}</span>;
+          }
+        }
+        return <span key={i}>{token}</span>;
+      })}
+    </>
+  );
+}
