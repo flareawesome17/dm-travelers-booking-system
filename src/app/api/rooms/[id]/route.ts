@@ -5,6 +5,21 @@ import { parseAndValidate, dbError, internalError } from "@/lib/api-security";
 import { updateRoomSchema } from "@/lib/validation-schemas";
 import { broadcastSystemMessage } from "@/lib/activity-hub";
 
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // We can use a basic permission check here or rely on the general token
+  // If "bookings.read" or "rooms.read" is suitable, let's use rooms.read
+  const auth = await requirePermission(req, "rooms.read");
+  if ("error" in auth) return auth.error;
+  
+  try {
+    const { id } = await params;
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase.from("rooms").select("*").eq("id", id).single();
+    if (error) return dbError(error, "Failed to fetch room");
+    return NextResponse.json(data);
+  } catch { return internalError(); }
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requirePermission(req, "rooms.update");
   if ("error" in auth) return auth.error;

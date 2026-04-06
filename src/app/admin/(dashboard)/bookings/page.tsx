@@ -538,7 +538,8 @@ export default function AdminBookingsPage() {
 
       {/* Edit dialog */}
       <Dialog open={!!editBooking} onOpenChange={(o) => {!o && setEditBooking(null)}}>
-        <DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Edit booking</DialogTitle></DialogHeader>
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto custom-scrollbar">
+          <DialogHeader><DialogTitle>Edit booking</DialogTitle></DialogHeader>
           {editBooking?.id && <EditBookingForm apiUrl="" token={token()} booking={editBooking as any} onSuccess={() => { setLoading(true); fetchBookings(); }} onClose={() => setEditBooking(null)} />}
         </DialogContent>
       </Dialog>

@@ -94,7 +94,10 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
     fetch(`${apiUrl}/api/rooms/${booking.room_id}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);
+        return r.json();
+      })
       .then(data => setRoom(data))
       .catch(err => console.error("Failed to fetch room details:", err));
 
