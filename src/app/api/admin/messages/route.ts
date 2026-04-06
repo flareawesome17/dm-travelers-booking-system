@@ -7,6 +7,11 @@ import { z } from "zod";
 const sendMessageSchema = z.object({
   content: z.string().min(1).max(2000),
   recipient_id: z.string().uuid().optional(),
+  reply_to: z.object({
+    id: z.string(),
+    content: z.string(),
+    sender: z.string()
+  }).optional(),
 });
 
 /* ------------------------------------------------------------------ */
@@ -127,6 +132,11 @@ export async function POST(req: NextRequest) {
     const adminName =
       typeof auth.payload.name === "string" ? auth.payload.name : "Admin";
 
+    const metadata: Record<string, any> = {};
+    if (parsed.data.reply_to) {
+      metadata.reply_to = parsed.data.reply_to;
+    }
+
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from("admin_messages")
@@ -137,6 +147,7 @@ export async function POST(req: NextRequest) {
         type: "user",
         category: "chat",
         recipient_id: parsed.data.recipient_id ?? null,
+        metadata,
       })
       .select()
       .single();
