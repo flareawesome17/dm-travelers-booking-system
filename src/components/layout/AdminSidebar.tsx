@@ -183,6 +183,7 @@ export default function AdminSidebar({
   const expiringPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onlineUsersPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastExpiringIdsRef = useRef<Set<string>>(new Set());
+  const [touchStart, setTouchStart] = useState<number | null>(null);
 
   const LAST_SEEN_KEY = "admin_bookings_last_seen";
 
@@ -343,6 +344,23 @@ export default function AdminSidebar({
 
   const filteredOps = filterByPermission(operationsItems);
   const filteredMgmt = filterByPermission(managementItems);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!isMobileOpen) return;
+    setTouchStart(e.touches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStart === null || !isMobileOpen) return;
+    const currentX = e.touches[0].clientX;
+    const diff = touchStart - currentX; // Swipe LEFT
+    if (diff > 70) {
+      onMobileClose?.();
+      setTouchStart(null);
+    }
+  };
+
+  const handleTouchEnd = () => setTouchStart(null);
 
   const initials = (() => {
     const n = currentAdmin?.name?.trim();
@@ -552,6 +570,9 @@ export default function AdminSidebar({
           className="fixed inset-0 bg-black/60 z-40 tablet:hidden backdrop-blur-sm"
           onClick={onMobileClose}
           aria-hidden="true"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         />
       )}
 
@@ -571,6 +592,9 @@ export default function AdminSidebar({
         style={{
           boxShadow: isMobileOpen ? '4px 0 24px rgba(0,0,0,0.3)' : undefined,
         }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
         {sidebarContent}
       </aside>

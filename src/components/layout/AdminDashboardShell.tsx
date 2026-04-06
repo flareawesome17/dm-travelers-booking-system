@@ -18,6 +18,7 @@ export default function AdminDashboardShell({
   const [permissions, setPermissions] = useState<string[]>([]);
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const [currentAdminId, setCurrentAdminId] = useState<string | undefined>();
+  const [touchStart, setTouchStart] = useState<number | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -154,8 +155,39 @@ export default function AdminDashboardShell({
 
   const handleMobileClose = useCallback(() => setIsMobileOpen(false), []);
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    // Only detect when sidebar is NOT open to trigger an 'open' swipe
+    // And only on mobile/tablet viewports (where the sidebar is a drawer)
+    if (isMobileOpen || window.innerWidth >= 1024) return;
+    const startX = e.touches[0].clientX;
+    // Edge detection: only if triggered within 30px of the screen edge
+    if (startX < 30) {
+      setTouchStart(startX);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStart === null) return;
+    const currentX = e.touches[0].clientX;
+    const diff = currentX - touchStart;
+    // Open the sidebar if the user swipes right by 70px
+    if (diff > 70) {
+      setIsMobileOpen(true);
+      setTouchStart(null);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setTouchStart(null);
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-[#07008A]/[0.02] overflow-x-hidden relative">
+    <div 
+      className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-[#07008A]/[0.02] overflow-x-hidden relative"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       <AdminSidebar
         isCollapsed={isCollapsed}
         onToggle={() => setIsCollapsed(!isCollapsed)}
