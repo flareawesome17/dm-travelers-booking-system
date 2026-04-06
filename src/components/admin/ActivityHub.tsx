@@ -223,6 +223,7 @@ export default function ActivityHub({
   const [mentionIndex, setMentionIndex] = useState(0);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default");
   const [msgToDelete, setMsgToDelete] = useState<string | null>(null);
+  const [activeActionsId, setActiveActionsId] = useState<string | null>(null);
 
   const adminRole = useMemo(() => {
     return teamMembers.find((m) => m.id === currentAdminId)?.role_id || null;
@@ -1026,6 +1027,8 @@ export default function ActivityHub({
                     onEdit={(newContent) => handleUpdateMessage(msg.id, newContent)}
                     onDelete={() => setMsgToDelete(msg.id)}
                     showDateSep={showDateSep}
+                    isActive={activeActionsId === msg.id}
+                    onSetActive={() => setActiveActionsId(activeActionsId === msg.id ? null : msg.id)}
                   />
                 )
               })}
@@ -1213,6 +1216,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 /* ------------------------------------------------------------------ */
 /*  Sub-components                                                      */
 /* ------------------------------------------------------------------ */
@@ -1296,6 +1306,8 @@ function MessageBubble({
   onEdit,
   onDelete,
   showDateSep,
+  isActive,
+  onSetActive,
 }: {
   msg: Message;
   isMe: boolean;
@@ -1307,6 +1319,8 @@ function MessageBubble({
   onEdit: (content: string) => void;
   onDelete: () => void;
   showDateSep: boolean;
+  isActive: boolean;
+  onSetActive: () => void;
 }) {
   const [swiping, setSwiping] = useState(false);
   const [swipeX, setSwipeX] = useState(0);
@@ -1441,14 +1455,6 @@ function MessageBubble({
                 </span>
               </div>
               
-              {/* Desktop quick actions - Floating above the bubble to avoid viewport issues */}
-              <div className="absolute right-0 top-0 -translate-y-[90%] bg-white dark:bg-slate-800 shadow-md border border-slate-100 dark:border-slate-700 rounded-lg px-1 flex opacity-0 group-hover/bubble:opacity-100 transition-all z-20 hidden tablet:flex hover:!-translate-y-full scale-90 origin-bottom-right">
-                <button onClick={() => setShowReactions(!showReactions)} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-amber-400"><SmilePlus className="h-3.5 w-3.5" /></button>
-                <button onClick={onReply} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-indigo-400"><ReplyIcon className="h-3.5 w-3.5 scale-x-[-1]" /></button>
-                <button onClick={() => setIsEditing(true)} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-amber-600"><Pencil className="h-3.5 w-3.5" /></button>
-                <button onClick={onDelete} className="p-1.5 text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
-              </div>
-
               {msg.metadata?.reply_to && (
                 <div className="mb-0.5 p-1.5 pl-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-[11px] text-indigo-700 dark:text-indigo-300 border-l-2 border-indigo-400 self-stretch opacity-80 backdrop-blur-sm z-0 translate-y-2 pb-3">
                   <span className="font-bold">{msg.metadata.reply_to.sender}:</span> {msg.metadata.reply_to.content}
@@ -1480,7 +1486,7 @@ function MessageBubble({
                 ) : (
                   <div className="flex flex-col items-end">
                     <p 
-                      onClick={() => setShowReactions(!showReactions)}
+                      onClick={() => onSetActive()}
                       className="text-[13px] text-white leading-snug bg-[#07008A] rounded-lg rounded-br-sm px-3 py-2 whitespace-pre-wrap flex-initial break-words max-w-full cursor-pointer active:scale-[0.98] transition-transform"
                     >
                       <MessageContent content={msg.content} teamMembers={teamMembers} />
@@ -1512,6 +1518,55 @@ function MessageBubble({
                 </div>
               )}
             </div>
+
+            {/* QUICK ACTIONS BAR */}
+            <div 
+              className={cn(
+                "absolute top-0 -translate-y-full mb-1 z-30 transition-all duration-200 flex items-center gap-1",
+                "right-0",
+                isActive ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none group-hover/bubble:opacity-100 group-hover/bubble:scale-100 group-hover/bubble:pointer-events-auto"
+              )}
+            >
+              <div className="flex items-center gap-0.5 p-1 bg-white/95 dark:bg-slate-800/95 backdrop-blur-md shadow-lg border border-slate-200/60 dark:border-slate-700/60 rounded-full">
+                <button 
+                  onClick={() => setShowReactions(!showReactions)} 
+                  className="h-8 w-8 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  title="React"
+                >
+                  <SmilePlus className="h-4 w-4" />
+                </button>
+                <button 
+                  onClick={onReply} 
+                  className="h-8 w-8 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  title="Reply"
+                >
+                  <ReplyIcon className="h-4 w-4 scale-x-[-1]" />
+                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="h-8 w-8 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors outline-none">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="rounded-xl p-1.5 shadow-2xl border-slate-200/60 dark:border-slate-700/60">
+                    <DropdownMenuItem onClick={() => setIsEditing(true)} className="rounded-lg gap-2 cursor-pointer">
+                      <Pencil className="h-3.5 w-3.5 text-amber-500" />
+                      <span>Edit Message</span>
+                    </DropdownMenuItem>
+                    {(isMe || [1, 5].includes(Number(adminRole))) && (
+                      <DropdownMenuItem onClick={onDelete} className="rounded-lg gap-2 cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/20">
+                         <Trash2 className="h-3.5 w-3.5" />
+                         <span>Delete for Everyone</span>
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem onClick={onReply} className="rounded-lg gap-2 cursor-pointer tablet:hidden">
+                       <ReplyIcon className="h-3.5 w-3.5 scale-x-[-1]" />
+                       <span>Reply</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="flex items-start gap-2.5 w-full">
@@ -1531,13 +1586,6 @@ function MessageBubble({
                 </span>
               </div>
               
-              {/* Desktop quick actions - Floating above the bubble to avoid viewport issues */}
-              <div className="absolute left-0 top-0 -translate-y-[90%] bg-white dark:bg-slate-800 shadow-md border border-slate-100 dark:border-slate-700 rounded-lg px-1 flex opacity-0 group-hover/bubble:opacity-100 transition-all z-20 hidden tablet:flex hover:!-translate-y-full scale-90 origin-bottom-left">
-                <button onClick={() => setShowReactions(!showReactions)} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-amber-400"><SmilePlus className="h-3.5 w-3.5" /></button>
-                <button onClick={onReply} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-indigo-400"><ReplyIcon className="h-3.5 w-3.5 scale-x-[-1]" /></button>
-                <button onClick={onDelete} className="p-1.5 text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
-              </div>
-
               {msg.metadata?.reply_to && (
                 <div className="mb-0.5 p-1.5 pl-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-[11px] text-indigo-700 dark:text-indigo-300 border-l-2 border-indigo-400 self-stretch opacity-80 backdrop-blur-sm z-0 translate-y-2 pb-3">
                   <span className="font-bold">{msg.metadata.reply_to.sender}:</span> {msg.metadata.reply_to.content}
@@ -1545,13 +1593,18 @@ function MessageBubble({
               )}
               
                <div className="relative z-10 w-full flex justify-start">
-                  <p 
-                    onClick={() => setShowReactions(!showReactions)}
-                    className="text-[13px] text-slate-800 dark:text-slate-200 leading-snug bg-slate-100 dark:bg-slate-800 rounded-lg rounded-tl-sm px-3 py-2 whitespace-pre-wrap flex-initial break-words max-w-full cursor-pointer active:scale-[0.98] transition-transform"
-                  >
-                    <MessageContent content={msg.content} teamMembers={teamMembers} />
-                  </p>
-               </div>
+                   <div className="flex flex-col items-start">
+                    <p 
+                      onClick={() => onSetActive()}
+                      className="text-[13px] text-slate-800 dark:text-slate-200 leading-snug bg-slate-100 dark:bg-slate-800 rounded-lg rounded-tl-sm px-3 py-2 whitespace-pre-wrap flex-initial break-words max-w-full cursor-pointer active:scale-[0.98] transition-transform"
+                    >
+                      <MessageContent content={msg.content} teamMembers={teamMembers} />
+                    </p>
+                    {msg.metadata?.is_edited && (
+                      <span className="text-[9px] text-slate-400 mt-0.5 italic">edited</span>
+                    )}
+                   </div>
+                </div>
 
               {/* Reactions Bar */}
               {Object.keys(reactionCount).length > 0 && (
@@ -1564,6 +1617,47 @@ function MessageBubble({
                   ))}
                 </div>
               )}
+            </div>
+
+             {/* QUICK ACTIONS BAR */}
+             <div 
+              className={cn(
+                "absolute top-0 -translate-y-full mb-1 z-30 transition-all duration-200 flex items-center gap-1",
+                "left-0 ml-[38px]",
+                isActive ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none group-hover/bubble:opacity-100 group-hover/bubble:scale-100 group-hover/bubble:pointer-events-auto"
+              )}
+            >
+              <div className="flex items-center gap-0.5 p-1 bg-white/95 dark:bg-slate-800/95 backdrop-blur-md shadow-lg border border-slate-200/60 dark:border-slate-700/60 rounded-full">
+                <button 
+                  onClick={() => setShowReactions(!showReactions)} 
+                  className="h-8 w-8 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  title="React"
+                >
+                  <SmilePlus className="h-4 w-4" />
+                </button>
+                <button 
+                  onClick={onReply} 
+                  className="h-8 w-8 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  title="Reply"
+                >
+                  <ReplyIcon className="h-4 w-4 scale-x-[-1]" />
+                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="h-8 w-8 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors outline-none">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="rounded-xl p-1.5 shadow-2xl border-slate-200/60 dark:border-slate-700/60">
+                    {(isMe || [1, 5].includes(Number(adminRole))) && (
+                      <DropdownMenuItem onClick={onDelete} className="rounded-lg gap-2 cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/20">
+                         <Trash2 className="h-3.5 w-3.5" />
+                         <span>Delete for Everyone</span>
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           </div>
         )}
@@ -1588,8 +1682,8 @@ function MessageBubble({
   );
 }
 
-// Map alias for Reply
-import { CornerUpLeft as ReplyIcon, Pencil, Trash2 } from "lucide-react";
+ // Map alias for Reply
+import { CornerUpLeft as ReplyIcon, Pencil, Trash2, MoreHorizontal } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
 /*  Message Component with Mentions Support                             */
