@@ -47,6 +47,12 @@ type BookingRow = {
   discount_amount?: number;
   discount_id?: string | null;
   cheque_number?: string | null;
+  guests?: {
+    id: string;
+    full_name?: string;
+    email?: string;
+    phone_number?: string;
+  };
 };
 
 type EditBookingFormProps = {
@@ -84,6 +90,11 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
   const [discountValue, setDiscountValue] = useState<number>(booking.discount_value ?? 0);
   const [discountType, setDiscountType] = useState<"fixed" | "percent">((booking.discount_type as "fixed" | "percent") ?? "fixed");
   const [discountId, setDiscountId] = useState<string | null>(booking.discount_id ?? null);
+  
+  // Guest Details
+  const [guestName, setGuestName] = useState(booking.guests?.full_name ?? "");
+  const [guestEmail, setGuestEmail] = useState(booking.guests?.email ?? "");
+  const [guestPhone, setGuestPhone] = useState(booking.guests?.phone_number ?? "");
 
   const [roomAvailability, setRoomAvailability] = useState<{ id: string; check_in_date: string; check_out_date: string; status: string; rate_plan_kind?: string | null }[]>([]);
 
@@ -232,6 +243,11 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
           total_amount: newRoomTotal,
           num_adults: numAdults,
           cheque_number: chequeNumber.trim() || null,
+          guest: {
+            full_name: guestName.trim() || "Guest",
+            email: guestEmail.trim() || "",
+            phone_number: guestPhone.trim() || "",
+          },
         }),
       });
 
@@ -274,20 +290,56 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
     <form onSubmit={handleSubmit} className="space-y-6 pt-2">
       <div className="space-y-4">
         {/* Reservation Status Section */}
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-           <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-3 block">Reservation Status</Label>
-           <select
-            className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-[#07008A]/20"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-          >
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </div>
+         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-3 block">Reservation Status</Label>
+            <select
+             className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-[#07008A]/20"
+             value={status}
+             onChange={(e) => setStatus(e.target.value)}
+           >
+             {STATUS_OPTIONS.map((s) => (
+               <option key={s} value={s}>
+                 {s}
+               </option>
+             ))}
+           </select>
+         </div>
+
+         {/* Guest Information Section */}
+         <div className="p-4 rounded-xl border border-slate-200 space-y-4">
+           <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">Guest Information</Label>
+           <div className="space-y-3">
+             <div className="space-y-1.5">
+               <Label className="text-[11px] text-slate-400">Full Name</Label>
+               <Input 
+                 value={guestName}
+                 onChange={(e) => setGuestName(e.target.value)}
+                 className="h-10 rounded-lg border-slate-200"
+                 placeholder="Guest full name"
+               />
+             </div>
+             <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] text-slate-400">Email Address</Label>
+                  <Input 
+                    value={guestEmail}
+                    onChange={(e) => setGuestEmail(e.target.value)}
+                    className="h-10 rounded-lg border-slate-200"
+                    placeholder="guest@mail.com"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] text-slate-400">Phone Number</Label>
+                  <Input 
+                    value={guestPhone}
+                    onChange={(e) => setGuestPhone(e.target.value)}
+                    className="h-10 rounded-lg border-slate-200"
+                    placeholder="09xx-xxx-xxxx"
+                  />
+                </div>
+             </div>
+           </div>
+         </div>
 
         {/* Schedule Section */}
         <div className="grid grid-cols-2 gap-4">

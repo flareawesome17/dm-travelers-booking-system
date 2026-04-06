@@ -38,6 +38,29 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     if (error || !data) return dbError(error, "Failed to update booking");
 
+    // Handle guest updates if provided
+    if (body.guest && data.guest_id) {
+      const { error: guestError } = await supabase
+        .from("guests")
+        .update({
+          full_name: body.guest.full_name,
+          email: body.guest.email,
+          phone_number: body.guest.phone_number,
+        })
+        .eq("id", data.guest_id);
+      
+      if (guestError) {
+        console.error("[GUEST_UPDATE_ERROR]", guestError);
+      } else {
+        // Update local data object to reflect the guest changes in the response
+        if (data.guests) {
+          data.guests.full_name = body.guest.full_name || data.guests.full_name;
+          data.guests.email = body.guest.email || data.guests.email;
+          data.guests.phone_number = body.guest.phone_number || data.guests.phone_number;
+        }
+      }
+    }
+
     let receivableSync: Awaited<ReturnType<typeof syncReceivableForBooking>> | null = null;
     if (
       "is_lgu_booking" in body ||
