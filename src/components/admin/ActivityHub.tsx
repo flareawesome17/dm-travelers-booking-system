@@ -210,6 +210,31 @@ export default function ActivityHub({
   useEffect(() => { activeDmPartnerRef.current = activeDmPartner; }, [activeDmPartner]);
   useEffect(() => { tabRef.current = tab; }, [tab]);
 
+  // Unlock AudioContext on first user interaction
+  useEffect(() => {
+    const initAudio = () => {
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        } else if (audioCtx.state === "suspended") {
+          audioCtx.resume();
+        }
+      } catch (err) {
+        // silent
+      }
+      document.removeEventListener("click", initAudio);
+      document.removeEventListener("touchstart", initAudio);
+    };
+
+    document.addEventListener("click", initAudio);
+    document.addEventListener("touchstart", initAudio);
+
+    return () => {
+      document.removeEventListener("click", initAudio);
+      document.removeEventListener("touchstart", initAudio);
+    };
+  }, []);
+
   // Sound preference
   useEffect(() => {
     try {
