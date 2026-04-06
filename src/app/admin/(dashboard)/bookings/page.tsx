@@ -98,6 +98,7 @@ export default function AdminBookingsPage() {
   const [checkOutBooking, setCheckOutBooking] = useState<BookingRow | null>(null);
   const [checkOutAt, setCheckOutAt] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
   const [search, setSearch] = useState<string>("");
   const [page, setPage] = useState<number>(1);
   const pageSize = 10;
@@ -234,9 +235,14 @@ export default function AdminBookingsPage() {
 
   const filtered = list.filter((b) => {
     const matchesStatus = statusFilter === "all" ? true : String(b.status || "").toLowerCase() === statusFilter.toLowerCase();
+    
+    let matchesType = true;
+    if (typeFilter === "lgu") matchesType = !!b.is_lgu_booking;
+    else if (typeFilter === "special") matchesType = !!b.is_special_booking;
+    else if (typeFilter === "normal") matchesType = !b.is_lgu_booking && !b.is_special_booking;
+
     const term = search.trim().toLowerCase();
-    if (!term) return matchesStatus;
-    const haystack = [
+    const matchesSearch = !term ? true : [
       b.reference_number,
       b.guests?.full_name,
       b.guests?.email,
@@ -246,8 +252,9 @@ export default function AdminBookingsPage() {
       b.is_lgu_booking ? "lgu booking" : "",
       b.is_special_booking ? "special booking" : "",
       b.special_booking_label,
-    ].filter(Boolean).join(" ").toLowerCase();
-    return matchesStatus && haystack.includes(term);
+    ].filter(Boolean).join(" ").toLowerCase().includes(term);
+
+    return matchesStatus && matchesType && matchesSearch;
   });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -289,8 +296,22 @@ export default function AdminBookingsPage() {
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <input type="text" placeholder="Search reference, guest name, email, room..." className="h-9 w-full rounded-md border border-input bg-white pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#07008A]/60 transition-all font-medium" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
             </div>
-            <div className="w-full sm:w-auto">
-              <select className="h-9 w-full sm:w-[200px] rounded-md border border-input bg-white px-3 text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#07008A]/60 transition-all" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <select 
+                className="h-9 w-full sm:w-[160px] rounded-md border border-input bg-white px-3 text-xs text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-[#07008A]/60 transition-all cursor-pointer" 
+                value={typeFilter} 
+                onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
+              >
+                <option value="all">All Types</option>
+                <option value="normal">Normal Booking</option>
+                <option value="lgu">LGU Booking</option>
+                <option value="special">Special Booking</option>
+              </select>
+              <select 
+                className="h-9 w-full sm:w-[160px] rounded-md border border-input bg-white px-3 text-xs text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-[#07008A]/60 transition-all cursor-pointer" 
+                value={statusFilter} 
+                onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+              >
                 <option value="all">All statuses</option>
                 <option value="Confirmed">Confirmed</option>
                 <option value="Checked-In">Checked-In</option>
@@ -324,8 +345,8 @@ export default function AdminBookingsPage() {
                           title="No bookings found" 
                           description={search || statusFilter !== "all" ? "We couldn't find any bookings matching your current filters." : "You have no bookings yet. Add one to get started."}
                           action={
-                            search || statusFilter !== "all" ? (
-                              <Button variant="outline" onClick={() => { setSearch(""); setStatusFilter("all"); setPage(1); }}>Reset Filters</Button>
+                            search || statusFilter !== "all" || typeFilter !== "all" ? (
+                              <Button variant="outline" onClick={() => { setSearch(""); setStatusFilter("all"); setTypeFilter("all"); setPage(1); }}>Reset Filters</Button>
                             ) : canCreate ? (
                               <Button className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={() => setOpen(true)}>
                                 <Plus className="h-4 w-4 mr-1" /> New booking
