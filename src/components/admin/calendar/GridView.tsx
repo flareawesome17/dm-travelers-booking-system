@@ -85,8 +85,9 @@ export function GridView({ rooms, currentMonth, onBookingClick }: GridViewProps)
       {/* Weekdays Header */}
       <div className="grid grid-cols-7 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 sticky top-0 z-20">
         {WEEKDAYS.map((day) => (
-          <div key={day} className="p-3 text-center text-xs font-bold uppercase tracking-wider text-slate-500">
-            {day}
+          <div key={day} className="p-2 md:p-3 text-center text-[10px] md:text-xs font-bold uppercase tracking-wider text-slate-500">
+            <span className="md:hidden">{day[0]}</span>
+            <span className="hidden md:block">{day}</span>
           </div>
         ))}
       </div>
@@ -97,7 +98,10 @@ export function GridView({ rooms, currentMonth, onBookingClick }: GridViewProps)
           const isCurrentMonth = isSameMonth(day, currentMonth);
           const isToday = isSameDay(day, new Date());
           const dayBookings = getDayBookings(day);
-          const displayLimit = 4;
+          
+          // Responsive display limit
+          const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+          const displayLimit = isMobile ? 2 : 4;
 
           return (
             <div 

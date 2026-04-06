@@ -71,7 +71,7 @@ export function TimelineView({ rooms, startDate, endDate, days, onBookingClick }
     <div className="flex flex-col border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm relative">
       {/* Header Row (Days) */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 sticky top-0 z-20">
-        <div className="w-40 shrink-0 border-r border-slate-200 dark:border-slate-800 p-4 font-semibold text-sm text-slate-700 dark:text-slate-300 flex items-center justify-center bg-slate-50 dark:bg-slate-900/80 z-30 sticky left-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+        <div className="w-24 md:w-40 shrink-0 border-r border-slate-200 dark:border-slate-800 p-2 md:p-4 font-semibold text-xs md:text-sm text-slate-700 dark:text-slate-300 flex items-center justify-center bg-slate-50 dark:bg-slate-900/80 z-30 sticky left-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
           Rooms
         </div>
         <div className="flex-1 relative flex text-sm text-slate-600 dark:text-slate-400 font-medium">
@@ -79,7 +79,7 @@ export function TimelineView({ rooms, startDate, endDate, days, onBookingClick }
             <div 
               key={idx} 
               className={cn(
-                "flex-1 border-r border-slate-100 dark:border-slate-800/50 p-3 text-center transition-colors min-w-[120px]",
+                "flex-1 border-r border-slate-100 dark:border-slate-800/50 p-2 md:p-3 text-center transition-colors min-w-[80px] md:min-w-[120px]",
                 isSameDay(day, new Date()) && "bg-blue-50/50 dark:bg-blue-900/10 text-blue-700 dark:text-blue-400 font-bold"
               )}
             >
@@ -96,13 +96,13 @@ export function TimelineView({ rooms, startDate, endDate, days, onBookingClick }
         {rooms.map((room) => (
           <div key={room.id} className="flex border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors group relative">
             {/* Room Axis (Sticky Left) */}
-            <div className="w-40 shrink-0 border-r border-slate-200 dark:border-slate-800 p-4 bg-white dark:bg-slate-900 z-10 sticky left-0 flex items-center gap-3 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] group-hover:bg-slate-50 dark:group-hover:bg-slate-800/50 transition-colors">
-              <div className="h-8 w-8 rounded-lg bg-[#07008A]/5 dark:bg-indigo-900/40 text-[#07008A] dark:text-indigo-400 flex items-center justify-center shrink-0">
-                <BedDouble className="h-4 w-4" />
+            <div className="w-24 md:w-40 shrink-0 border-r border-slate-200 dark:border-slate-800 p-2 md:p-4 bg-white dark:bg-slate-900 z-10 sticky left-0 flex items-center gap-2 md:gap-3 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] group-hover:bg-slate-50 dark:group-hover:bg-slate-800/50 transition-colors">
+              <div className="h-6 w-6 md:h-8 md:w-8 rounded-lg bg-[#07008A]/5 dark:bg-indigo-900/40 text-[#07008A] dark:text-indigo-400 flex items-center justify-center shrink-0">
+                <BedDouble className="h-3.5 w-3.5 md:h-4 md:w-4" />
               </div>
               <div className="min-w-0">
-                <p className="font-bold text-slate-800 dark:text-slate-200 truncate">Rm {room.room_number}</p>
-                <p className="text-[11px] text-slate-500 uppercase tracking-widest truncate">{room.type}</p>
+                <p className="font-bold text-xs md:text-sm text-slate-800 dark:text-slate-200 truncate">Rm {room.room_number}</p>
+                <p className="hidden md:block text-[11px] text-slate-500 uppercase tracking-widest truncate">{room.type}</p>
               </div>
             </div>
 
@@ -113,7 +113,7 @@ export function TimelineView({ rooms, startDate, endDate, days, onBookingClick }
                 <div 
                   key={`line-${idx}`} 
                   className={cn(
-                    "flex-1 border-r border-slate-100 dark:border-slate-800/50 pb-16 min-w-[120px]",
+                    "flex-1 border-r border-slate-100 dark:border-slate-800/50 pb-16 min-w-[80px] md:min-w-[120px]",
                     isSameDay(day, new Date()) && "bg-blue-50/20 dark:bg-blue-900/5"
                   )} 
                 />

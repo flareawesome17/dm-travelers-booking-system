@@ -77,11 +77,11 @@ export default function CalendarPage() {
       {/* Header controls */}
       <div className="flex flex-col gap-4 p-4 md:p-6 md:flex-row md:items-center justify-between shrink-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#07008A] dark:text-white flex items-center gap-2">
-            <CalendarIcon className="h-6 w-6 text-[#FED501]" />
+          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#07008A] dark:text-white flex items-center gap-2">
+            <CalendarIcon className="h-5 w-5 md:h-6 md:w-6 text-[#FED501]" />
             Booking Calendar
           </h1>
-          <p className="text-sm text-slate-500 mt-1">Visualize and manage room occupancy</p>
+          <p className="hidden sm:block text-sm text-slate-500 mt-1">Visualize and manage room occupancy</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -141,7 +141,8 @@ export default function CalendarPage() {
                 )}
                 onClick={() => setViewMode("timeline")}
              >
-                <List className="h-4 w-4 mr-1.5" /> Timeline
+                <List className="h-4 w-4 md:mr-1.5" /> 
+                <span className="hidden md:inline">Timeline</span>
              </Button>
              <Button
                 variant={viewMode === "grid" ? "default" : "ghost"}
@@ -157,7 +158,8 @@ export default function CalendarPage() {
                    setStartDate(startOfMonth(startDate));
                 }}
              >
-                <LayoutGrid className="h-4 w-4 mr-1.5" /> Grid
+                <LayoutGrid className="h-4 w-4 md:mr-1.5" /> 
+                <span className="hidden md:inline">Grid</span>
              </Button>
            </div>
         </div>
@@ -190,7 +192,7 @@ export default function CalendarPage() {
 
       {/* Booking Quick Action Sidebar or Modal */}
       {selectedBooking && (
-         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-80 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-5 z-50 animate-in slide-in-from-bottom-5">
+         <div className="fixed bottom-24 md:bottom-10 left-1/2 -translate-x-1/2 w-[calc(100vw-32px)] md:w-96 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-5 z-50 animate-in slide-in-from-bottom-5">
            <div className="flex justify-between items-start mb-3">
              <div>
                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
