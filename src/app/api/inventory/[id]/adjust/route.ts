@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { requirePermission } from "@/lib/rbac";
+import { broadcastSystemMessage } from "@/lib/activity-hub";
 
 export async function POST(
   req: NextRequest,
@@ -97,6 +98,15 @@ export async function POST(
 
     // Build response with low stock warning
     const lowStockWarning = newStock <= Number(item.min_stock_alert);
+
+    // Broadcast low stock alert to Activity Hub (fire-and-forget)
+    if (lowStockWarning) {
+      broadcastSystemMessage({
+        content: `⚠️ Low stock: "${item.name}" is at ${newStock} ${item.unit || "units"} (min: ${item.min_stock_alert}).`,
+        category: "inventory",
+        metadata: { item_id: id, current_stock: newStock, min_stock_alert: item.min_stock_alert },
+      }, supabase).catch(() => {});
+    }
 
     return NextResponse.json({
       item: { ...item, current_stock: newStock },

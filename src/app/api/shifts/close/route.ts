@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { requirePermission } from "@/lib/rbac";
 import { getOrCreateActiveShiftLog } from "@/lib/shiftUtils";
+import { broadcastSystemMessage } from "@/lib/activity-hub";
 
 export async function POST(req: NextRequest) {
   const auth = await requirePermission(req, "shifts.close");
@@ -73,6 +74,13 @@ export async function POST(req: NextRequest) {
       },
       performed_by_admin_id: adminId,
     });
+
+    // Broadcast shift close to Activity Hub
+    broadcastSystemMessage({
+      content: `${shift.name} shift has been closed. Income: ₱${totalIncome.toLocaleString()} | Expenses: ₱${totalExpense.toLocaleString()} | Net: ₱${netTotal.toLocaleString()}.`,
+      category: "shift",
+      metadata: { shift_log_id: shiftLog.id, shift_name: shift.name },
+    }, supabase).catch(() => {});
 
     return NextResponse.json({
       message: `${shift.name} shift closed successfully.`,

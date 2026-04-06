@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { requirePermission } from "@/lib/rbac";
+import { broadcastSystemMessage } from "@/lib/activity-hub";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requirePermission(req, "bookings.update");
@@ -79,6 +80,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         .eq("status", "Occupied");
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+
+    // Broadcast check-in to Activity Hub
+    const gName = data?.guests?.full_name || "Guest";
+    const rNum = data?.rooms?.room_number || "?";
+    broadcastSystemMessage({
+      content: `${gName} has checked in to Room ${rNum}.`,
+      category: "booking",
+      metadata: { booking_id: id, action: "check_in" },
+    }, supabase).catch(() => {});
+
     return NextResponse.json({ ...data, early_checkin_fee_applied: earlyFee });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

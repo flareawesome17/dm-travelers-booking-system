@@ -6,6 +6,7 @@ import { parseAndValidate, dbError, internalError } from "@/lib/api-security";
 import { createBookingSchema } from "@/lib/validation-schemas";
 import { syncReceivableForBooking } from "@/lib/receivables";
 import { addShiftTransaction } from "@/lib/shiftUtils";
+import { broadcastSystemMessage } from "@/lib/activity-hub";
 
 export async function GET(req: NextRequest) {
   const auth = await requirePermission(req, "bookings.read");
@@ -155,6 +156,19 @@ export async function POST(req: NextRequest) {
           console.error("[DEPOSIT_SHIFT_SYNC_ERROR]", shiftError);
         }
       }
+    }
+
+    // ── Activity Hub: broadcast new booking notification ──
+    try {
+      const guestName = data.guests?.full_name || "A guest";
+      const roomNumber = data.rooms?.room_number || "unassigned";
+      await broadcastSystemMessage({
+        content: `New booking created: ${guestName} in Room ${roomNumber} (${data.reference_number}). Total: ₱${Number(totalAmount).toLocaleString()}.`,
+        category: "booking",
+        metadata: { booking_id: data.id, reference_number: data.reference_number },
+      }, supabase);
+    } catch {
+      // Non-critical
     }
 
     return NextResponse.json(data, { status: 201 });

@@ -46,7 +46,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https://yqsjczhiemzngudppkhg.supabase.co https://*.supabase.co",
-              "connect-src 'self' https://yqsjczhiemzngudppkhg.supabase.co https://*.supabase.co",
+              "connect-src 'self' https://yqsjczhiemzngudppkhg.supabase.co https://*.supabase.co wss://yqsjczhiemzngudppkhg.supabase.co wss://*.supabase.co",
               "frame-src 'self' https://www.google.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",

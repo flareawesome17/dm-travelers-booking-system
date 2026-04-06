@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { requirePermission } from "@/lib/rbac";
+import { broadcastSystemMessage } from "@/lib/activity-hub";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requirePermission(req, "bookings.update");
@@ -96,6 +97,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         );
       }
     }
+
+    // Broadcast check-out to Activity Hub
+    const gName = data?.guests?.full_name || "Guest";
+    const rNum = data?.rooms?.room_number || "?";
+    broadcastSystemMessage({
+      content: `${gName} has checked out of Room ${rNum}. Room is now marked as Dirty.`,
+      category: "booking",
+      metadata: { booking_id: id, action: "check_out" },
+    }, supabase).catch(() => {});
 
     return NextResponse.json({ ...data, late_checkout_fee_applied: lateFee });
   } catch {

@@ -5,6 +5,7 @@ export async function GET(req: NextRequest) {
   const res = await getCurrentAdminPermissions(req);
   if ("error" in res) return res.error;
   return NextResponse.json({
+    admin_id: res.payload.sub,
     role_id: res.payload.role_id,
     permissions: res.permissions,
   });

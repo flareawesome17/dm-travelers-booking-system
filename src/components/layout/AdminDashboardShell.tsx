@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu } from "lucide-react";
 import AdminSidebar from "@/components/layout/AdminSidebar";
+import ActivityHub from "@/components/admin/ActivityHub";
 import { cn } from "@/lib/utils";
 import { PermissionsProvider } from "@/context/PermissionsContext";
 
@@ -16,6 +17,7 @@ export default function AdminDashboardShell({
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+  const [currentAdminId, setCurrentAdminId] = useState<string | undefined>();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -58,7 +60,10 @@ export default function AdminDashboardShell({
         const perms = Array.isArray(payload?.permissions)
           ? payload.permissions.filter((p: unknown) => typeof p === "string")
           : [];
-        if (!cancelled) setPermissions(perms);
+        if (!cancelled) {
+          setPermissions(perms);
+          if (typeof payload?.admin_id === "string") setCurrentAdminId(payload.admin_id);
+        }
       } finally {
         if (!cancelled) setPermissionsLoaded(true);
       }
@@ -128,7 +133,7 @@ export default function AdminDashboardShell({
   const handleMobileClose = useCallback(() => setIsMobileOpen(false), []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-[#07008A]/[0.02] touch-pan-x touch-pan-y">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-[#07008A]/[0.02]">
       <AdminSidebar
         isCollapsed={isCollapsed}
         onToggle={() => setIsCollapsed(!isCollapsed)}
@@ -167,6 +172,9 @@ export default function AdminDashboardShell({
           </div>
         </div>
       </main>
+
+      {/* Activity Hub – global chat & notification drawer */}
+      <ActivityHub currentAdminId={currentAdminId} permissions={permissions} />
     </div>
   );
 }
