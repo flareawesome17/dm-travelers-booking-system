@@ -154,20 +154,43 @@ export default function AdminDashboardPage() {
   });
 
   useEffect(() => {
+    const offsetStr = localStorage.getItem("app_timezone_offset") || "+08:00";
+    const offsetSign = offsetStr.startsWith("+") ? 1 : -1;
+    const [h, m] = offsetStr.substring(1).split(":").map(Number);
+    const offsetInMs = offsetSign * (h * 60 + (m || 0)) * 60 * 1000;
+    
+    const now = new Date(Date.now() + offsetInMs);
+    const today = now.toISOString().split("T")[0];
+    
     setNowData({
-      today: new Date().toISOString().split("T")[0],
+      today,
       timeOfDay: (() => {
-        const h = new Date().getHours();
-        if (h < 12) return "Good morning";
-        if (h < 18) return "Good afternoon";
+        const hour = now.getUTCHours();
+        if (hour < 12) return "Good morning";
+        if (hour < 18) return "Good afternoon";
         return "Good evening";
       })(),
-      localizedDate: new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
+      localizedDate: now.toLocaleDateString(undefined, { 
+        month: 'long', 
+        day: 'numeric', 
+        year: 'numeric',
+        timeZone: 'UTC'
+      })
     });
   }, []);
 
-  const arrivalsToday = bookings.filter(b => b.check_in_date?.startsWith(nowData.today) && b.status !== "Cancelled");
-  const departuresToday = bookings.filter(b => b.check_out_date?.startsWith(nowData.today) && b.status === "Checked-In");
+  const arrivalsToday = bookings.filter(b => {
+    const isToday = b.check_in_date?.startsWith(nowData.today);
+    const s = (b.status || "").toLowerCase().replace("-", " ");
+    const isArriving = !["checked in", "checked out", "cancelled", "completed"].includes(s);
+    return isToday && isArriving;
+  });
+
+  const departuresToday = bookings.filter(b => {
+    const isToday = b.check_out_date?.startsWith(nowData.today);
+    const s = (b.status || "").toLowerCase().replace("-", " ");
+    return isToday && (s === "checked in");
+  });
   
   const roomStats = {
     available: rooms.filter(r => r.status === "Available").length,
