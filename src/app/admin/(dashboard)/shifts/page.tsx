@@ -232,7 +232,8 @@ export default function ShiftsPage() {
 
       {showCloseModal && (
         <CloseShiftModal 
-          shiftLog={data?.shift_log} 
+          shiftLog={data?.shift_log}
+          shiftDef={data?.shift}
           onClose={() => setShowCloseModal(false)}
           onSuccess={fetchData}
         />

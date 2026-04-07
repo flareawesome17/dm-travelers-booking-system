@@ -159,10 +159,13 @@ export async function POST(req: NextRequest) {
             amount: Number(depositPaid),
             type: "INCOME",
             performedBy: typeof auth.payload?.sub === "string" ? auth.payload.sub : null,
-            onFailure: "silent",
+            onFailure: "throw",
           });
         } catch (shiftError) {
           console.error("[DEPOSIT_SHIFT_SYNC_ERROR]", shiftError);
+          // Payment was recorded in payments table but couldn't sync to shift ledger.
+          // Instead of rolling back: keep the payment, warn the user.
+          data._shift_sync_warning = "Deposit payment was saved but could not be recorded in the shift ledger. Please re-record this payment via the Record Payment action to sync it to the current shift.";
         }
       }
     }

@@ -395,7 +395,11 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
         return;
       }
 
-      toast.success("Booking created successfully.");
+      if (data?._shift_sync_warning) {
+        toast.warning("Booking created but the deposit was not recorded in the shift ledger. Use 'Record Payment' to sync it.", { duration: 8000 });
+      } else {
+        toast.success("Booking created successfully.");
+      }
       onSuccess(data);
       onClose();
     } catch {
