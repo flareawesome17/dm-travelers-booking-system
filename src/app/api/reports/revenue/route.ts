@@ -56,9 +56,9 @@ export async function GET(req: NextRequest) {
     const restaurantRevenue = (rOrders ?? []).reduce((s, r) => s + Number(r.total_amount || 0), 0);
     const receivableRevenue = (receivablePayments ?? []).reduce((s, rp) => s + Number(rp.amount || 0), 0);
 
-    const totalRevenue = roomRevenue + restaurantRevenue + receivableRevenue;
-    const totalExpenses = (expenses ?? []).reduce((s, e) => s + Number(e.amount || 0), 0);
-    const netProfit = totalRevenue - totalExpenses;
+    let totalRevenue = roomRevenue + restaurantRevenue + receivableRevenue;
+    let totalExpenses = (expenses ?? []).reduce((s, e) => s + Number(e.amount || 0), 0);
+    let netProfit = totalRevenue - totalExpenses;
 
     const byMethod: Record<string, number> = {};
     (payments ?? []).forEach((p) => {
@@ -101,6 +101,55 @@ export async function GET(req: NextRequest) {
     const bookingCount = Array.from(new Set((payments ?? []).map((p) => p.booking_id).filter(Boolean))).length;
     const orderCount = (rOrders ?? []).length;
     const receivableCollectionCount = (receivablePayments ?? []).length;
+
+    // --- Shift Ledger Single Source of Truth for All Periods ---
+    if (format !== "csv") {
+      let shiftQuery = supabase
+        .from("shift_logs")
+        .select("id, status, total_income, total_expense, net_total")
+        .order('date', { ascending: true });
+      
+      if (startDay) shiftQuery = shiftQuery.gte("date", startDay);
+      if (endDay) shiftQuery = shiftQuery.lte("date", endDay);
+
+      const { data: shiftLogs } = await shiftQuery;
+
+      if (shiftLogs && shiftLogs.length > 0) {
+        let shiftTotalIncome = 0;
+        let shiftTotalExpense = 0;
+
+        const openShiftIds = shiftLogs.filter(l => l.status !== "CLOSED").map(l => l.id);
+        let openShiftTxs: any[] = [];
+
+        if (openShiftIds.length > 0) {
+          const { data: txs } = await supabase
+            .from("shift_transactions")
+            .select("shift_log_id, amount, type")
+            .in("shift_log_id", openShiftIds);
+          openShiftTxs = txs || [];
+        }
+
+        for (const log of shiftLogs) {
+          if (log.status === "CLOSED") {
+            shiftTotalIncome += Number(log.total_income || 0);
+            shiftTotalExpense += Number(log.total_expense || 0);
+          } else {
+            const txList = openShiftTxs.filter(t => t.shift_log_id === log.id);
+            shiftTotalIncome += txList.filter(t => t.type === "INCOME").reduce((s, t) => s + Number(t.amount || 0), 0);
+            shiftTotalExpense += txList.filter(t => t.type === "EXPENSE").reduce((s, t) => s + Number(t.amount || 0), 0);
+          }
+        }
+
+        totalRevenue = shiftTotalIncome;
+        totalExpenses = shiftTotalExpense;
+        netProfit = totalRevenue - totalExpenses;
+      } else {
+        // If no shifts exist in range, income is 0 because ledger is the source of truth
+        totalRevenue = 0;
+        totalExpenses = 0;
+        netProfit = 0;
+      }
+    }
 
     return NextResponse.json({
       total_revenue: totalRevenue,

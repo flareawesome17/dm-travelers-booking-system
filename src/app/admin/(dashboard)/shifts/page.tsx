@@ -19,6 +19,8 @@ export default function ShiftsPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [orphans, setOrphans] = useState<{count: number; payments: any[]}>({ count: 0, payments: [] });
+  const [isRecovering, setIsRecovering] = useState(false);
   const { hasPermission } = usePermissions();
 
   const fetchData = useCallback(async () => {
@@ -27,17 +29,52 @@ export default function ShiftsPage() {
     
     
     try {
-      const res = await fetch("/api/shifts/current", {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const token = localStorage.getItem("admin_token");
+      const [res, orphanRes] = await Promise.all([
+        fetch("/api/shifts/current", {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        hasPermission("shifts.read") ? fetch("/api/shifts/recover-transactions", {
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(() => null) : Promise.resolve(null)
+      ]);
+
       if (!res.ok) throw new Error("Failed to load shift");
       setData(await res.json());
+
+      if (orphanRes && orphanRes.ok) {
+        setOrphans(await orphanRes.json());
+      }
     } catch {
       toast.error("Failed to fetch shift data");
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, hasPermission]);
+
+  const handleRecover = async () => {
+    if (!hasPermission("shifts.update")) {
+      toast.error("You don't have permission to modify shift transactions.");
+      return;
+    }
+
+    setIsRecovering(true);
+    try {
+      const res = await fetch("/api/shifts/recover-transactions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("admin_token")}` }
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to recover transactions");
+      
+      toast.success(json.message);
+      fetchData(); // Refresh the page to show the new transactions
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsRecovering(false);
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -75,9 +112,46 @@ export default function ShiftsPage() {
         <div className="space-y-6">
           
           <AnimatePresence>
+            {orphans.count > 0 && data.shift_log.status !== "CLOSED" && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="bg-orange-50 border border-orange-200 text-orange-900 px-4 py-3 rounded-md flex flex-col gap-3">
+                <div className="flex items-start gap-3">
+                  <ShieldAlert className="h-5 w-5 mt-0.5 text-orange-600 shrink-0" />
+                  <div className="text-sm flex-1">
+                    <span className="font-semibold block text-base text-orange-700">Warning: Unsynced Payments Detected</span>
+                    <p className="mt-1">
+                      Found <strong>{orphans.count}</strong> payment(s) in the system that failed to attach to a shift ledger 
+                      (Total: <strong>₱{orphans.payments.reduce((s, p) => s + Number(p.amount), 0).toFixed(2)}</strong>).
+                      This usually happens if a payment was recorded just as a shift was closed.
+                    </p>
+                    
+                    <div className="mt-3 space-y-2 border-t border-orange-200/60 pt-3">
+                      {orphans.payments.map((p, i) => (
+                        <div key={p.id || i} className="flex justify-between items-center bg-orange-100/50 p-2 rounded text-xs px-3 border border-orange-200/50">
+                          <div>
+                            <span className="font-bold uppercase mr-2">{p.reference_number}</span>
+                            <span className="text-orange-800/70">{p.type} via {p.method}</span>
+                          </div>
+                          <span className="font-bold text-orange-700">₱{Number(p.amount).toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between">
+                      <p className="text-xs text-orange-800/80 italic">Recovering will attach these to the current <strong>{data.shift.name}</strong> shift ledger.</p>
+                      {hasPermission("shifts.update") && (
+                        <Button size="sm" onClick={handleRecover} disabled={isRecovering} className="bg-orange-600 hover:bg-orange-700 text-white shadow-sm border-0">
+                          {isRecovering ? "Recovering..." : "Recover to Current Shift"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             {data.warnings?.previous_shift_open && (
               <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-md flex items-start gap-3">
-                <ShieldAlert className="h-5 w-5 mt-0.5 text-amber-600" />
+                <ShieldAlert className="h-5 w-5 mt-0.5 text-amber-600 shrink-0" />
                 <div className="text-sm">
                   <span className="font-semibold block">Previous Shift Left Open!</span>
                   The ledger from the previous shift was not closed properly. Please investigate and close it manually in the backend to ensure accurate tracking.

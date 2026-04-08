@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   BarChart3, Download, Banknote, TrendingUp, TrendingDown, 
-  Wallet, Plus, Calendar, Filter, PieChart, ArrowUpRight, ArrowDownRight, ShieldAlert, User
+  Wallet, Plus, Calendar, Filter, PieChart, ArrowUpRight, ArrowDownRight, ShieldAlert, User, Printer
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/ui/empty-state";
 import { usePermissions } from "@/context/PermissionsContext";
+import PrintableDailyReport from "@/components/admin/reports/PrintableDailyReport";
 
 type ReportData = {
   total_revenue: number;
@@ -41,6 +42,7 @@ export default function AdminReportsPage() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("monthly");
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
+  const [showPrintableReport, setShowPrintableReport] = useState(false);
   const { hasPermission } = usePermissions();
   const router = useRouter();
 
@@ -146,11 +148,18 @@ export default function AdminReportsPage() {
                <TabsTrigger value="yearly" className="text-xs px-3 py-1.5">Yearly</TabsTrigger>
              </TabsList>
            </Tabs>
-           {hasPermission("reports.export") && (
-             <Button onClick={handleExport} variant="outline" size="sm" className="h-9">
-               <Download className="h-4 w-4 mr-2" /> Export
-             </Button>
-           )}
+           <div className="flex bg-slate-100 rounded-md border p-1 h-10 items-center justify-center">
+             {period === "daily" && (
+                <Button onClick={() => setShowPrintableReport(true)} variant="ghost" size="sm" className="h-8">
+                  <Printer className="h-4 w-4 mr-2" /> Print Handover
+                </Button>
+             )}
+             {hasPermission("reports.export") && (
+               <Button onClick={handleExport} variant="ghost" size="sm" className="h-8 border-l border-slate-200 rounded-l-none">
+                 <Download className="h-4 w-4 mr-2" /> Export CSV
+               </Button>
+             )}
+           </div>
          </div>
       </div>
 
@@ -403,6 +412,14 @@ export default function AdminReportsPage() {
               </div>
             </CardContent>
           </Card>
+
+          {showPrintableReport && (
+            <PrintableDailyReport 
+              data={data} 
+              onClose={() => setShowPrintableReport(false)} 
+              dateLabel={new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            />
+          )}
         </>
       )}
     </div>
