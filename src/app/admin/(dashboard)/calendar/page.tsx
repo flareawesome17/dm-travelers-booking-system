@@ -1,18 +1,33 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { format, addDays, subDays, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth } from "date-fns";
-import { TimelineView } from "@/components/admin/calendar/TimelineView";
-import { GridView } from "@/components/admin/calendar/GridView";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, LayoutGrid, List, Loader2, Layers } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { toast } from "@/components/ui/sonner";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { addDays, endOfMonth, eachDayOfInterval, format, startOfDay, startOfMonth, subDays } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ExtendStayModal } from "@/components/admin/bookings/ExtendStayModal";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { GridView } from "@/components/admin/calendar/GridView";
+import { TimelineView } from "@/components/admin/calendar/TimelineView";
+import { toast } from "@/components/ui/sonner";
+import { cn } from "@/lib/utils";
 import { usePermissions } from "@/context/PermissionsContext";
+import {
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  LayoutGrid,
+  List,
+  Loader2,
+  Sparkles,
+  X,
+} from "lucide-react";
+
+const LEGEND_ITEMS = [
+  { label: "Core Booking", className: "bg-[#07008A]/[0.07] text-[#07008A] border-[#07008A]/15" },
+  { label: "LGU", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  { label: "Special", className: "bg-amber-50 text-amber-700 border-amber-200" },
+  { label: "Checked-Out", className: "bg-rose-50 text-rose-700 border-rose-200" },
+];
 
 export default function CalendarPage() {
   const { hasPermission } = usePermissions();
@@ -20,236 +35,247 @@ export default function CalendarPage() {
   const [rooms, setRooms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"timeline" | "grid">("timeline");
-  
-  // Controls
-  const [viewWindowDays, setViewWindowDays] = useState(14); // e.g. 14 days viewed at once
-  const [startDate, setStartDate] = useState<Date>(startOfDay(subDays(new Date(), 2))); // start 2 days ago for context
-  
-  const endDate = useMemo(() => {
-    if (viewMode === "grid") return endOfMonth(startDate);
-    return addDays(startDate, viewWindowDays);
-  }, [startDate, viewWindowDays, viewMode]);
-
-  const days = useMemo(() => eachDayOfInterval({ start: startDate, end: endDate }), [startDate, endDate]);
-
-  // Selected booking for action
+  const [viewWindowDays] = useState(14);
+  const [startDate, setStartDate] = useState<Date>(startOfDay(subDays(new Date(), 2)));
   const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
   const [showExtendModal, setShowExtendModal] = useState(false);
   const [token, setToken] = useState("");
 
-  const fetchData = async () => {
+  const endDate = useMemo(() => {
+    if (viewMode === "grid") return endOfMonth(startDate);
+    return addDays(startDate, viewWindowDays);
+  }, [startDate, viewMode, viewWindowDays]);
+
+  const days = useMemo(() => eachDayOfInterval({ start: startDate, end: endDate }), [startDate, endDate]);
+  const rangeLabel = useMemo(() => `${format(startDate, "MMM d, yyyy")} - ${format(endDate, "MMM d, yyyy")}`, [endDate, startDate]);
+
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const t = localStorage.getItem("admin_token");
-      if (t) setToken(t);
+      const adminToken = localStorage.getItem("admin_token") || "";
+      if (adminToken) setToken(adminToken);
 
-      // Fetch overlapping bookings
-      const startStr = startDate.toISOString();
-      const endStr = endDate.toISOString();
-      const res = await fetch(`/api/admin/calendar?start_date=${encodeURIComponent(startStr)}&end_date=${encodeURIComponent(endStr)}`, {
-        headers: { Authorization: `Bearer ${t}` }
-      });
+      const res = await fetch(
+        `/api/admin/calendar?start_date=${encodeURIComponent(startDate.toISOString())}&end_date=${encodeURIComponent(endDate.toISOString())}`,
+        { headers: { Authorization: `Bearer ${adminToken}` } },
+      );
+
       if (!res.ok) throw new Error("Failed to fetch calendar data");
       const data = await res.json();
-      setRooms(data);
-    } catch (err) {
-      console.error(err);
+      setRooms(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error(error);
       toast.error("Failed to load calendar data");
     } finally {
       setLoading(false);
     }
-  };
+  }, [endDate, startDate]);
 
   useEffect(() => {
     fetchData();
-  }, [startDate, endDate]);
+  }, [fetchData]);
 
   const handleBookingClick = (booking: any) => {
     setSelectedBooking(booking);
   };
 
-  // Auto-close booking preview dialog when clicking outside (done via extending state logic if mapped)
-  // For simplicity, we just trigger ExtendStayModal explicitly or a Custom Popover on click.
-  // We'll use a basic handler for now: we intercept the booking and show a simple floating card or open a standard modal.
-  
+  const jumpToToday = () => {
+    const now = new Date();
+    setStartDate(viewMode === "grid" ? startOfMonth(now) : startOfDay(subDays(now, 2)));
+  };
+
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-72px)] overflow-hidden bg-slate-50 dark:bg-slate-900/50">
-      {/* Header controls */}
-      <div className="flex flex-col gap-4 p-4 md:p-6 md:flex-row md:items-center justify-between shrink-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#07008A] dark:text-white flex items-center gap-2">
-            <CalendarIcon className="h-5 w-5 md:h-6 md:w-6 text-[#FED501]" />
-            Booking Calendar
-          </h1>
-          <p className="hidden sm:block text-sm text-slate-500 mt-1">Visualize and manage room occupancy</p>
-        </div>
+    <div className="flex h-[calc(100vh-72px)] flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(254,213,1,0.09),transparent_26%),linear-gradient(180deg,#f8fafc_0%,#f1f5f9_100%)]">
+      <div
+        data-testid="calendar-toolbar"
+        className="sticky top-0 z-40 shrink-0 border-b border-slate-200/80 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/88"
+      >
+        <div className="flex flex-col gap-4 px-4 py-4 md:px-6 md:py-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#FED501]/50 bg-[#FED501]/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#8a6b00]">
+                <Sparkles className="h-3.5 w-3.5" />
+                Front Desk Board
+              </div>
+              <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight text-[#07008A] md:text-3xl">
+                <CalendarIcon className="h-5 w-5 text-[#FED501] md:h-6 md:w-6" />
+                Booking Calendar
+              </h1>
+              <p className="mt-1 text-sm text-slate-500">Visualize and manage room occupancy with a clearer operational timeline.</p>
+            </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-           <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-             <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 hover:bg-white dark:hover:bg-slate-700 hover:shadow-sm"
-                onClick={() => setStartDate(subDays(startDate, 7))}
-             >
-                <ChevronLeft className="h-4 w-4" />
-             </Button>
-             
-             <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="h-8 px-3 mx-1 font-medium bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700">
-                  {format(startDate, "MMM d, yyyy")} - {format(endDate, "MMM d, yyyy")}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50/80 p-1 shadow-sm">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 rounded-xl text-slate-600 hover:bg-white hover:text-slate-900"
+                  onClick={() => setStartDate(subDays(startDate, viewMode === "grid" ? 30 : 7))}
+                >
+                  <ChevronLeft className="h-4 w-4" />
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="center">
-                 <Calendar
-                    mode="single"
-                    selected={startDate}
-                    onSelect={(d) => d && setStartDate(d)}
-                    initialFocus
-                 />
-              </PopoverContent>
-             </Popover>
 
-             <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 hover:bg-white dark:hover:bg-slate-700 hover:shadow-sm"
-                onClick={() => setStartDate(addDays(startDate, 7))}
-             >
-                <ChevronRight className="h-4 w-4" />
-             </Button>
-           </div>
-           
-           <Button variant="outline" className="h-10 border-slate-200 dark:border-slate-700" onClick={() => {
-             const now = new Date();
-             setStartDate(viewMode === "grid" ? startOfMonth(now) : startOfDay(subDays(now, 2)));
-           }}>
-             Today
-           </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="h-9 rounded-xl border-slate-200 bg-white px-4 font-semibold text-slate-700 shadow-sm">
+                      {rangeLabel}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto rounded-2xl border-slate-200 p-0 shadow-xl" align="center">
+                    <Calendar
+                      mode="single"
+                      selected={startDate}
+                      onSelect={(date) => {
+                        if (!date) return;
+                        setStartDate(viewMode === "grid" ? startOfMonth(date) : startOfDay(date));
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
 
-           {/* View Switcher */}
-           <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-             <Button
-                variant={viewMode === "timeline" ? "default" : "ghost"}
-                size="sm"
-                className={cn(
-                  "h-8 px-3 transition-all",
-                  viewMode === "timeline" 
-                    ? "bg-white text-slate-800 shadow-sm dark:bg-slate-700 dark:text-white" 
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                )}
-                onClick={() => setViewMode("timeline")}
-             >
-                <List className="h-4 w-4 md:mr-1.5" /> 
-                <span className="hidden md:inline">Timeline</span>
-             </Button>
-             <Button
-                variant={viewMode === "grid" ? "default" : "ghost"}
-                size="sm"
-                className={cn(
-                  "h-8 px-3 transition-all",
-                  viewMode === "grid" 
-                    ? "bg-white text-slate-800 shadow-sm dark:bg-slate-700 dark:text-white" 
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                )}
-                onClick={() => {
-                   setViewMode("grid");
-                   setStartDate(startOfMonth(startDate));
-                }}
-             >
-                <LayoutGrid className="h-4 w-4 md:mr-1.5" /> 
-                <span className="hidden md:inline">Grid</span>
-             </Button>
-           </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 rounded-xl text-slate-600 hover:bg-white hover:text-slate-900"
+                  onClick={() => setStartDate(addDays(startDate, viewMode === "grid" ? 30 : 7))}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <Button variant="outline" className="h-10 rounded-2xl border-slate-200 bg-white font-semibold text-slate-700 shadow-sm" onClick={jumpToToday}>
+                Today
+              </Button>
+
+              <div className="flex rounded-2xl border border-slate-200 bg-slate-50/80 p-1 shadow-sm">
+                <Button
+                  variant={viewMode === "timeline" ? "default" : "ghost"}
+                  size="sm"
+                  className={cn(
+                    "h-9 rounded-xl px-4",
+                    viewMode === "timeline"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-500 hover:text-slate-800",
+                  )}
+                  onClick={() => setViewMode("timeline")}
+                >
+                  <List className="mr-1.5 h-4 w-4" />
+                  Timeline
+                </Button>
+                <Button
+                  variant={viewMode === "grid" ? "default" : "ghost"}
+                  size="sm"
+                  className={cn(
+                    "h-9 rounded-xl px-4",
+                    viewMode === "grid"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-500 hover:text-slate-800",
+                  )}
+                  onClick={() => {
+                    setViewMode("grid");
+                    setStartDate(startOfMonth(startDate));
+                  }}
+                >
+                  <LayoutGrid className="mr-1.5 h-4 w-4" />
+                  Grid
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {LEGEND_ITEMS.map((item) => (
+              <span
+                key={item.label}
+                className={cn("inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]", item.className)}
+              >
+                {item.label}
+              </span>
+            ))}
+            <span className="ml-auto hidden text-[11px] font-medium text-slate-400 md:inline">
+              {viewMode === "timeline" ? `${days.length} visible days` : format(startDate, "MMMM yyyy")}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Main Timeline View */}
-      <div className="flex-1 overflow-auto p-4 md:p-6 relative">
+      <div className="relative flex-1 overflow-auto">
         {loading && rooms.length === 0 ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm z-50">
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/55 backdrop-blur-sm">
             <Loader2 className="h-8 w-8 animate-spin text-[#07008A]" />
           </div>
         ) : null}
-        
-        {viewMode === "timeline" ? (
-          <TimelineView 
-             rooms={rooms}
-             startDate={startDate}
-             endDate={endDate}
-             days={days}
-             onBookingClick={handleBookingClick}
-          />
-        ) : (
-          <GridView 
-             rooms={rooms}
-             currentMonth={startDate}
-             onBookingClick={handleBookingClick}
-          />
-        )}
+
+        <div className="p-4 md:p-6">
+          {viewMode === "timeline" ? (
+            <TimelineView rooms={rooms} startDate={startDate} endDate={endDate} days={days} onBookingClick={handleBookingClick} />
+          ) : (
+            <GridView rooms={rooms} currentMonth={startDate} onBookingClick={handleBookingClick} />
+          )}
+        </div>
       </div>
 
-      {/* Booking Quick Action Sidebar or Modal */}
-      {selectedBooking && (
-         <div className="fixed bottom-24 md:bottom-10 left-1/2 -translate-x-1/2 w-[calc(100vw-32px)] md:w-96 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-5 z-50 animate-in slide-in-from-bottom-5">
-           <div className="flex justify-between items-start mb-3">
-             <div>
-               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                 {selectedBooking.is_lgu_booking ? "LGU Booking" : selectedBooking.is_special_booking ? "Special Event" : "Booking"}
-               </p>
-               <h3 className="font-bold text-slate-800 dark:text-slate-100">{selectedBooking.guests?.full_name}</h3>
-             </div>
-             <button onClick={() => setSelectedBooking(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1 -mr-1">
-               <Layers className="h-4 w-4" />
-             </button>
-           </div>
-           
-           <div className="space-y-4 mb-5">
-               <div className="flex items-center gap-2 mb-2">
-                  <span className={cn(
-                     "px-2 py-0.5 text-[10px] font-bold uppercase rounded-full border",
-                     (selectedBooking.status === "Checked Out" || selectedBooking.status === "Checked-Out")
-                        ? "bg-rose-100 border-rose-200 text-rose-700" 
-                        : (selectedBooking.status === "Checked In" || selectedBooking.status === "Checked-In")
-                           ? "bg-emerald-100 border-emerald-200 text-emerald-700"
-                           : "bg-blue-100 border-blue-200 text-blue-700"
-                  )}>
-                     {selectedBooking.status}
-                  </span>
-               </div>
-               <div className="grid grid-cols-2 gap-2 text-xs">
-                  {/* Left Block: Check In */}
-                  {(selectedBooking.status !== "Checked-Out" && selectedBooking.status !== "Checked Out") ? (
-                     <div className="bg-slate-50 dark:bg-slate-900 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
-                        <p className="text-slate-400">{selectedBooking.actual_check_in ? "Checked In" : "Sched In"}</p>
-                        <p className="font-semibold text-slate-700 dark:text-slate-300">
-                           {format(new Date(selectedBooking.actual_check_in || selectedBooking.check_in_date), "MMM d, h:mm a")}
-                        </p>
-                     </div>
-                  ) : null}
+      {selectedBooking ? (
+        <div className="fixed inset-x-0 bottom-4 z-50 flex justify-center px-4 md:bottom-6">
+          <div className="w-full max-w-[420px] rounded-[28px] border border-slate-200/80 bg-white/97 p-5 shadow-[0_30px_80px_rgba(15,23,42,0.22)] backdrop-blur">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                  {selectedBooking.is_lgu_booking ? "LGU Booking" : selectedBooking.is_special_booking ? "Special Booking" : "Booking"}
+                </p>
+                <h3 className="mt-2 truncate text-lg font-bold text-slate-900">{selectedBooking.guests?.full_name || "Guest"}</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Room {selectedBooking.room_number || selectedBooking.rooms?.room_number || "Unassigned"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedBooking(null)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
 
-                  {/* Right Block: Check Out */}
-                  <div className={cn(
-                     "bg-slate-50 dark:bg-slate-900 p-2 rounded-lg border border-slate-100 dark:border-slate-800",
-                     (selectedBooking.status === "Checked-Out" || selectedBooking.status === "Checked Out") ? "col-span-2 text-center" : ""
-                  )}>
-                     <p className="text-slate-400">
-                        {(selectedBooking.status === "Checked-Out" || selectedBooking.status === "Checked Out") 
-                           ? "Checked Out" 
-                           : (selectedBooking.actual_check_out ? "Checked Out" : "Sched Out")}
-                     </p>
-                     <p className="font-semibold text-slate-700 dark:text-slate-300">
-                        {format(new Date(selectedBooking.actual_check_out || selectedBooking.check_out_date || new Date()), "MMM d, h:mm a")}
-                     </p>
-                  </div>
-               </div>
-           </div>
-           
-           <div className="grid grid-cols-2 gap-2">
-              <Button 
-                variant="outline" 
-                className="w-full text-xs h-8"
+            <div className="mb-5 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                  {selectedBooking.actual_check_in ? "Checked In" : "Scheduled In"}
+                </p>
+                <p className="mt-2 text-sm font-semibold text-slate-800">
+                  {format(new Date(selectedBooking.actual_check_in || selectedBooking.check_in_date), "MMM d, h:mm a")}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                  {selectedBooking.actual_check_out ? "Checked Out" : "Scheduled Out"}
+                </p>
+                <p className="mt-2 text-sm font-semibold text-slate-800">
+                  {format(new Date(selectedBooking.actual_check_out || selectedBooking.check_out_date || new Date()), "MMM d, h:mm a")}
+                </p>
+              </div>
+            </div>
+
+            <div className="mb-5">
+              <span
+                className={cn(
+                  "inline-flex rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em]",
+                  selectedBooking.status === "Checked-Out" || selectedBooking.status === "Checked Out"
+                    ? "border-rose-200 bg-rose-50 text-rose-700"
+                    : selectedBooking.status === "Checked-In" || selectedBooking.status === "Checked In"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-[#07008A]/15 bg-[#07008A]/[0.06] text-[#07008A]",
+                )}
+              >
+                {selectedBooking.status}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                variant="outline"
+                className="h-10 rounded-2xl border-slate-200"
                 onClick={() => {
                   window.open(`/admin/bookings?id=${selectedBooking.id}`, "_blank");
                   setSelectedBooking(null);
@@ -257,19 +283,17 @@ export default function CalendarPage() {
               >
                 View Details
               </Button>
-              {canUpdate && (
-                <Button 
-                  className="w-full text-xs h-8 bg-[#07008A] hover:bg-[#05006a] text-white"
-                  onClick={() => setShowExtendModal(true)}
-                >
+              {canUpdate ? (
+                <Button className="h-10 rounded-2xl bg-[#07008A] text-white hover:bg-[#05006a]" onClick={() => setShowExtendModal(true)}>
                   Extend Stay
                 </Button>
-              )}
-           </div>
-         </div>
-      )}
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
-      {selectedBooking && showExtendModal && (
+      {selectedBooking && showExtendModal ? (
         <ExtendStayModal
           open={showExtendModal}
           onClose={() => setShowExtendModal(false)}
@@ -280,7 +304,7 @@ export default function CalendarPage() {
             setSelectedBooking(null);
           }}
         />
-      )}
+      ) : null}
     </div>
   );
 }

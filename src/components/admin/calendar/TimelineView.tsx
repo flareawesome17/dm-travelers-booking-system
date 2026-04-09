@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { format, differenceInMinutes, addDays, startOfDay, endOfDay, isSameDay } from "date-fns";
+import { format, isSameDay } from "date-fns";
+import { BedDouble, ChevronLeft, ChevronRight, Crown, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { BedDouble, User, Crown, Info } from "lucide-react";
+import { packTimelineBookings } from "@/lib/calendarLayout";
 
 type Booking = {
   id: string;
@@ -36,144 +37,221 @@ type TimelineViewProps = {
   onBookingClick?: (booking: Booking) => void;
 };
 
+const ROOM_COLUMN_WIDTH = 224;
+const DAY_COLUMN_MIN_WIDTH = 140;
+const LANE_HEIGHT = 38;
+const ROW_PADDING = 14;
+
+function getStatusTone(booking: Booking) {
+  const isCheckedOut = booking.status === "Checked Out" || booking.status === "Checked-Out";
+  if (isCheckedOut) {
+    return {
+      chip: "border-rose-300 bg-rose-50 text-rose-700 shadow-[0_8px_20px_rgba(244,63,94,0.08)]",
+      accent: "bg-rose-500/70",
+      meta: "text-rose-600",
+    };
+  }
+
+  if (booking.is_lgu_booking) {
+    return {
+      chip: "border-emerald-300 bg-emerald-50 text-emerald-800 shadow-[0_8px_24px_rgba(16,185,129,0.12)]",
+      accent: "bg-emerald-500/80",
+      meta: "text-emerald-700",
+    };
+  }
+
+  if (booking.is_special_booking) {
+    return {
+      chip: "border-amber-300 bg-amber-50 text-amber-800 shadow-[0_8px_24px_rgba(245,158,11,0.12)]",
+      accent: "bg-amber-500/80",
+      meta: "text-amber-700",
+    };
+  }
+
+  return {
+    chip: "border-[#07008A]/25 bg-[#07008A]/[0.07] text-[#07008A] shadow-[0_10px_28px_rgba(7,0,138,0.12)]",
+    accent: "bg-[#07008A]/80",
+    meta: "text-[#07008A]/75",
+  };
+}
+
 export function TimelineView({ rooms, startDate, endDate, days, onBookingClick }: TimelineViewProps) {
-  const totalMinutes = useMemo(() => differenceInMinutes(endDate, startDate), [startDate, endDate]);
   const [hoveredBlock, setHoveredBlock] = useState<string | null>(null);
 
-  const getBookingStyle = (booking: Booking) => {
-    const bookingStart = new Date(booking.actual_check_in || booking.check_in_date);
-    const bookingEnd = new Date(booking.actual_check_out || booking.check_out_date || new Date().toISOString());
+  const packedRooms = useMemo(() => {
+    return rooms.map((room) => {
+      const packedBookings = packTimelineBookings(room.bookings, startDate, endDate);
+      const laneCount = Math.max(1, packedBookings[0]?.laneCount || 1);
+      const rowHeight = Math.max(78, laneCount * LANE_HEIGHT + ROW_PADDING * 2);
 
-    // Clamp to viewport
-    const effectiveStart = bookingStart < startDate ? startDate : bookingStart;
-    const effectiveEnd = bookingEnd > endDate ? endDate : bookingEnd;
+      return {
+        ...room,
+        packedBookings,
+        laneCount,
+        rowHeight,
+      };
+    });
+  }, [rooms, startDate, endDate]);
 
-    const leftMinutes = differenceInMinutes(effectiveStart, startDate);
-    const widthMinutes = differenceInMinutes(effectiveEnd, effectiveStart);
-
-    const leftPercent = Math.max(0, (leftMinutes / totalMinutes) * 100);
-    const widthPercent = Math.min(100 - leftPercent, (widthMinutes / totalMinutes) * 100);
-
-    return {
-      left: `${leftPercent}%`,
-      width: `${Math.max(0.5, widthPercent)}%`, // At least 0.5% width to be visible
-    };
-  };
-
-  const getStatusColor = (booking: Booking) => {
-    if (booking.status === "Checked Out" || booking.status === "Checked-Out") return "bg-rose-100 border-rose-300 text-rose-800 dark:bg-rose-900/40 dark:border-rose-700 dark:text-rose-300";
-    if (booking.is_lgu_booking) return "bg-emerald-100 border-emerald-300 text-emerald-800 dark:bg-emerald-900/40 dark:border-emerald-700 dark:text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.2)]";
-    if (booking.is_special_booking) return "bg-amber-100 border-amber-300 text-amber-800 dark:bg-amber-900/40 dark:border-amber-700 dark:text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.2)]";
-    return "bg-[#07008A]/10 border-[#07008A]/30 text-[#07008A] dark:bg-indigo-900/40 dark:border-indigo-700 dark:text-indigo-300 shadow-[0_0_8px_rgba(7,0,138,0.1)]";
-  };
+  const timelineWidth = days.length * DAY_COLUMN_MIN_WIDTH;
+  const boardMinWidth = ROOM_COLUMN_WIDTH + timelineWidth;
 
   return (
-    <div className="flex flex-col border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm relative">
-      {/* Header Row (Days) */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 sticky top-0 z-20">
-        <div className="w-24 md:w-40 shrink-0 border-r border-slate-200 dark:border-slate-800 p-2 md:p-4 font-semibold text-xs md:text-sm text-slate-700 dark:text-slate-300 flex items-center justify-center bg-slate-50 dark:bg-slate-900/80 z-30 sticky left-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
-          Rooms
+    <div
+      data-testid="timeline-board"
+      className="relative isolate min-w-max rounded-[26px] border border-slate-200/80 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)]"
+      style={{ minWidth: boardMinWidth }}
+    >
+      <div
+        data-testid="timeline-day-header"
+        className="sticky top-0 z-50 flex rounded-t-[26px] border-b border-slate-200/80 bg-white shadow-[0_10px_24px_-18px_rgba(15,23,42,0.45)]"
+      >
+        <div
+          className="sticky left-0 z-[60] shrink-0 border-r border-slate-200/80 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] px-5 py-4 shadow-[8px_0_24px_-18px_rgba(15,23,42,0.2)]"
+          style={{ width: ROOM_COLUMN_WIDTH }}
+        >
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Rooms</p>
+          <p className="mt-1 text-sm font-semibold text-slate-700">Occupancy Board</p>
         </div>
-        <div className="flex-1 relative flex text-sm text-slate-600 dark:text-slate-400 font-medium">
-          {days.map((day, idx) => (
-            <div 
-              key={idx} 
+
+        <div className="flex" style={{ minWidth: timelineWidth }}>
+          {days.map((day) => (
+            <div
+              key={day.toISOString()}
               className={cn(
-                "flex-1 border-r border-slate-100 dark:border-slate-800/50 p-2 md:p-3 text-center transition-colors min-w-[80px] md:min-w-[120px]",
-                isSameDay(day, new Date()) && "bg-blue-50/50 dark:bg-blue-900/10 text-blue-700 dark:text-blue-400 font-bold"
+                "border-r border-slate-100 bg-white px-4 py-4 text-center",
+                isSameDay(day, new Date()) && "bg-[#07008A]/[0.045]",
               )}
+              style={{ minWidth: DAY_COLUMN_MIN_WIDTH }}
             >
-              <div className="text-[11px] uppercase tracking-wider opacity-60 mb-0.5">{format(day, "MMM")}</div>
-              <div className="text-base">{format(day, "dd")}</div>
-              <div className="text-[10px] opacity-70 mt-0.5">{format(day, "EEE")}</div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">{format(day, "MMM")}</p>
+              <p className={cn("mt-1 text-[28px] font-semibold leading-none text-slate-700", isSameDay(day, new Date()) && "text-[#07008A]")}>
+                {format(day, "dd")}
+              </p>
+              <p className={cn("mt-2 text-[11px] font-medium text-slate-400", isSameDay(day, new Date()) && "text-[#07008A]/70")}>
+                {format(day, "EEE")}
+              </p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Room Rows */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
-        {rooms.map((room) => (
-          <div key={room.id} className="flex border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors group relative">
-            {/* Room Axis (Sticky Left) */}
-            <div className="w-24 md:w-40 shrink-0 border-r border-slate-200 dark:border-slate-800 p-2 md:p-4 bg-white dark:bg-slate-900 z-10 sticky left-0 flex items-center gap-2 md:gap-3 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] group-hover:bg-slate-50 dark:group-hover:bg-slate-800/50 transition-colors">
-              <div className="h-6 w-6 md:h-8 md:w-8 rounded-lg bg-[#07008A]/5 dark:bg-indigo-900/40 text-[#07008A] dark:text-indigo-400 flex items-center justify-center shrink-0">
-                <BedDouble className="h-3.5 w-3.5 md:h-4 md:w-4" />
-              </div>
-              <div className="min-w-0">
-                <p className="font-bold text-xs md:text-sm text-slate-800 dark:text-slate-200 truncate">Rm {room.room_number}</p>
-                <p className="hidden md:block text-[11px] text-slate-500 uppercase tracking-widest truncate">{room.type}</p>
+      <div className="relative">
+        {packedRooms.map((room) => (
+          <div
+            key={room.id}
+            data-testid={`timeline-room-row-${room.id}`}
+            className="flex border-b border-slate-100 last:border-b-0"
+            style={{ minHeight: room.rowHeight }}
+          >
+            <div
+              data-testid={`timeline-room-rail-${room.id}`}
+              className="sticky left-0 z-20 shrink-0 border-r border-slate-200/80 bg-white px-5 py-4 shadow-[8px_0_24px_-18px_rgba(15,23,42,0.18)]"
+              style={{ width: ROOM_COLUMN_WIDTH }}
+            >
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#07008A]/[0.06] text-[#07008A] ring-1 ring-[#07008A]/10">
+                  <BedDouble className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-base font-bold text-slate-800">Rm {room.room_number}</p>
+                  <p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">{room.type}</p>
+                  <p className="mt-2 text-[11px] text-slate-500">
+                    {room.packedBookings.length === 0 ? "No bookings in view" : `${room.packedBookings.length} booking${room.packedBookings.length !== 1 ? "s" : ""} in range`}
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* Timeline Axis */}
-            <div className="flex-1 relative flex min-w-[120px]">
-              {/* Vertical Grid Lines */}
-              {days.map((day, idx) => (
-                <div 
-                  key={`line-${idx}`} 
-                  className={cn(
-                    "flex-1 border-r border-slate-100 dark:border-slate-800/50 pb-16 min-w-[80px] md:min-w-[120px]",
-                    isSameDay(day, new Date()) && "bg-blue-50/20 dark:bg-blue-900/5"
-                  )} 
-                />
-              ))}
+            <div
+              data-testid={`timeline-row-body-${room.id}`}
+              className="relative overflow-hidden"
+              style={{ minWidth: timelineWidth, height: room.rowHeight }}
+            >
+              <div className="absolute inset-0 flex">
+                {days.map((day) => (
+                  <div
+                    key={`${room.id}-${day.toISOString()}`}
+                    className={cn(
+                      "border-r border-slate-100",
+                      isSameDay(day, new Date()) ? "bg-[#07008A]/[0.03]" : "bg-[linear-gradient(180deg,rgba(248,250,252,0.75)_0%,rgba(255,255,255,1)_28%)]",
+                    )}
+                    style={{ minWidth: DAY_COLUMN_MIN_WIDTH }}
+                  />
+                ))}
+              </div>
 
-              {/* Booking Blocks */}
-              {room.bookings.map((booking) => {
-                const style = getBookingStyle(booking);
-                const isHovered = hoveredBlock === booking.id;
-                // Determine if booking is entirely out of current view
-                const bookingStart = new Date(booking.actual_check_in || booking.check_in_date);
-                const bookingEnd = new Date(booking.actual_check_out || booking.check_out_date || new Date().toISOString());
-                if (bookingEnd <= startDate || bookingStart >= endDate) return null;
+              {room.packedBookings.map((packed) => {
+                const isHovered = hoveredBlock === packed.booking.id;
+                const widthPercent = packed.widthPercent;
+                const isCompact = widthPercent < 9;
+                const tone = getStatusTone(packed.booking);
+                const bookingStartLabel = format(packed.bookingStart, "MMM d, HH:mm");
 
-                const isCheckedOut = booking.status === "Checked Out" || booking.status === "Checked-Out";
-                
                 return (
                   <div
-                    key={booking.id}
-                    className="absolute top-2 bottom-2 pt-1 pb-1 z-10"
-                    style={style}
-                    onMouseEnter={() => setHoveredBlock(booking.id)}
+                    key={packed.booking.id}
+                    data-testid={`timeline-booking-${packed.booking.id}`}
+                    className="absolute z-10"
+                    style={{
+                      left: `${packed.leftPercent}%`,
+                      width: `${packed.widthPercent}%`,
+                      top: ROW_PADDING + packed.lane * LANE_HEIGHT,
+                      height: 30,
+                    }}
+                    onMouseEnter={() => setHoveredBlock(packed.booking.id)}
                     onMouseLeave={() => setHoveredBlock(null)}
                   >
                     <button
-                      onClick={() => onBookingClick?.(booking)}
+                      type="button"
+                      onClick={() => onBookingClick?.(packed.booking)}
                       className={cn(
-                        "w-full h-full rounded-md border py-1.5 px-2 flex flex-col justify-center overflow-hidden transition-all text-left group/btn relative",
-                        getStatusColor(booking),
-                        isHovered ? "ring-2 ring-indigo-400 ring-offset-1 z-20 scale-[1.02]" : "active:scale-95",
-                        isCheckedOut && "opacity-80 border-dashed"
+                        "relative flex h-full w-full items-center overflow-hidden rounded-2xl border px-3 text-left transition-all duration-150",
+                        tone.chip,
+                        isHovered ? "z-20 scale-[1.01] ring-2 ring-[#07008A]/20" : "active:scale-[0.99]",
                       )}
+                      aria-label={`${packed.booking.guests?.full_name || "Guest"} ${packed.booking.status}`}
                     >
-                      <div className="flex items-center gap-1.5 w-full">
-                         {booking.is_special_booking && <Crown className="h-3 w-3 shrink-0" />}
-                         <p className="font-bold text-xs truncate leading-none">
-                           {booking.guests?.full_name || "Guest"}
-                         </p>
-                      </div>
-                      
-                      {/* Hide details if block is too narrow (e.g., width < 5%) */}
-                      {parseFloat(style.width) > 5 && (
-                        <div className="mt-1 flex items-center gap-1">
-                          <p className="text-[10px] font-semibold uppercase opacity-80 leading-none">
-                            {booking.status}
+                      <span className={cn("absolute inset-y-1 left-1 w-1 rounded-full", tone.accent)} />
+                      {packed.clippedStart ? (
+                        <ChevronLeft className="mr-1 h-3.5 w-3.5 shrink-0 opacity-55" />
+                      ) : null}
+                      {packed.booking.is_special_booking ? (
+                        <Crown className="mr-1.5 h-3.5 w-3.5 shrink-0 opacity-70" />
+                      ) : null}
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-xs font-bold leading-none">
+                            {isCompact
+                              ? (packed.booking.guests?.full_name || "Guest").slice(0, 1)
+                              : packed.booking.guests?.full_name || "Guest"}
                           </p>
-                          <span className="text-[10px] opacity-70 truncate leading-none">
-                            • {format(bookingStart, "MMM d, HH:mm")}
-                          </span>
+                          {!isCompact ? (
+                            <span className={cn("truncate text-[10px] font-semibold uppercase tracking-wider", tone.meta)}>
+                              {packed.booking.status}
+                            </span>
+                          ) : null}
                         </div>
-                      )}
-                    </button>
-                    
-                    {/* Hover tooltip (inline) */}
-                    {isHovered && parseFloat(style.width) <= 5 && (
-                      <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 text-white text-[10px] py-1 px-2 rounded whitespace-nowrap z-[100] shadow-lg pointer-events-none fade-in flex flex-col gap-0.5">
-                        <span className="font-bold">{booking.guests?.full_name}</span>
-                        <span className="opacity-80 text-[9px] uppercase">{booking.status}</span>
+                        {!isCompact ? (
+                          <p className={cn("mt-1 truncate text-[10px] font-medium", tone.meta)}>
+                            {bookingStartLabel}
+                          </p>
+                        ) : null}
                       </div>
-                    )}
+
+                      {packed.clippedEnd ? (
+                        <ChevronRight className="ml-1 h-3.5 w-3.5 shrink-0 opacity-55" />
+                      ) : null}
+                    </button>
+
+                    {isHovered && isCompact ? (
+                      <div className="pointer-events-none absolute left-1/2 top-full z-[60] mt-2 -translate-x-1/2 rounded-xl bg-slate-950 px-3 py-2 text-[10px] text-white shadow-xl">
+                        <p className="font-bold">{packed.booking.guests?.full_name || "Guest"}</p>
+                        <p className="mt-1 uppercase tracking-wider text-slate-300">{packed.booking.status}</p>
+                        <p className="mt-1 text-slate-400">{bookingStartLabel}</p>
+                      </div>
+                    ) : null}
                   </div>
                 );
               })}
@@ -181,12 +259,12 @@ export function TimelineView({ rooms, startDate, endDate, days, onBookingClick }
           </div>
         ))}
 
-        {rooms.length === 0 && (
-          <div className="p-8 text-center text-slate-500">
-            <Info className="h-8 w-8 mx-auto mb-2 opacity-20" />
-            <p>No rooms available.</p>
+        {rooms.length === 0 ? (
+          <div className="px-8 py-16 text-center text-slate-500">
+            <Info className="mx-auto h-8 w-8 opacity-20" />
+            <p className="mt-3 text-sm font-medium">No rooms available.</p>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

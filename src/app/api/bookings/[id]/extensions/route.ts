@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/rbac";
 import { parseAndValidate, dbError, internalError } from "@/lib/api-security";
 import { createExtensionSchema } from "@/lib/validation-schemas";
 import { toMoneyNumber } from "@/lib/bookingTotals";
+import { getExtensionConflictResult } from "@/lib/bookingExtensionConflicts";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requirePermission(req, "bookings.read");
@@ -18,41 +19,26 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const supabase = getSupabaseAdmin();
 
     if (checkOnly && newCheckout) {
-      // Perform availability check
       const { data: booking, error: bErr } = await supabase
         .from("bookings")
-        .select("id, room_id, check_out_date, reserved_checkout_datetime")
+        .select("id, room_id, check_out_date, reserved_checkout_datetime, actual_check_in_at, rate_plan_kind")
         .eq("id", id)
         .single();
       
       if (bErr || !booking) return dbError(bErr, "Booking not found");
-      if (!booking.room_id) {
-        return NextResponse.json({ available: true, conflict_count: 0 });
+
+      try {
+        const result = await getExtensionConflictResult({
+          supabase,
+          currentBooking: booking,
+          newCheckout,
+        });
+
+        return NextResponse.json(result);
+      } catch (conflictError) {
+        console.error("[AVAILABILITY_CHECK_ERROR]", conflictError);
+        return dbError(conflictError, "Failed to check availability");
       }
-
-      const currentCheckout = booking.reserved_checkout_datetime || (booking.check_out_date ? `${booking.check_out_date}T12:00:00+08:00` : null);
-      if (!currentCheckout) {
-         return NextResponse.json({ available: true, conflict_count: 0 });
-      }
-
-      const { count, error: cErr } = await supabase
-        .from("bookings")
-        .select("*", { count: "exact", head: true })
-        .eq("room_id", booking.room_id)
-        .neq("id", id)
-        .in("status", ["Confirmed", "Checked-In"])
-        .lt("reserved_checkin_datetime", newCheckout)
-        .gt("reserved_checkout_datetime", currentCheckout);
-
-      if (cErr) {
-        console.error("[AVAILABILITY_CHECK_ERROR]", cErr);
-        return dbError(cErr, "Failed to check availability");
-      }
-
-      return NextResponse.json({ 
-        available: (count ?? 0) === 0,
-        conflict_count: count ?? 0 
-      });
     }
 
     const { data, error } = await supabase
@@ -83,7 +69,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Verify booking exists and is Checked-In
     const { data: booking, error: bErr } = await supabase
       .from("bookings")
-      .select("id, status, room_id, extensions_total, balance_due, check_out_date, reserved_checkout_datetime")
+      .select("id, status, room_id, extensions_total, balance_due, check_out_date, reserved_checkout_datetime, actual_check_in_at, rate_plan_kind")
       .eq("id", id)
       .single();
 
@@ -95,22 +81,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       );
     }
 
-    // New Conflict Check
-    const { count: conflictCount, error: conflictErr } = await supabase
-      .from("bookings")
-      .select("*", { count: "exact", head: true })
-      .eq("room_id", booking.room_id)
-      .neq("id", id)
-      .in("status", ["Confirmed", "Checked-In"])
-      .lt("reserved_checkin_datetime", body.new_checkout_date)
-      .gt("reserved_checkout_datetime", booking.reserved_checkout_datetime);
+    let conflictResult;
+    try {
+      conflictResult = await getExtensionConflictResult({
+        supabase,
+        currentBooking: booking,
+        newCheckout: body.new_checkout_date,
+      });
+    } catch (conflictErr) {
+      return dbError(conflictErr, "Failed to verify room availability");
+    }
 
-    if (conflictErr) return dbError(conflictErr, "Failed to verify room availability");
-    
-    // Safety check for nulls
-    const currentCheckout = booking.reserved_checkout_datetime || (booking.check_out_date ? `${booking.check_out_date}T12:00:00+08:00` : null);
-    
-    if (currentCheckout && (conflictCount ?? 0) > 0) {
+    if (!conflictResult.available) {
       return NextResponse.json(
         { error: { code: "room_conflict", message: "Room is already reserved for a future guest during this extension period." } },
         { status: 422 }

@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { format, eachDayOfInterval, startOfMonth, endOfMonth, isSameDay, isSameMonth, parseISO, startOfDay, endOfDay } from "date-fns";
-import { cn } from "@/lib/utils";
+import { format, eachDayOfInterval, endOfDay, endOfMonth, isSameDay, isSameMonth, startOfDay, startOfMonth } from "date-fns";
 import { Crown, MoreHorizontal } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type Booking = {
   id: string;
@@ -34,124 +34,175 @@ type GridViewProps = {
   onBookingClick?: (booking: Booking, room: Room) => void;
 };
 
+const DISPLAY_LIMIT = 3;
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function getBookingTone(booking: Booking) {
+  const isCheckedOut = booking.status === "Checked Out" || booking.status === "Checked-Out";
+  if (isCheckedOut) {
+    return "border-rose-200 bg-rose-50 text-rose-700";
+  }
+  if (booking.is_lgu_booking) {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+  if (booking.is_special_booking) {
+    return "border-amber-200 bg-amber-50 text-amber-700";
+  }
+  return "border-[#07008A]/10 bg-[#07008A]/[0.06] text-[#07008A]";
+}
+
 export function GridView({ rooms, currentMonth, onBookingClick }: GridViewProps) {
   const [hoveredBooking, setHoveredBooking] = useState<string | null>(null);
 
-  // Generate a flat list of all bookings with their room context
   const allBookings = useMemo(() => {
-    return rooms.flatMap(room => 
-      room.bookings.map(booking => ({ ...booking, room }))
-    );
+    return rooms.flatMap((room) => room.bookings.map((booking) => ({ ...booking, room })));
   }, [rooms]);
 
-  // Generate the days to show for the 6-week month grid
   const daysInGrid = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
-    const monthEnd = endOfMonth(monthStart);
-    const startDate = startOfDay(monthStart); // Normally would pad to Sunday, keeping it simple
-    // Find the first Sunday
+    const startDate = startOfDay(monthStart);
     const startOffset = startDate.getDay();
     const gridStart = new Date(startDate);
     gridStart.setDate(gridStart.getDate() - startOffset);
 
     const gridEnd = new Date(gridStart);
-    gridEnd.setDate(gridEnd.getDate() + 41); // 6 weeks * 7 days - 1
-    
+    gridEnd.setDate(gridEnd.getDate() + 41);
+
     return eachDayOfInterval({ start: gridStart, end: gridEnd });
   }, [currentMonth]);
-
-  const getStatusColor = (booking: Booking) => {
-    const isCheckedOut = booking.status === "Checked Out" || booking.status === "Checked-Out";
-    if (isCheckedOut) return "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300 border border-dashed border-rose-300 dark:border-rose-700 opacity-80";
-    if (booking.is_lgu_booking) return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300";
-    if (booking.is_special_booking) return "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300";
-    return "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300";
-  };
 
   const getDayBookings = (day: Date) => {
     const dStart = startOfDay(day);
     const dEnd = endOfDay(day);
-    return allBookings.filter(b => {
-      const bStart = new Date(b.actual_check_in || b.check_in_date);
-      const bEnd = new Date(b.actual_check_out || b.check_out_date || b.check_in_date);
-      return bStart <= dEnd && bEnd >= dStart;
-    });
+
+    return allBookings
+      .filter((booking) => {
+        const bookingStart = new Date(booking.actual_check_in || booking.check_in_date);
+        const bookingEnd = new Date(booking.actual_check_out || booking.check_out_date || booking.check_in_date);
+        return bookingStart <= dEnd && bookingEnd >= dStart;
+      })
+      .sort((a, b) => {
+        const first = new Date(a.actual_check_in || a.check_in_date).getTime();
+        const second = new Date(b.actual_check_in || b.check_in_date).getTime();
+        return first - second;
+      });
   };
 
-  const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
   return (
-    <div className="flex flex-col border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm relative h-full">
-      {/* Weekdays Header */}
-      <div className="grid grid-cols-7 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 sticky top-0 z-20">
+    <div className="overflow-visible rounded-[26px] border border-slate-200/80 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+      <div className="sticky top-0 z-20 grid grid-cols-7 border-b border-slate-200/80 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/88">
         {WEEKDAYS.map((day) => (
-          <div key={day} className="p-2 md:p-3 text-center text-[10px] md:text-xs font-bold uppercase tracking-wider text-slate-500">
+          <div key={day} className="px-3 py-4 text-center text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
             <span className="md:hidden">{day[0]}</span>
             <span className="hidden md:block">{day}</span>
           </div>
         ))}
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-7 flex-1 min-h-[600px] bg-slate-100 dark:bg-slate-800/50 gap-[1px]">
-        {daysInGrid.map((day, i) => {
+      <div className="grid grid-cols-7 gap-px bg-slate-200/80">
+        {daysInGrid.map((day) => {
+          const dayBookings = getDayBookings(day);
+          const visibleBookings = dayBookings.slice(0, DISPLAY_LIMIT);
+          const hiddenBookings = dayBookings.slice(DISPLAY_LIMIT);
           const isCurrentMonth = isSameMonth(day, currentMonth);
           const isToday = isSameDay(day, new Date());
-          const dayBookings = getDayBookings(day);
-          
-          // Responsive display limit
-          const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-          const displayLimit = isMobile ? 2 : 4;
 
           return (
-            <div 
-              key={i} 
+            <div
+              key={day.toISOString()}
               className={cn(
-                "bg-white dark:bg-slate-900 p-2 flex flex-col gap-1 overflow-hidden",
-                !isCurrentMonth && "opacity-40"
+                "flex min-h-[180px] flex-col bg-white p-3 align-top",
+                !isCurrentMonth && "bg-slate-50/60",
+                isToday && "bg-[#07008A]/[0.035]",
               )}
             >
-              <div className="flex justify-between items-center mb-1">
-                 <span className={cn(
-                    "text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full",
-                    isToday ? "bg-[#07008A] text-white" : "text-slate-700 dark:text-slate-300"
-                 )}>
-                   {format(day, "d")}
-                 </span>
-                 {dayBookings.length > 0 && (
-                   <span className="text-[10px] text-slate-400 font-medium">{dayBookings.length} bkg</span>
-                 )}
+              <div className="mb-3 flex items-start justify-between">
+                <div>
+                  <p className={cn("text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400", isToday && "text-[#07008A]/60")}>
+                    {format(day, "MMM")}
+                  </p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold",
+                        isToday ? "bg-[#07008A] text-white shadow-lg shadow-[#07008A]/20" : "bg-slate-100 text-slate-700",
+                      )}
+                    >
+                      {format(day, "d")}
+                    </span>
+                    <span className="text-[11px] font-medium text-slate-400">{format(day, "EEE")}</span>
+                  </div>
+                </div>
+
+                {dayBookings.length > 0 ? (
+                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    {dayBookings.length} booking{dayBookings.length !== 1 ? "s" : ""}
+                  </span>
+                ) : null}
               </div>
-              
-              <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-1 pr-1">
-                {dayBookings.slice(0, displayLimit).map(booking => (
-                   <button
-                     key={booking.id}
-                     onClick={() => onBookingClick?.(booking, booking.room)}
-                     onMouseEnter={() => setHoveredBooking(booking.id)}
-                     onMouseLeave={() => setHoveredBooking(null)}
-                     className={cn(
-                       "w-full text-left text-[10px] sm:text-xs truncate px-1.5 py-1 rounded transition-colors group flex flex-col gap-0.5",
-                       getStatusColor(booking),
-                       hoveredBooking === booking.id && "ring-1 ring-black/10 dark:ring-white/20",
-                       booking.status === "Checked Out" && "opacity-75 border border-dashed border-rose-300"
-                     )}
-                   >
-                     <div className="flex items-center gap-1 w-full overflow-hidden">
-                       <span className="font-bold opacity-70 shrink-0">Rm {booking.room.room_number}:</span>
-                       <span className="truncate">{booking.guests?.full_name || "Guest"}</span>
-                       {booking.is_special_booking && <Crown className="h-3 w-3 shrink-0 opacity-70 ml-auto" />}
-                     </div>
-                     <span className="text-[9px] font-bold uppercase tracking-wider opacity-60 truncate">
-                        {booking.status}
-                     </span>
-                   </button>
+
+              <div className="flex flex-1 flex-col gap-2">
+                {visibleBookings.map((booking) => (
+                  <button
+                    key={booking.id}
+                    type="button"
+                    onClick={() => onBookingClick?.(booking, booking.room)}
+                    onMouseEnter={() => setHoveredBooking(booking.id)}
+                    onMouseLeave={() => setHoveredBooking(null)}
+                    className={cn(
+                      "rounded-2xl border px-2.5 py-2 text-left transition-all duration-150",
+                      getBookingTone(booking),
+                      hoveredBooking === booking.id && "ring-2 ring-[#07008A]/10",
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5 overflow-hidden">
+                      <span className="shrink-0 rounded-full bg-white/80 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-current">
+                        Rm {booking.room.room_number}
+                      </span>
+                      {booking.is_special_booking ? <Crown className="h-3 w-3 shrink-0 opacity-70" /> : null}
+                    </div>
+                    <p className="mt-1 truncate text-[11px] font-semibold">{booking.guests?.full_name || "Guest"}</p>
+                    <p className="mt-1 truncate text-[10px] font-medium uppercase tracking-wider opacity-70">{booking.status}</p>
+                  </button>
                 ))}
-                {dayBookings.length > displayLimit && (
-                   <div className="text-[10px] text-center text-slate-500 font-medium py-0.5 flex items-center justify-center gap-1">
-                     <MoreHorizontal className="h-3 w-3" />
-                     {dayBookings.length - displayLimit} more
-                   </div>
+
+                {hiddenBookings.length > 0 ? (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="mt-auto inline-flex items-center justify-center gap-1 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-2 py-2 text-[11px] font-semibold text-slate-500 transition-colors hover:bg-slate-100"
+                      >
+                        <MoreHorizontal className="h-3.5 w-3.5" />
+                        +{hiddenBookings.length} more
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72 rounded-2xl border-slate-200 p-3 shadow-xl" align="start">
+                      <div className="mb-3">
+                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{format(day, "MMMM d")}</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-800">More bookings for this day</p>
+                      </div>
+                      <div className="space-y-2">
+                        {hiddenBookings.map((booking) => (
+                          <button
+                            key={booking.id}
+                            type="button"
+                            onClick={() => onBookingClick?.(booking, booking.room)}
+                            className={cn(
+                              "w-full rounded-2xl border px-3 py-2 text-left transition-colors hover:bg-slate-50",
+                              getBookingTone(booking),
+                            )}
+                          >
+                            <p className="text-[10px] font-bold uppercase tracking-wider opacity-70">Rm {booking.room.room_number}</p>
+                            <p className="mt-1 text-sm font-semibold">{booking.guests?.full_name || "Guest"}</p>
+                            <p className="mt-1 text-[10px] font-medium uppercase tracking-wider opacity-70">{booking.status}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                ) : (
+                  <div className="mt-auto" />
                 )}
               </div>
             </div>

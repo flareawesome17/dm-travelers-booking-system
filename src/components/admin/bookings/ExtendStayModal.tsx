@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useCallback, useEffect, useState } from "react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
-import { getErrorMessage } from "@/lib/utils";
+import { cn, getErrorMessage } from "@/lib/utils";
 import { Clock, CalendarPlus, ArrowRight } from "lucide-react";
 
 type ExtendStayModalProps = {
@@ -39,7 +39,17 @@ export function ExtendStayModal({ open, onClose, booking, token, onSuccess }: Ex
   const [durationType, setDurationType] = useState<"hours" | "days">("hours");
   const [durationValue, setDurationValue] = useState("3");
   const [submitting, setSubmitting] = useState(false);
-  const [availability, setAvailability] = useState<"checking" | "available" | "conflict" | "idle">("idle");
+  const [availability, setAvailability] = useState<{
+    state: "checking" | "available" | "conflict" | "idle";
+    conflictCount: number;
+    firstConflictStart: string | null;
+    conflictReference: string | null;
+  }>({
+    state: "idle",
+    conflictCount: 0,
+    firstConflictStart: null,
+    conflictReference: null,
+  });
 
   const ratePlan = booking.rate_plan_kind || "24h";
   const room = booking.rooms;
@@ -85,32 +95,49 @@ export function ExtendStayModal({ open, onClose, booking, token, onSuccess }: Ex
     return d.toISOString();
   })();
 
-  const checkRoomAvailability = async (checkout: string) => {
+  const checkRoomAvailability = useCallback(async (checkout: string) => {
     if (!checkout || !booking.id) return;
-    setAvailability("checking");
     try {
       const res = await fetch(`/api/bookings/${booking.id}/extensions?check_only=true&new_checkout=${encodeURIComponent(checkout)}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
-      if (data.available) setAvailability("available");
-      else setAvailability("conflict");
+      if (!res.ok) {
+        setAvailability({ state: "idle", conflictCount: 0, firstConflictStart: null, conflictReference: null });
+        return;
+      }
+      if (data.available) {
+        setAvailability({
+          state: "available",
+          conflictCount: Number(data.conflict_count || 0),
+          firstConflictStart: data.first_conflict_start || null,
+          conflictReference: data.conflict_reference || null,
+        });
+      } else {
+        setAvailability({
+          state: "conflict",
+          conflictCount: Number(data.conflict_count || 0),
+          firstConflictStart: data.first_conflict_start || null,
+          conflictReference: data.conflict_reference || null,
+        });
+      }
     } catch {
-      setAvailability("idle");
+      setAvailability({ state: "idle", conflictCount: 0, firstConflictStart: null, conflictReference: null });
     }
-  };
+  }, [booking.id, token]);
 
   // Debounce availability check
   useEffect(() => {
     if (!newCheckout || !dv || dv <= 0) {
-      setAvailability("idle");
+      setAvailability({ state: "idle", conflictCount: 0, firstConflictStart: null, conflictReference: null });
       return;
     }
+    setAvailability({ state: "checking", conflictCount: 0, firstConflictStart: null, conflictReference: null });
     const timer = setTimeout(() => {
       checkRoomAvailability(newCheckout);
     }, 500);
     return () => clearTimeout(timer);
-  }, [newCheckout, dv]);
+  }, [checkRoomAvailability, durationType, dv, newCheckout]);
 
   const formatDate = (iso: string) => {
     if (!iso) return "—";
@@ -153,6 +180,9 @@ export function ExtendStayModal({ open, onClose, booking, token, onSuccess }: Ex
             </div>
             Extend Stay
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Review the new checkout time, additional extension cost, and room availability before confirming the stay extension.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -219,22 +249,39 @@ export function ExtendStayModal({ open, onClose, booking, token, onSuccess }: Ex
                   <span className="font-semibold text-slate-800">{formatDate(newCheckout)}</span>
                 </div>
                 
-                {availability === "checking" && (
+                {availability.state === "checking" && (
                   <div className="flex items-center gap-2 text-[10px] text-slate-500 animate-pulse">
                     <div className="h-2 w-2 rounded-full bg-slate-400" />
                     Checking room availability...
                   </div>
                 )}
-                {availability === "available" && (
+                {availability.state === "available" && (
                   <div className="flex items-center gap-2 text-[10px] text-emerald-600 font-medium">
                     <div className="h-2 w-2 rounded-full bg-emerald-500" />
                     Room is available for this extension
                   </div>
                 )}
-                {availability === "conflict" && (
-                  <div className="flex items-center gap-2 text-[10px] text-rose-600 font-bold bg-rose-50 p-2 rounded border border-rose-100">
+                {availability.state === "conflict" && (
+                  <div className="space-y-1 rounded border border-rose-200 bg-rose-50 p-2 text-[10px] text-rose-700">
+                    <div className="flex items-center gap-2 font-bold">
+                      <div className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
+                      Conflict detected: room is reserved for another guest.
+                    </div>
+                    {availability.firstConflictStart && (
+                      <p className="pl-4 font-medium">
+                        First conflict starts {formatDate(availability.firstConflictStart)}
+                        {availability.conflictReference ? ` (${availability.conflictReference})` : ""}.
+                      </p>
+                    )}
+                    {availability.conflictCount > 1 && (
+                      <p className="pl-4 font-medium">{availability.conflictCount} blocking reservations found.</p>
+                    )}
+                  </div>
+                )}
+                {availability.state === "idle" && newCheckout && (
+                  <div className="flex items-center gap-2 text-[10px] text-slate-400">
                     <div className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
-                    Conflict detected: Room is reserved for another guest. Extension prohibited.
+                    Waiting for a valid extension window.
                   </div>
                 )}
               </div>
@@ -247,10 +294,15 @@ export function ExtendStayModal({ open, onClose, booking, token, onSuccess }: Ex
           <Button
             type="button"
             onClick={handleSubmit}
-            disabled={submitting || !dv || dv <= 0 || availability === "conflict" || availability === "checking"}
-            className="bg-[#07008A] hover:bg-[#05006a] text-white"
+            disabled={submitting || !dv || dv <= 0 || availability.state === "conflict" || availability.state === "checking"}
+            className={cn(
+              "text-white",
+              availability.state === "conflict"
+                ? "bg-slate-300 hover:bg-slate-300 text-slate-600"
+                : "bg-[#07008A] hover:bg-[#05006a]",
+            )}
           >
-            {submitting ? "Extending..." : availability === "conflict" ? "Room Unavailable" : "Confirm Extension"}
+            {submitting ? "Extending..." : availability.state === "conflict" ? "Cannot Extend" : "Confirm Extension"}
           </Button>
         </DialogFooter>
       </DialogContent>

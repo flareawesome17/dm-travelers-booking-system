@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -20,7 +20,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn, getErrorMessage } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -33,8 +32,16 @@ import { CountdownTimer } from "@/components/admin/bookings/CountdownTimer";
 import { ExtendStayModal } from "@/components/admin/bookings/ExtendStayModal";
 import { ManageExtrasModal } from "@/components/admin/bookings/ManageExtrasModal";
 import { AddExtraChargeModal } from "@/components/admin/bookings/AddExtraChargeModal";
+import { BookingAnalyticsStrip } from "@/components/admin/bookings/BookingAnalyticsStrip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "@/components/ui/sonner";
+import {
+  filterAdminBookings,
+  getFiltersForBookingAnalyticsCard,
+  type BookingAnalyticsCardKey,
+  type BookingAnalyticsSummary,
+  type BookingDateScope,
+} from "@/lib/bookingAnalytics";
 import { getBookingChargeBreakdown } from "@/lib/bookingTotals";
 import { usePermissions } from "@/context/PermissionsContext";
 
@@ -62,7 +69,7 @@ type BookingRow = {
     }[];
   }[]; booking_extras?: {
     id: string; extra_type: string; quantity: number; unit_price: number; total_price: number;
-  }[]; actual_check_in_at?: string;
+  }[]; actual_check_in_at?: string; actual_check_out_at?: string;
   total_amount?: number; deposit_paid?: number; balance_due?: number; restaurant_charges_total?: number;
   extras_total?: number; extensions_total?: number;
   rate_plan_kind?: string; special_requests?: string | null;
@@ -99,8 +106,12 @@ export default function AdminBookingsPage() {
   const [checkOutAt, setCheckOutAt] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [dateScope, setDateScope] = useState<BookingDateScope>("all");
   const [search, setSearch] = useState<string>("");
   const [page, setPage] = useState<number>(1);
+  const [summary, setSummary] = useState<BookingAnalyticsSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [summaryError, setSummaryError] = useState(false);
   const pageSize = 10;
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -113,25 +124,45 @@ export default function AdminBookingsPage() {
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}`, ...options?.headers },
     });
 
-  const fetchBookings = () => {
+  const fetchBookings = useCallback(() => {
     const t = localStorage.getItem("admin_token");
     if (!t) return;
+    setLoading(true);
     fetch("/api/bookings", { headers: { Authorization: `Bearer ${t}` } })
       .then((r) => r.json())
       .then((data) => setList(Array.isArray(data) ? data : []))
       .catch(() => setList([]))
       .finally(() => setLoading(false));
-  };
+  }, []);
+
+  const fetchSummary = useCallback(() => {
+    const t = localStorage.getItem("admin_token");
+    if (!t) return;
+    setSummaryLoading(true);
+    setSummaryError(false);
+    fetch("/api/bookings/summary", { headers: { Authorization: `Bearer ${t}` } })
+      .then(async (r) => {
+        const data = await r.json().catch(() => null);
+        if (!r.ok) throw new Error(typeof data?.error === "string" ? data.error : "Failed to load booking analytics.");
+        setSummary(data);
+      })
+      .catch(() => {
+        setSummary(null);
+        setSummaryError(true);
+      })
+      .finally(() => setSummaryLoading(false));
+  }, []);
+
+  const refreshData = useCallback(() => {
+    fetchBookings();
+    fetchSummary();
+  }, [fetchBookings, fetchSummary]);
 
   useEffect(() => {
     const t = localStorage.getItem("admin_token");
     if (!t) { router.replace("/admin/login"); return; }
-    fetch("/api/bookings", { headers: { Authorization: `Bearer ${t}` } })
-      .then((r) => r.json())
-      .then((data) => setList(Array.isArray(data) ? data : []))
-      .catch(() => setList([]))
-      .finally(() => setLoading(false));
-  }, [router]);
+    refreshData();
+  }, [refreshData, router]);
  
   useEffect(() => {
     if (highlightId && !loading) {
@@ -233,29 +264,32 @@ export default function AdminBookingsPage() {
     return { rate, hoursLate, fee: rate * hoursLate, reason: "Late check-out detected." as const };
   };
 
-  const filtered = list.filter((b) => {
-    const matchesStatus = statusFilter === "all" ? true : String(b.status || "").toLowerCase() === statusFilter.toLowerCase();
-    
-    let matchesType = true;
-    if (typeFilter === "lgu") matchesType = !!b.is_lgu_booking;
-    else if (typeFilter === "special") matchesType = !!b.is_special_booking;
-    else if (typeFilter === "normal") matchesType = !b.is_lgu_booking && !b.is_special_booking;
+  const filtered = filterAdminBookings({
+    bookings: list,
+    statusFilter,
+    typeFilter,
+    search,
+    dateScope,
+    today: summary?.today || new Date().toISOString().slice(0, 10),
+    timezone: summary?.timezone,
+  }) as BookingRow[];
 
-    const term = search.trim().toLowerCase();
-    const matchesSearch = !term ? true : [
-      b.reference_number,
-      b.guests?.full_name,
-      b.guests?.email,
-      b.rooms?.room_number,
-      b.rooms?.room_type,
-      b.rate_plan_kind,
-      b.is_lgu_booking ? "lgu booking" : "",
-      b.is_special_booking ? "special booking" : "",
-      b.special_booking_label,
-    ].filter(Boolean).join(" ").toLowerCase().includes(term);
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value);
+    if (dateScope === "today" && value !== "Checked-In" && value !== "Checked-Out") {
+      setDateScope("all");
+    }
+    setPage(1);
+  };
 
-    return matchesStatus && matchesType && matchesSearch;
-  });
+  const handleAnalyticsCardClick = (key: BookingAnalyticsCardKey) => {
+    const nextFilters = getFiltersForBookingAnalyticsCard(key);
+    if (!nextFilters) return;
+    setStatusFilter(nextFilters.statusFilter);
+    setTypeFilter(nextFilters.typeFilter);
+    setDateScope(nextFilters.dateScope);
+    setPage(1);
+  };
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -268,6 +302,14 @@ export default function AdminBookingsPage() {
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <h1 className="text-2xl lg:text-3xl font-bold text-[#07008A] tracking-tight">Bookings</h1>
         <p className="text-muted-foreground mt-1 text-sm">Manage reservations and check-in dates</p>
+      </motion.div>
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mb-6">
+        <BookingAnalyticsStrip
+          summary={summary}
+          loading={summaryLoading}
+          error={summaryError}
+          onCardClick={handleAnalyticsCardClick}
+        />
       </motion.div>
       <Card className="border border-slate-200/80 shadow-xs bg-white overflow-hidden">
         <CardHeader className="border-b border-slate-100 bg-slate-50/40 px-5 py-4 flex flex-row items-center justify-between">
@@ -285,7 +327,7 @@ export default function AdminBookingsPage() {
               </Button>
               <DialogContent className="admin-modal-responsive [--admin-modal-width:68rem] max-h-[92vh] overflow-y-auto modal-scrollbar p-5 sm:p-6">
                 <DialogHeader><DialogTitle>Add new booking</DialogTitle></DialogHeader>
-                <BookingForm apiUrl="" token={typeof window !== "undefined" ? localStorage.getItem("admin_token") || "" : ""} onSuccess={() => { setLoading(true); fetchBookings(); }} onClose={() => setOpen(false)} />
+                <BookingForm apiUrl="" token={typeof window !== "undefined" ? localStorage.getItem("admin_token") || "" : ""} onSuccess={() => { refreshData(); }} onClose={() => setOpen(false)} />
               </DialogContent>
             </Dialog>
           )}
@@ -297,6 +339,16 @@ export default function AdminBookingsPage() {
               <input type="text" placeholder="Search reference, guest name, email, room..." className="h-9 w-full rounded-md border border-input bg-white pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#07008A]/60 transition-all font-medium" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
             </div>
             <div className="flex items-center gap-2 w-full sm:w-auto">
+              {dateScope === "today" && (
+                <button
+                  type="button"
+                  className="inline-flex h-9 items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 text-[11px] font-bold uppercase tracking-wider text-emerald-700 transition-colors hover:bg-emerald-100"
+                  onClick={() => { setDateScope("all"); setPage(1); }}
+                >
+                  Today
+                  <span className="text-sm leading-none">×</span>
+                </button>
+              )}
               <select 
                 className="h-9 w-full sm:w-[160px] rounded-md border border-input bg-white px-3 text-xs text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-[#07008A]/60 transition-all cursor-pointer" 
                 value={typeFilter} 
@@ -310,7 +362,7 @@ export default function AdminBookingsPage() {
               <select 
                 className="h-9 w-full sm:w-[160px] rounded-md border border-input bg-white px-3 text-xs text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-[#07008A]/60 transition-all cursor-pointer" 
                 value={statusFilter} 
-                onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                onChange={(e) => handleStatusFilterChange(e.target.value)}
               >
                 <option value="all">All statuses</option>
                 <option value="Confirmed">Confirmed</option>
@@ -343,10 +395,10 @@ export default function AdminBookingsPage() {
                         <EmptyState 
                           icon={CalendarCheck} 
                           title="No bookings found" 
-                          description={search || statusFilter !== "all" ? "We couldn't find any bookings matching your current filters." : "You have no bookings yet. Add one to get started."}
+                          description={search || statusFilter !== "all" || typeFilter !== "all" || dateScope !== "all" ? "We couldn't find any bookings matching your current filters." : "You have no bookings yet. Add one to get started."}
                           action={
-                            search || statusFilter !== "all" || typeFilter !== "all" ? (
-                              <Button variant="outline" onClick={() => { setSearch(""); setStatusFilter("all"); setTypeFilter("all"); setPage(1); }}>Reset Filters</Button>
+                            search || statusFilter !== "all" || typeFilter !== "all" || dateScope !== "all" ? (
+                              <Button variant="outline" onClick={() => { setSearch(""); setStatusFilter("all"); setTypeFilter("all"); setDateScope("all"); setPage(1); }}>Reset Filters</Button>
                             ) : canCreate ? (
                               <Button className="bg-[#07008A] hover:bg-[#05006a] text-white" onClick={() => setOpen(true)}>
                                 <Plus className="h-4 w-4 mr-1" /> New booking
@@ -518,7 +570,7 @@ export default function AdminBookingsPage() {
                               
                               <DropdownMenuSeparator />
                               {canUpdate && b.status !== "Checked-In" && b.status !== "Checked-Out" && b.status !== "Cancelled" && (
-                                <DropdownMenuItem onClick={async () => { if (!b.id) return; try { const res = await api(`/api/bookings/${b.id}`, { method: "PATCH", body: JSON.stringify({ status: "Cancelled" }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Failed to cancel."); return; } toast.success("Cancelled."); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }} className="text-red-500 focus:text-red-500 focus:bg-red-50 cursor-pointer text-sm">
+                                <DropdownMenuItem onClick={async () => { if (!b.id) return; try { const res = await api(`/api/bookings/${b.id}`, { method: "PATCH", body: JSON.stringify({ status: "Cancelled" }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Failed to cancel."); return; } toast.success("Cancelled."); refreshData(); } catch { toast.error("Something went wrong."); } }} className="text-red-500 focus:text-red-500 focus:bg-red-50 cursor-pointer text-sm">
                                   <XCircle className="mr-2 h-4 w-4" /> Cancel Booking
                                 </DropdownMenuItem>
                               )}
@@ -531,7 +583,7 @@ export default function AdminBookingsPage() {
                                   </AlertDialogTrigger>
                                   <AlertDialogContent>
                                     <AlertDialogHeader><AlertDialogTitle>Delete this booking?</AlertDialogTitle><AlertDialogDescription>This will permanently delete booking <span className="font-semibold">{b.reference_number}</span>. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                                    <AlertDialogFooter><AlertDialogCancel>Keep Booking</AlertDialogCancel><AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={async () => { if (!b.id) return; try { const res = await api(`/api/bookings/${b.id}`, { method: "DELETE" }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Failed."); return; } toast.success("Deleted."); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }}>Delete booking</AlertDialogAction></AlertDialogFooter>
+                                    <AlertDialogFooter><AlertDialogCancel>Keep Booking</AlertDialogCancel><AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={async () => { if (!b.id) return; try { const res = await api(`/api/bookings/${b.id}`, { method: "DELETE" }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Failed."); return; } toast.success("Deleted."); refreshData(); } catch { toast.error("Something went wrong."); } }}>Delete booking</AlertDialogAction></AlertDialogFooter>
                                   </AlertDialogContent>
                                 </AlertDialog>
                               )}
@@ -561,15 +613,15 @@ export default function AdminBookingsPage() {
       </Card>
 
       {/* Edit dialog */}
-      <Dialog open={!!editBooking} onOpenChange={(o) => {!o && setEditBooking(null)}}>
+      <Dialog open={!!editBooking} onOpenChange={(o) => { if (!o) setEditBooking(null); }}>
         <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto custom-scrollbar">
           <DialogHeader><DialogTitle>Edit booking</DialogTitle></DialogHeader>
-          {editBooking?.id && <EditBookingForm apiUrl="" token={token()} booking={editBooking as any} onSuccess={() => { setLoading(true); fetchBookings(); }} onClose={() => setEditBooking(null)} />}
+          {editBooking?.id && <EditBookingForm apiUrl="" token={token()} booking={editBooking as any} onSuccess={() => { refreshData(); }} onClose={() => setEditBooking(null)} />}
         </DialogContent>
       </Dialog>
 
       {/* Payment Modal */}
-      <Dialog open={!!paymentBooking} onOpenChange={(o) => {!o && setPaymentBooking(null)}}>
+      <Dialog open={!!paymentBooking} onOpenChange={(o) => { if (!o) setPaymentBooking(null); }}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-[#07008A] flex items-center gap-2">
@@ -580,7 +632,7 @@ export default function AdminBookingsPage() {
           {paymentBooking && (
             <RecordPaymentModal 
               booking={paymentBooking as any}
-              onSuccess={() => { setPaymentBooking(null); fetchBookings(); }}
+              onSuccess={() => { setPaymentBooking(null); refreshData(); }}
               onClose={() => setPaymentBooking(null)}
             />
           )}
@@ -588,7 +640,7 @@ export default function AdminBookingsPage() {
       </Dialog>
 
       {/* Check-in dialog */}
-      <AlertDialog open={!!checkInBooking} onOpenChange={(o) => {!o && setCheckInBooking(null)}}>
+      <AlertDialog open={!!checkInBooking} onOpenChange={(o) => { if (!o) setCheckInBooking(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Confirm check-in?</AlertDialogTitle><AlertDialogDescription>This will mark the booking as <span className="font-semibold">Checked-In</span>. Early check-in fees apply automatically if before 2:00 PM.</AlertDialogDescription></AlertDialogHeader>
           <div className="space-y-2">
@@ -597,12 +649,12 @@ export default function AdminBookingsPage() {
             {checkInBooking?.check_in_date && <p className="text-xs text-slate-500">Reserved: <span className="font-medium">{`${String(checkInBooking.check_in_date).slice(0, 10)} 14:00`}</span></p>}
             {(() => { const p = computeEarlyCheckInPreview(); return <p className={cn("text-xs", p.fee > 0 ? "text-slate-700" : "text-slate-500")}>Breakdown: <span className="font-semibold text-[#07008A]">₱{p.fee.toFixed(2)}</span> (<span className="font-mono">₱{p.rate.toFixed(2)}</span> × <span className="font-mono">{p.hoursEarly}</span> hour{p.hoursEarly !== 1 ? "s" : ""} early) — {p.reason}</p>; })()}
           </div>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel>                  <AlertDialogAction className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={async () => { const b = checkInBooking; if (!b?.id) return; try { const tzOffset = localStorage.getItem("app_timezone_offset") || "+08:00"; const actual = checkInAt ? new Date(`${checkInAt}${tzOffset}`).toISOString() : new Date().toISOString(); const res = await api(`/api/bookings/${b.id}/check-in`, { method: "POST", body: JSON.stringify({ actual_check_in_at: actual }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Check-in failed."); return; } const fee = Number((data as { early_checkin_fee_applied?: number }).early_checkin_fee_applied || 0); toast.success(fee > 0 ? `Checked in. Early fee: ₱${fee.toFixed(2)}.` : "Checked in."); setCheckInBooking(null); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }}>Confirm check-in</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel>                  <AlertDialogAction className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={async () => { const b = checkInBooking; if (!b?.id) return; try { const tzOffset = localStorage.getItem("app_timezone_offset") || "+08:00"; const actual = checkInAt ? new Date(`${checkInAt}${tzOffset}`).toISOString() : new Date().toISOString(); const res = await api(`/api/bookings/${b.id}/check-in`, { method: "POST", body: JSON.stringify({ actual_check_in_at: actual }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Check-in failed."); return; } const fee = Number((data as { early_checkin_fee_applied?: number }).early_checkin_fee_applied || 0); toast.success(fee > 0 ? `Checked in. Early fee: ₱${fee.toFixed(2)}.` : "Checked in."); setCheckInBooking(null); refreshData(); } catch { toast.error("Something went wrong."); } }}>Confirm check-in</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       {/* Check-out dialog */}
-      <AlertDialog open={!!checkOutBooking} onOpenChange={(o) => {!o && setCheckOutBooking(null)}}>
+      <AlertDialog open={!!checkOutBooking} onOpenChange={(o) => { if (!o) setCheckOutBooking(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Confirm check-out?</AlertDialogTitle><AlertDialogDescription>This will mark the booking as <span className="font-semibold">Checked-Out</span>. Late check-out fees apply automatically after the designated checkout time.</AlertDialogDescription></AlertDialogHeader>
           <div className="space-y-2">
@@ -635,7 +687,7 @@ export default function AdminBookingsPage() {
             )}
             {(() => { const p = computeLateCheckOutPreview(); return <p className={cn("text-xs", p.fee > 0 ? "text-slate-700" : "text-slate-500")}>Breakdown: <span className="font-semibold text-[#07008A]">₱{p.fee.toFixed(2)}</span> (<span className="font-mono">₱{p.rate.toFixed(2)}</span> × <span className="font-mono">{p.hoursLate}</span> hour{p.hoursLate !== 1 ? "s" : ""} late) — {p.reason}</p>; })()}
           </div>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-amber-600 hover:bg-amber-700 text-white" onClick={async () => { const b = checkOutBooking; if (!b?.id) return; try { const tzOffset = localStorage.getItem("app_timezone_offset") || "+08:00"; const actual = checkOutAt ? new Date(`${checkOutAt}${tzOffset}`).toISOString() : new Date().toISOString(); const res = await api(`/api/bookings/${b.id}/check-out`, { method: "POST", body: JSON.stringify({ actual_check_out_at: actual }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Check-out failed."); return; } const fee = Number((data as { late_checkout_fee_applied?: number }).late_checkout_fee_applied || 0); toast.success(fee > 0 ? `Checked out. Late fee: ₱${fee.toFixed(2)}.` : "Checked out."); setCheckOutBooking(null); setLoading(true); fetchBookings(); } catch { toast.error("Something went wrong."); } }}>Confirm check-out</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-amber-600 hover:bg-amber-700 text-white" onClick={async () => { const b = checkOutBooking; if (!b?.id) return; try { const tzOffset = localStorage.getItem("app_timezone_offset") || "+08:00"; const actual = checkOutAt ? new Date(`${checkOutAt}${tzOffset}`).toISOString() : new Date().toISOString(); const res = await api(`/api/bookings/${b.id}/check-out`, { method: "POST", body: JSON.stringify({ actual_check_out_at: actual }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Check-out failed."); return; } const fee = Number((data as { late_checkout_fee_applied?: number }).late_checkout_fee_applied || 0); toast.success(fee > 0 ? `Checked out. Late fee: ₱${fee.toFixed(2)}.` : "Checked out."); setCheckOutBooking(null); refreshData(); } catch { toast.error("Something went wrong."); } }}>Confirm check-out</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
@@ -653,8 +705,7 @@ export default function AdminBookingsPage() {
           booking={extendBooking as any}
           token={token()}
           onSuccess={() => {
-            setLoading(true);
-            fetchBookings();
+            refreshData();
           }}
         />
       )}
@@ -665,8 +716,7 @@ export default function AdminBookingsPage() {
           open={!!extrasBooking}
           onClose={() => setExtrasBooking(null)}
           onSuccess={() => {
-            setLoading(true);
-            fetchBookings();
+            refreshData();
           }}
           booking={extrasBooking as any}
           token={token()}
@@ -678,8 +728,7 @@ export default function AdminBookingsPage() {
           open={!!extraChargeBooking}
           onClose={() => setExtraChargeBooking(null)}
           onSuccess={() => {
-            setLoading(true);
-            fetchBookings();
+            refreshData();
           }}
           booking={extraChargeBooking as any}
           token={token()}
