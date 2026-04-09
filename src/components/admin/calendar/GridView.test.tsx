@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { GridView } from "./GridView";
 
 describe("GridView", () => {
-  it("shows a +N more trigger and reveals hidden bookings in the overflow popover", () => {
+  it("shows a +N more trigger and reveals hidden bookings in the overflow dialog", () => {
     render(
       <GridView
         currentMonth={new Date("2026-04-01T00:00:00.000Z")}
@@ -54,6 +54,6 @@ describe("GridView", () => {
     fireEvent.click(screen.getByRole("button", { name: /\+1 more/i }));
 
     expect(screen.getByText("Hidden Booking")).toBeInTheDocument();
-    expect(screen.getByText(/more bookings for this day/i)).toBeInTheDocument();
+    expect(screen.getByText(/april 9, 2026/i)).toBeInTheDocument();
   });
 });

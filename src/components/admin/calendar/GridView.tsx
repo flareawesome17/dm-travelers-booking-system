@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import { format, eachDayOfInterval, endOfDay, endOfMonth, isSameDay, isSameMonth, startOfDay, startOfMonth } from "date-fns";
 import { Crown, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type Booking = {
   id: string;
@@ -53,6 +54,10 @@ function getBookingTone(booking: Booking) {
 
 export function GridView({ rooms, currentMonth, onBookingClick }: GridViewProps) {
   const [hoveredBooking, setHoveredBooking] = useState<string | null>(null);
+  const [overflowDay, setOverflowDay] = useState<{
+    day: Date;
+    bookings: Array<Booking & { room: Room }>;
+  } | null>(null);
 
   const allBookings = useMemo(() => {
     return rooms.flatMap((room) => room.bookings.map((booking) => ({ ...booking, room })));
@@ -167,40 +172,14 @@ export function GridView({ rooms, currentMonth, onBookingClick }: GridViewProps)
                 ))}
 
                 {hiddenBookings.length > 0 ? (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <button
-                        type="button"
-                        className="mt-auto inline-flex items-center justify-center gap-1 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-2 py-2 text-[11px] font-semibold text-slate-500 transition-colors hover:bg-slate-100"
-                      >
-                        <MoreHorizontal className="h-3.5 w-3.5" />
-                        +{hiddenBookings.length} more
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-72 rounded-2xl border-slate-200 p-3 shadow-xl" align="start">
-                      <div className="mb-3">
-                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{format(day, "MMMM d")}</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-800">More bookings for this day</p>
-                      </div>
-                      <div className="space-y-2">
-                        {hiddenBookings.map((booking) => (
-                          <button
-                            key={booking.id}
-                            type="button"
-                            onClick={() => onBookingClick?.(booking, booking.room)}
-                            className={cn(
-                              "w-full rounded-2xl border px-3 py-2 text-left transition-colors hover:bg-slate-50",
-                              getBookingTone(booking),
-                            )}
-                          >
-                            <p className="text-[10px] font-bold uppercase tracking-wider opacity-70">Rm {booking.room.room_number}</p>
-                            <p className="mt-1 text-sm font-semibold">{booking.guests?.full_name || "Guest"}</p>
-                            <p className="mt-1 text-[10px] font-medium uppercase tracking-wider opacity-70">{booking.status}</p>
-                          </button>
-                        ))}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                  <button
+                    type="button"
+                    onClick={() => setOverflowDay({ day, bookings: dayBookings })}
+                    className="mt-auto inline-flex items-center justify-center gap-1 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-2 py-2 text-[11px] font-semibold text-slate-500 transition-colors hover:bg-slate-100"
+                  >
+                    <MoreHorizontal className="h-3.5 w-3.5" />
+                    +{hiddenBookings.length} more
+                  </button>
                 ) : (
                   <div className="mt-auto" />
                 )}
@@ -209,6 +188,60 @@ export function GridView({ rooms, currentMonth, onBookingClick }: GridViewProps)
           );
         })}
       </div>
+
+      <Dialog open={Boolean(overflowDay)} onOpenChange={(open) => !open && setOverflowDay(null)}>
+        <DialogContent className="max-h-[85vh] max-w-[min(92vw,30rem)] overflow-hidden rounded-[28px] border-slate-200 p-0 shadow-[0_30px_80px_rgba(15,23,42,0.18)]">
+          <DialogHeader className="border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-5 py-4">
+            <div className="flex items-start justify-between gap-3 pr-8">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                  {overflowDay ? format(overflowDay.day, "EEEE") : ""}
+                </p>
+                <DialogTitle className="mt-1 text-xl font-bold text-slate-900">
+                  {overflowDay ? format(overflowDay.day, "MMMM d, yyyy") : "Day bookings"}
+                </DialogTitle>
+              </div>
+              {overflowDay ? (
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  {overflowDay.bookings.length} booking{overflowDay.bookings.length !== 1 ? "s" : ""}
+                </span>
+              ) : null}
+            </div>
+            <DialogDescription className="text-sm text-slate-500">
+              Review the full booking list for this date without covering the calendar content.
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="max-h-[calc(85vh-7.5rem)] px-5 py-4">
+            <div className="space-y-3 pr-3">
+              {overflowDay?.bookings.map((booking) => (
+                <button
+                  key={booking.id}
+                  type="button"
+                  onClick={() => {
+                    onBookingClick?.(booking, booking.room);
+                    setOverflowDay(null);
+                  }}
+                  className={cn(
+                    "w-full rounded-[22px] border px-4 py-3 text-left transition-all hover:translate-y-[-1px] hover:shadow-sm",
+                    getBookingTone(booking),
+                  )}
+                >
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <span className="shrink-0 rounded-full bg-white/80 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-current">
+                      Rm {booking.room.room_number}
+                    </span>
+                    <span className="truncate text-[11px] font-medium uppercase tracking-[0.16em] opacity-70">{booking.room.type}</span>
+                    {booking.is_special_booking ? <Crown className="ml-auto h-3.5 w-3.5 shrink-0 opacity-70" /> : null}
+                  </div>
+                  <p className="mt-2 text-base font-semibold">{booking.guests?.full_name || "Guest"}</p>
+                  <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.16em] opacity-75">{booking.status}</p>
+                </button>
+              ))}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

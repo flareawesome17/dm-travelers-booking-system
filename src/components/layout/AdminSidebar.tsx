@@ -38,20 +38,38 @@ import {
 } from "@/components/ui/tooltip";
 import { toast } from "@/components/ui/sonner";
 
-const operationsItems = [
+type SidebarItem = {
+  label: string;
+  path: string;
+  icon: React.ComponentType<{ className?: string }>;
+  permission?: string;
+};
+
+type SidebarSection = {
+  label: string;
+  items: SidebarItem[];
+};
+
+const overviewItems: SidebarItem[] = [
   { label: "Dashboard", path: "/admin", icon: LayoutDashboard },
+];
+
+const operationsItems: SidebarItem[] = [
   { label: "Bookings", path: "/admin/bookings", icon: CalendarCheck, permission: "bookings.read" },
   { label: "Calendar", path: "/admin/calendar", icon: CalendarRange, permission: "bookings.calendar" },
-  { label: "Receivables", path: "/admin/receivables", icon: Building2, permission: "receivables.read" },
   { label: "Rooms", path: "/admin/rooms", icon: BedDouble, permission: "rooms.read" },
   { label: "Housekeeping", path: "/admin/housekeeping", icon: Sparkles, permission: "housekeeping.read" },
   { label: "Restaurant", path: "/admin/restaurant", icon: UtensilsCrossed, permission: "restaurant.read" },
+];
+
+const financeItems: SidebarItem[] = [
+  { label: "Receivables", path: "/admin/receivables", icon: Building2, permission: "receivables.read" },
   { label: "Inventory", path: "/admin/inventory", icon: PackageSearch, permission: "inventory.read" },
   { label: "Treasury", path: "/admin/treasury", icon: Landmark, permission: "treasury.read" },
   { label: "LGU Monitoring", path: "/admin/lgu-monitoring", icon: ShieldCheck, permission: "lgu-monitoring.read" },
 ];
 
-const managementItems = [
+const managementItems: SidebarItem[] = [
   { label: "Reports", path: "/admin/reports", icon: BarChart3, permission: "reports.read" },
   { label: "Shifts", path: "/admin/shifts", icon: Clock, permission: "shifts.read" },
   { label: "Reviews", path: "/admin/reviews", icon: Star, permission: "reviews.read" },
@@ -62,7 +80,7 @@ const managementItems = [
 ];
 
 // Keep flat navItems for backwards compat
-const navItems = [...operationsItems, ...managementItems];
+const navItems = [...overviewItems, ...operationsItems, ...financeItems, ...managementItems];
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
@@ -173,7 +191,6 @@ export default function AdminSidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const permSet = new Set(permissions);
   const [token, setToken] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string>("/logo.png");
   const [newBookingCount, setNewBookingCount] = useState(0);
@@ -339,11 +356,18 @@ export default function AdminSidebar({
   const isItemActive = (path: string) =>
     pathname === path || (path !== "/admin" && pathname.startsWith(path));
 
-  const filterByPermission = (items: typeof navItems) =>
-    items.filter((i) => !i.permission || permSet.has(i.permission));
+  const navSections = useMemo<SidebarSection[]>(() => {
+    const permSet = new Set(permissions);
+    const filterByPermission = (items: SidebarItem[]) =>
+      items.filter((item) => !item.permission || permSet.has(item.permission));
 
-  const filteredOps = filterByPermission(operationsItems);
-  const filteredMgmt = filterByPermission(managementItems);
+    return [
+      { label: "Overview", items: filterByPermission(overviewItems) },
+      { label: "Operations", items: filterByPermission(operationsItems) },
+      { label: "Finance & Control", items: filterByPermission(financeItems) },
+      { label: "Management", items: filterByPermission(managementItems) },
+    ].filter((section) => section.items.length > 0);
+  }, [permissions]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (!isMobileOpen) return;
@@ -428,52 +452,36 @@ export default function AdminSidebar({
           "sidebar-scroll flex-1 overflow-y-auto overflow-x-hidden py-4",
           (isCollapsed && !isMobileOpen) ? "px-2" : "px-3"
         )}>
-          {/* Operations Group */}
-          {(!isCollapsed || isMobileOpen) && (
-            <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-white/30">
-              Operations
-            </p>
-          )}
-          <div className="space-y-0.5">
-            {filteredOps.map(({ label, path, icon }) => (
-              <NavItem
-                key={path}
-                label={label}
-                path={path}
-                icon={icon}
-                isActive={isItemActive(path)}
-                isCollapsed={isCollapsed && !isMobileOpen}
-                badge={path === "/admin/bookings" ? newBookingCount : path === "/admin" ? expiringCount : undefined}
-                badgeVariant={path === "/admin" ? "amber" : "red"}
-              />
-            ))}
-          </div>
+          {navSections.map((section, sectionIndex) => (
+            <div key={section.label}>
+              {sectionIndex > 0 ? (
+                <div className={cn("my-4", (isCollapsed && !isMobileOpen) ? "mx-2" : "mx-3")}>
+                  <div className="h-px bg-white/8" />
+                </div>
+              ) : null}
 
-          {/* Separator */}
-          <div className={cn("my-4", (isCollapsed && !isMobileOpen) ? "mx-2" : "mx-3")}>
-            <div className="h-px bg-white/8" />
-          </div>
+              {(!isCollapsed || isMobileOpen) && (
+                <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.12em] text-white/30">
+                  {section.label}
+                </p>
+              )}
 
-          {/* Management Group */}
-          {(!isCollapsed || isMobileOpen) && (
-            <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-white/30">
-              Management
-            </p>
-          )}
-          <div className="space-y-0.5">
-            {filteredMgmt.map(({ label, path, icon }) => (
-              <NavItem
-                key={path}
-                label={label}
-                path={path}
-                icon={icon}
-                isActive={isItemActive(path)}
-                isCollapsed={isCollapsed && !isMobileOpen}
-                badge={path === "/admin/users" && onlineUsersCount > 0 ? onlineUsersCount : undefined}
-                badgeVariant="amber"
-              />
-            ))}
-          </div>
+              <div className="space-y-0.5">
+                {section.items.map(({ label, path, icon }) => (
+                  <NavItem
+                    key={path}
+                    label={label}
+                    path={path}
+                    icon={icon}
+                    isActive={isItemActive(path)}
+                    isCollapsed={isCollapsed && !isMobileOpen}
+                    badge={path === "/admin/bookings" ? newBookingCount : path === "/admin" ? expiringCount : path === "/admin/users" && onlineUsersCount > 0 ? onlineUsersCount : undefined}
+                    badgeVariant={path === "/admin" || path === "/admin/users" ? "amber" : "red"}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
         </nav>
       </TooltipProvider>
 
