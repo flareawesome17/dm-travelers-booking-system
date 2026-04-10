@@ -25,6 +25,8 @@ This file stores durable project context that should be read at the start of eve
 - When `auto_close_shifts` is set to manual (`false`), the active shift ledger is intended to remain open after the scheduled end time until staff close it manually.
 - The current shift API now reports manual overtime as elapsed overtime minutes plus a warning, rather than forcing the display to `0 mins`.
 - The close-shift modal has an internal vertical scroll constraint for short viewport heights to keep the confirmation controls reachable.
+- Booking edit pricing now recalculates from room configuration when type or discount inputs change, instead of trusting the previously stored booking total.
+- Only LGU has a dedicated alternate room-rate configuration today; normal and special bookings both use the standard room rates unless a separate special-rate feature is added later.
 
 ## Known Constraints
 
@@ -38,6 +40,7 @@ This file stores durable project context that should be read at the start of eve
 - 2026-04-10: Updated `rules.md` to require checking available skills at the start of every task and using relevant skills before substantial work.
 - 2026-04-10: Updated the global Codex Supabase MCP server to project ref `yqsjczhiemzngudppkhg`, confirmed `remote_mcp_client_enabled = true`, and completed Supabase MCP OAuth login. The Supabase skill was already installed, so no extra skill install was needed.
 - 2026-04-10: Verified that manual shift ledger mode does not auto-close the active shift after schedule end, added overtime elapsed-time warnings to the shift UI/API, and fixed the close-ledger modal to scroll on short screens. Targeted Vitest and ESLint checks passed for the touched files.
+- 2026-04-10: Fixed booking edit pricing so changing booking type between LGU and normal/special recalculates the room total and balance due from room rates. Added a shared booking pricing helper plus targeted API/unit tests, and confirmed the touched files pass ESLint.
 
 ## Open Follow-Ups
 

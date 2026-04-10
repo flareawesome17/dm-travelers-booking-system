@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/sonner";
 import { cn, getErrorMessage } from "@/lib/utils";
-import { getBookingChargeBreakdown } from "@/lib/bookingTotals";
+import { calculateBookingRoomSubtotal, getBookingChargeBreakdown } from "@/lib/bookingTotals";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarDays, Users, Tag, DollarSign, Percent } from "lucide-react";
@@ -19,6 +19,19 @@ type RoomData = {
   max_occupancy?: number;
   room_number?: string;
   room_type?: string;
+  rate_24h_enabled?: boolean;
+  rate_24h_price?: number | null;
+  rate_12h_enabled?: boolean;
+  rate_12h_price?: number | null;
+  rate_5h_enabled?: boolean;
+  rate_5h_price?: number | null;
+  rate_3h_enabled?: boolean;
+  rate_3h_price?: number | null;
+  lgu_rate_enabled?: boolean;
+  lgu_rate_24h_price?: number | null;
+  lgu_rate_12h_price?: number | null;
+  lgu_rate_5h_price?: number | null;
+  lgu_rate_3h_price?: number | null;
 };
 
 type BookingRow = {
@@ -133,8 +146,15 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
     lateCheckOutFee 
   } = getBookingChargeBreakdown(booking);
 
-  // The original room charge BEFORE discount was subtracted
-  const subtotalBeforeDiscount = originalRoomTotal + Number(booking.discount_amount || 0);
+  const storedSubtotalBeforeDiscount = originalRoomTotal + Number(booking.discount_amount || 0);
+  const recalculatedSubtotalBeforeDiscount = calculateBookingRoomSubtotal({
+    room,
+    ratePlanKind: booking.rate_plan_kind,
+    checkInDate: checkIn,
+    checkOutDate: checkOut,
+    isLguBooking,
+  });
+  const subtotalBeforeDiscount = recalculatedSubtotalBeforeDiscount ?? storedSubtotalBeforeDiscount;
 
   let calculatedDiscount = 0;
   if (discountType === "percent") {
@@ -545,7 +565,14 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
           <div className={cn(
             "flex items-center gap-2 p-3 rounded-xl border transition-all cursor-pointer",
             isLguBooking ? "bg-amber-50 border-amber-200" : "bg-slate-50 border-slate-100 hover:border-slate-200"
-          )} onClick={() => setIsLguBooking(!isLguBooking)}>
+          )} onClick={() => {
+            const nextValue = !isLguBooking;
+            setIsLguBooking(nextValue);
+            if (nextValue) {
+              setIsSpecialBooking(false);
+              setSpecialBookingLabel("");
+            }
+          }}>
             <input
               type="checkbox"
               checked={isLguBooking}
@@ -558,7 +585,15 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
           <div className={cn(
             "flex items-center gap-2 p-3 rounded-xl border transition-all cursor-pointer",
             isSpecialBooking ? "bg-indigo-50 border-indigo-200" : "bg-slate-50 border-slate-100 hover:border-slate-200"
-          )} onClick={() => setIsSpecialBooking(!isSpecialBooking)}>
+          )} onClick={() => {
+            const nextValue = !isSpecialBooking;
+            setIsSpecialBooking(nextValue);
+            if (nextValue) {
+              setIsLguBooking(false);
+            } else {
+              setSpecialBookingLabel("");
+            }
+          }}>
             <input
               type="checkbox"
               checked={isSpecialBooking}
