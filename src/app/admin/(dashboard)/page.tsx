@@ -567,8 +567,10 @@ export default function AdminDashboardPage() {
               <CardContent className="p-5 pt-2">
                 <div className="space-y-3">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-white/70">Time Remaining:</span>
-                    <span className="font-bold">{activeShift.time.minutes_remaining} mins</span>
+                    <span className="text-white/70">{activeShift.warnings?.is_overtime ? "Overtime:" : "Time Remaining:"}</span>
+                    <span className="font-bold">
+                      {activeShift.warnings?.is_overtime ? `+${activeShift.time.minutes_remaining} mins` : `${activeShift.time.minutes_remaining} mins`}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-white/70">Net Income:</span>

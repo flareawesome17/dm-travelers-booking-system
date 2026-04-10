@@ -98,6 +98,20 @@ export function minutesUntilShiftEnd(
 }
 
 /**
+ * Calculate how many minutes have elapsed since the scheduled shift end.
+ * Only use this once the shift is already known to be in overtime.
+ */
+export function minutesPastShiftEnd(
+  shift: ShiftDefinition,
+  currentTime: string
+): number {
+  const now = timeToMinutes(currentTime);
+  const end = timeToMinutes(shift.end_time);
+
+  return (now - end + 1440) % 1440;
+}
+
+/**
  * Get the date to use for a shift_log entry.
  * For overnight shifts past midnight, use yesterday's date.
  */

@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/rbac";
 import {
   getOrCreateActiveShiftLog,
   minutesUntilShiftEnd,
+  minutesPastShiftEnd,
   manilaTimeString,
   type ShiftDefinition,
 } from "@/lib/shiftUtils";
@@ -38,7 +39,8 @@ export async function GET(req: NextRequest) {
     // Calculate time remaining
     const currentTime = await manilaTimeString();
     const minsRemaining = minutesUntilShiftEnd(shift as ShiftDefinition, currentTime);
-    const isEndingSoon = minsRemaining <= 30;
+    const overtimeMinutes = is_overtime ? minutesPastShiftEnd(shift as ShiftDefinition, currentTime) : 0;
+    const isEndingSoon = !is_overtime && minsRemaining <= 30;
 
     // Check if previous shift is still open (blocks current shift operations)
     const shiftsSorted = (shifts as ShiftDefinition[]).filter(s => s.is_active).sort((a, b) => a.sort_order - b.sort_order);
@@ -70,7 +72,8 @@ export async function GET(req: NextRequest) {
       totals: { total_income: totalIncome, total_expense: totalExpense, net_total: netTotal },
       time: {
         current_time: currentTime,
-        minutes_remaining: is_overtime ? 0 : minsRemaining,
+        minutes_remaining: is_overtime ? overtimeMinutes : minsRemaining,
+        overtime_minutes: overtimeMinutes,
         is_ending_soon: isEndingSoon,
         shift_start: shift.start_time,
         shift_end: shift.end_time,
@@ -78,8 +81,11 @@ export async function GET(req: NextRequest) {
       warnings: {
         previous_shift_open: previousShiftOpen,
         is_overtime: is_overtime,
+        overtime: is_overtime
+          ? `${shift.name} shift is running ${overtimeMinutes} minute${overtimeMinutes === 1 ? "" : "s"} past schedule. Manual mode is on, so the ledger stays open until staff close it.`
+          : null,
         ending_soon: (isEndingSoon && !is_overtime)
-          ? `⏰ ${minsRemaining} minutes remaining in ${shift.name} shift. Please close the ledger soon.`
+          ? `${minsRemaining} minutes remaining in ${shift.name} shift. Please close the ledger soon.`
           : null,
       },
     });

@@ -50,7 +50,7 @@ export default function ShiftsPage() {
     } finally {
       setLoading(false);
     }
-  }, [router, hasPermission]);
+  }, [hasPermission]);
 
   const handleRecover = async () => {
     if (!hasPermission("shifts.update")) {
@@ -160,11 +160,11 @@ export default function ShiftsPage() {
             )}
 
             {data.warnings?.is_overtime && data.shift_log.status !== "CLOSED" && (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-md flex items-start gap-3">
-                <ShieldAlert className="h-5 w-5 mt-0.5 text-rose-600 animate-pulse" />
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-md flex items-start gap-3">
+                <ShieldAlert className="h-5 w-5 mt-0.5 text-amber-600 shrink-0" />
                 <div className="text-sm">
-                  <span className="font-semibold block">Shift Overtime!</span>
-                  This shift ledger has exceeded its scheduled time window. Please close the ledger immediately so the next shift can begin.
+                  <span className="font-semibold block">Manual Overtime Warning</span>
+                  {data.warnings?.overtime || "This shift ledger has passed its scheduled end time, but manual close mode is active so it will remain open until staff close it."}
                 </div>
               </motion.div>
             )}
@@ -197,8 +197,10 @@ export default function ShiftsPage() {
                     <span className="font-semibold">{data.shift_log.date}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-500">Time Remaining</span>
-                    <span className="font-mono text-[#07008A]">{data.time.minutes_remaining} mins</span>
+                    <span className="text-slate-500">{data.warnings?.is_overtime ? "Overtime" : "Time Remaining"}</span>
+                    <span className="font-mono text-[#07008A]">
+                      {data.warnings?.is_overtime ? `+${data.time.minutes_remaining} mins` : `${data.time.minutes_remaining} mins`}
+                    </span>
                   </div>
                   <div className="pt-4 border-t space-y-3">
                     <div className="flex justify-between items-center">

@@ -69,8 +69,8 @@ export function CloseShiftModal({
 
   return (
     <Dialog open={true} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-lg border-red-100">
-        <DialogHeader>
+      <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto border-red-100 sm:max-w-lg">
+        <DialogHeader className="pr-8">
           <DialogTitle className="flex items-center gap-2 text-red-600">
             <LockKeyhole className="h-5 w-5" />
             Close Shift Ledger
