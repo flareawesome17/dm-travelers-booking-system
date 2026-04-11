@@ -48,6 +48,9 @@ type ShiftRow = {
   booking_id: string | null;
   room_no: string;
   guest_name: string;
+  scheduled_check_in_at: string | null;
+  scheduled_check_out_at: string | null;
+  remaining_balance_due: number;
   check_in_at: string | null;
   check_out_at: string | null;
   room_rate: number;

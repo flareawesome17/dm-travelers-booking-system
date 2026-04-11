@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCollectibleTurnovers,
+  createBaseRow,
+  formatReferenceNumbersForWorkbook,
+  getReservationScheduleDisplay,
   getRestaurantChargeBreakdown,
   type ShiftCashReportRow,
   type ShiftCashTurnoverRow,
@@ -11,6 +14,9 @@ function createActivityRow(overrides: Partial<ShiftCashReportRow> = {}): ShiftCa
     booking_id: "booking-1",
     room_no: "101",
     guest_name: "Guest One",
+    scheduled_check_in_at: null,
+    scheduled_check_out_at: null,
+    remaining_balance_due: 0,
     check_in_at: "2026-04-11T06:00:00.000Z",
     check_out_at: null,
     room_rate: 2380,
@@ -40,6 +46,9 @@ function createTurnoverRow(overrides: Partial<ShiftCashTurnoverRow> = {}): Shift
     booking_id: "booking-1",
     room_no: "101",
     guest_name: "Guest One",
+    scheduled_check_in_at: "2026-04-12T06:00:00.000Z",
+    scheduled_check_out_at: "2026-04-13T04:00:00.000Z",
+    remaining_balance_due: 300,
     check_in_at: "2026-04-11T06:00:00.000Z",
     check_out_at: null,
     room_rate: 2380,
@@ -61,6 +70,69 @@ function createTurnoverRow(overrides: Partial<ShiftCashTurnoverRow> = {}): Shift
 }
 
 describe("buildCollectibleTurnovers", () => {
+  it("keeps reservation schedule fields on live activity rows built from bookings", () => {
+    const row = createBaseRow({
+      id: "booking-1",
+      room_no: "204",
+      guest_name: "Reservation Guest",
+      total_amount: 1930,
+      balance_due: 700,
+      actual_check_in_at: null,
+      actual_check_out_at: null,
+      reserved_checkin_datetime: "2026-04-12T06:00:00.000Z",
+      reserved_checkout_datetime: "2026-04-13T04:00:00.000Z",
+    } as any, []);
+
+    expect(row).toMatchObject({
+      scheduled_check_in_at: "2026-04-12T06:00:00.000Z",
+      scheduled_check_out_at: "2026-04-13T04:00:00.000Z",
+      remaining_balance_due: 700,
+      check_in_at: null,
+    });
+  });
+
+  it("formats reservation schedule text only for future unpaid reservations that are not checked in", () => {
+    expect(getReservationScheduleDisplay(createActivityRow({
+      scheduled_check_in_at: "2026-04-12T06:00:00.000Z",
+      scheduled_check_out_at: "2026-04-13T04:00:00.000Z",
+      remaining_balance_due: 700,
+      check_in_at: null,
+      latest_activity_at: "2026-04-11T05:00:00.000Z",
+    }))).toContain("CI:");
+
+    expect(getReservationScheduleDisplay(createActivityRow({
+      scheduled_check_in_at: "2026-04-12T06:00:00.000Z",
+      scheduled_check_out_at: "2026-04-13T04:00:00.000Z",
+      remaining_balance_due: 0,
+      check_in_at: null,
+      latest_activity_at: "2026-04-11T05:00:00.000Z",
+    }))).toBe("");
+
+    expect(getReservationScheduleDisplay(createActivityRow({
+      scheduled_check_in_at: "2026-04-10T06:00:00.000Z",
+      scheduled_check_out_at: "2026-04-11T04:00:00.000Z",
+      remaining_balance_due: 700,
+      check_in_at: null,
+      latest_activity_at: "2026-04-11T05:00:00.000Z",
+    }))).toBe("");
+
+    expect(getReservationScheduleDisplay(createActivityRow({
+      scheduled_check_in_at: "2026-04-12T06:00:00.000Z",
+      scheduled_check_out_at: "2026-04-13T04:00:00.000Z",
+      remaining_balance_due: 700,
+      check_in_at: "2026-04-11T06:00:00.000Z",
+    }))).toBe("");
+  });
+
+  it("shortens workbook reference numbers to the last four digits", () => {
+    expect(formatReferenceNumbersForWorkbook([
+      "TXN-1775905057294-326",
+      "QR-123",
+      "cash",
+      "TXN-1775905057294-326",
+    ])).toBe("4326, 123");
+  });
+
   it("splits restaurant charges between food and minimart from order-item snapshots", () => {
     const result = getRestaurantChargeBreakdown([
       { order_id: "order-1", line_total: 120, is_minimart: false } as any,

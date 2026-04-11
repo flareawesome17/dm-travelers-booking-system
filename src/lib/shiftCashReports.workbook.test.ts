@@ -3,7 +3,7 @@ import ExcelJS from "exceljs";
 import { generateShiftCashReportWorkbook, type ShiftCashReport } from "./shiftCashReports";
 
 describe("generateShiftCashReportWorkbook", () => {
-  it("adds payment-column borders, compacts date cells, uppercases the prepared-by name, and protects the worksheet", async () => {
+  it("renders extras and reservation schedule headers, shortens ref numbers, adds a total top border, and protects the worksheet", async () => {
     const report: ShiftCashReport = {
       shift_log: {
         id: "shift-log-1",
@@ -38,6 +38,9 @@ describe("generateShiftCashReportWorkbook", () => {
           booking_id: "booking-1",
           room_no: "101",
           guest_name: "Guest One",
+          scheduled_check_in_at: null,
+          scheduled_check_out_at: null,
+          remaining_balance_due: 0,
           check_in_at: "2026-04-11T06:10:00.000Z",
           check_out_at: null,
           room_rate: 1000,
@@ -59,6 +62,34 @@ describe("generateShiftCashReportWorkbook", () => {
           reference_numbers: ["QR-123"],
           latest_activity_at: "2026-04-11T07:00:00.000Z",
         },
+        {
+          booking_id: "booking-2",
+          room_no: "204",
+          guest_name: "Reservation Guest",
+          scheduled_check_in_at: "2026-04-12T06:00:00.000Z",
+          scheduled_check_out_at: "2026-04-13T04:00:00.000Z",
+          remaining_balance_due: 700,
+          check_in_at: null,
+          check_out_at: null,
+          room_rate: 1930,
+          extra_bed_amount: 0,
+          extra_person_amount: 0,
+          linens_amount: 0,
+          charge_amount: 0,
+          minimart_amount: 0,
+          food_amount: 0,
+          early_checkin_amount: 0,
+          late_checkout_amount: 0,
+          cash_amount: 0,
+          gcash_amount: 700,
+          card_amount: 0,
+          cheque_amount: 0,
+          qrph_amount: 0,
+          total_amount: 700,
+          payment_count: 1,
+          reference_numbers: ["TXN-1775905057294-326"],
+          latest_activity_at: "2026-04-11T05:00:00.000Z",
+        },
       ],
       turnover_rows: [],
       expense_summary: {
@@ -67,7 +98,7 @@ describe("generateShiftCashReportWorkbook", () => {
         total: 50,
         expense_count: 1,
       },
-      export_template_version: 1,
+      export_template_version: 2,
       report_mode: "live",
     };
 
@@ -76,19 +107,39 @@ describe("generateShiftCashReportWorkbook", () => {
     });
 
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
+    await workbook.xlsx.load(buffer as any);
     const worksheet = workbook.worksheets[0];
 
-    expect(worksheet.getCell("R10").border.left?.style).toBe("thin");
-    expect(worksheet.getCell("R10").border.right?.style).toBe("thin");
+    expect(worksheet.getCell("H8").value).toBe("EXTRAS");
+    expect(worksheet.getCell("D8").value).toBe("SCHEDULE");
     expect(worksheet.getCell("S10").border.left?.style).toBe("thin");
     expect(worksheet.getCell("S10").border.right?.style).toBe("thin");
-    expect(worksheet.getCell("T10").border.right?.style).toBe("medium");
-    expect(worksheet.getCell("T24").border.right?.style).toBe("medium");
-    expect(worksheet.getCell("D10").font?.size).toBe(9);
+    expect(worksheet.getCell("T10").border.left?.style).toBe("thin");
+    expect(worksheet.getCell("T10").border.right?.style).toBe("thin");
+    expect(worksheet.getCell("P7").border.top?.style).toBe("medium");
+    expect(worksheet.getCell("U7").border.top?.style).toBe("medium");
+    expect(worksheet.getCell("P8").border.top?.style).toBe("medium");
+    expect(worksheet.getCell("U8").border.top?.style).toBe("medium");
+    expect(worksheet.getCell("U10").border.right?.style).toBe("medium");
+    expect(worksheet.getCell("U24").border.right?.style).toBe("medium");
+    expect(worksheet.getCell("G24").border.right?.style).toBe("thin");
+    expect(worksheet.getCell("O24").border.right?.style).toBe("medium");
+    expect(worksheet.getCell("G24").border.bottom?.style).toBe("medium");
+    expect(worksheet.getCell("O24").border.bottom?.style).toBe("medium");
+    expect(worksheet.getCell("A24").border.top?.style).toBe("medium");
+    expect(worksheet.getCell("A24").border.bottom?.style).toBe("medium");
+    expect(worksheet.getCell("U24").border.top?.style).toBe("medium");
+    expect(worksheet.getCell("U24").border.bottom?.style).toBe("medium");
+    expect(worksheet.getCell("D10").font?.size).toBe(8);
     expect(worksheet.getCell("D10").alignment?.shrinkToFit).toBe(true);
     expect(worksheet.getCell("E10").font?.size).toBe(9);
     expect(worksheet.getCell("E10").alignment?.shrinkToFit).toBe(true);
+    expect(worksheet.getCell("D10").value).toBe("");
+    expect(String(worksheet.getCell("D11").value)).toContain("CI:");
+    expect(String(worksheet.getCell("D11").value)).toContain("CO:");
+    expect(worksheet.getCell("C11").value).toBe("Reservation Guest");
+    expect(worksheet.getCell("U10").value).toBe("123");
+    expect(worksheet.getCell("U11").value).toBe("4326");
     expect(worksheet.getCell("C34").value).toBe("ERNIE SAAVEDRA JR.");
     expect((worksheet as any).sheetProtection).toBeTruthy();
     expect((worksheet as any).sheetProtection.sheet).toBe(true);
