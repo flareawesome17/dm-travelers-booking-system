@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import logoImage from "@/assets/logo.png";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -427,7 +428,7 @@ export default function AdminSidebar({
         (isCollapsed && !isMobileOpen) ? "justify-center px-3 h-[72px]" : "justify-between px-5 h-[72px]"
       )}>
         <div className="flex items-center gap-3 overflow-hidden">
-          <img src={logoUrl} alt="D&M Logo" width={36} height={36} className="shrink-0 object-contain" />
+          <img src={logoImage.src} alt="D&M Logo" width={36} height={36} className="shrink-0 object-contain" />
           {(!isCollapsed || isMobileOpen) && (
             <div className="whitespace-nowrap flex-1 min-w-0">
               <p className="font-bold text-white text-sm tracking-tight leading-tight">Admin</p>
