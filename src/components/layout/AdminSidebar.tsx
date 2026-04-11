@@ -323,7 +323,11 @@ export default function AdminSidebar({
       .then((r) => r.json())
       .then((data) => {
         if (data?.hotel_logo) {
-          setLogoUrl(data.hotel_logo);
+          let logo = data.hotel_logo.trim();
+          if (logo && !logo.startsWith("/") && !logo.startsWith("http") && !logo.startsWith("data:")) {
+            logo = "/" + logo;
+          }
+          setLogoUrl(logo);
         }
       })
       .catch(() => {});
