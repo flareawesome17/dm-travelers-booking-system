@@ -698,7 +698,17 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
               </div>
               <div className="space-y-1 text-xs text-slate-600">
                 <div className="font-medium">Total guests for per guest rate</div>
-                <div>{totalGuests} guest(s)</div>
+                <select
+                  className="mt-1 flex h-8 w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  value={numGuests}
+                  onChange={(e) => setNumGuests(e.target.value)}
+                >
+                  {Array.from({ length: Math.min(roomCapacity, 6) }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={String(n)}>
+                      {n} {n === 1 ? "guest" : "guests"}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           )}

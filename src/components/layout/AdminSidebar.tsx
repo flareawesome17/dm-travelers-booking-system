@@ -43,6 +43,7 @@ type SidebarItem = {
   path: string;
   icon: React.ComponentType<{ className?: string }>;
   permission?: string;
+  permissions?: string[];
 };
 
 type SidebarSection = {
@@ -70,13 +71,27 @@ const financeItems: SidebarItem[] = [
 ];
 
 const managementItems: SidebarItem[] = [
-  { label: "Reports", path: "/admin/reports", icon: BarChart3, permission: "reports.read" },
+  { label: "Reports", path: "/admin/reports", icon: BarChart3, permissions: ["reports.shift_cash.read", "reports.analytics.read"] },
   { label: "Shifts", path: "/admin/shifts", icon: Clock, permission: "shifts.read" },
   { label: "Reviews", path: "/admin/reviews", icon: Star, permission: "reviews.read" },
   { label: "Discounts", path: "/admin/discounts", icon: Percent, permission: "discounts.read" },
   { label: "Users", path: "/admin/users", icon: Users, permission: "users.manage" },
   { label: "Roles", path: "/admin/roles", icon: KeyRound, permission: "roles.manage" },
-  { label: "Settings", path: "/admin/settings", icon: Settings, permission: "settings.read" },
+  { 
+    label: "Settings", 
+    path: "/admin/settings", 
+    icon: Settings, 
+    permissions: [
+      "settings.read", 
+      "settings.write",
+      "settings.manage",
+      "settings.general",
+      "settings.operations",
+      "settings.financial",
+      "settings.social",
+      "settings.extras"
+    ] 
+  },
 ];
 
 // Keep flat navItems for backwards compat
@@ -359,7 +374,12 @@ export default function AdminSidebar({
   const navSections = useMemo<SidebarSection[]>(() => {
     const permSet = new Set(permissions);
     const filterByPermission = (items: SidebarItem[]) =>
-      items.filter((item) => !item.permission || permSet.has(item.permission));
+      items.filter((item) => {
+        if (!item.permission && !item.permissions) return true;
+        if (item.permission && permSet.has(item.permission)) return true;
+        if (item.permissions && item.permissions.some(p => permSet.has(p))) return true;
+        return false;
+      });
 
     return [
       { label: "Overview", items: filterByPermission(overviewItems) },

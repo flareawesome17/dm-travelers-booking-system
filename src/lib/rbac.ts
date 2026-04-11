@@ -72,6 +72,48 @@ export async function requirePermission(req: NextRequest, permission: string) {
   }
 }
 
+export async function requireAnyPermission(req: NextRequest, permissions: string[]) {
+  const auth = verifyAdminToken(req);
+  if ("error" in auth) return { error: auth.error } as const;
+
+  const roleId = Number(auth.payload.role_id);
+  const adminId = typeof auth.payload.sub === "string" ? auth.payload.sub : null;
+  if (!adminId || !Number.isFinite(roleId)) {
+    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) } as const;
+  }
+
+  // Check if admin is still active
+  const supabase = getSupabaseAdmin();
+  const { data: admin, error: adminErr } = await supabase
+    .from("admin_users")
+    .select("is_active")
+    .eq("id", adminId)
+    .single();
+
+  if (adminErr || !admin) {
+    return { error: apiError("unauthorized", "Authentication required", 401) } as const;
+  }
+
+  if (!admin.is_active) {
+    return { 
+      error: apiError("forbidden", "Sorry, your account is disabled, please contact your administrator.", 403) 
+    } as const;
+  }
+
+  if (roleId === 1) return { payload: auth.payload } as const;
+
+  try {
+    const perms = await loadPermissions({ roleId, adminId });
+    const hasAny = permissions.some((p) => perms.has(p));
+    if (!hasAny) {
+      return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) } as const;
+    }
+    return { payload: auth.payload } as const;
+  } catch (e: any) {
+    return { error: NextResponse.json({ error: e?.message || "Internal server error" }, { status: 500 }) } as const;
+  }
+}
+
 export async function getCurrentAdminPermissions(req: NextRequest) {
   const auth = verifyAdminToken(req);
   if ("error" in auth) return { error: auth.error } as const;

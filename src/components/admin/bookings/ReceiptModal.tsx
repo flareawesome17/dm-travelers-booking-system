@@ -2,6 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Printer } from "lucide-react";
 import { getBookingChargeBreakdown } from "@/lib/bookingTotals";
+import { getBookingExtraDisplayName } from "@/lib/bookingExtras";
 
 type BookingRow = {
   id?: string;
@@ -35,7 +36,7 @@ type BookingRow = {
     }[];
   }[];
   booking_extras?: {
-    id: string; extra_type: string; quantity: number; unit_price: number; total_price: number;
+    id: string; extra_type: string; custom_label?: string | null; quantity: number; unit_price: number; total_price: number;
   }[];
 };
 
@@ -184,7 +185,7 @@ export function ReceiptModal({ booking, onClose }: ReceiptModalProps) {
                   booking.booking_extras.map((extra) => (
                     <tr key={extra.id}>
                       <td className="py-4 pr-4">
-                        <div className="font-semibold text-slate-800">{extra.extra_type || "Extra Charge"}</div>
+                        <div className="font-semibold text-slate-800">{getBookingExtraDisplayName(extra)}</div>
                         <div className="text-[11px] text-slate-500 mt-0.5">Additional charge (₱{Number(extra.unit_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} each)</div>
                       </td>
                       <td className="py-4 text-center">{extra.quantity}</td>

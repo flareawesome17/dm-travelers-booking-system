@@ -81,14 +81,14 @@ export default function AdminDashboardShell({
     if (pathname === "/admin" || pathname === "/admin/login") return;
 
     // Protection mapping for all 16 modules
-    const required: Array<[string, string]> = [
+    const required: Array<[string, string | string[]]> = [
       ["/admin/bookings", "bookings.read"],
       ["/admin/rooms", "rooms.read"],
       ["/admin/housekeeping", "housekeeping.read"],
       ["/admin/restaurant", "restaurant.read"],
       ["/admin/inventory", "inventory.read"],
       ["/admin/treasury", "treasury.read"],
-      ["/admin/reports", "reports.read"],
+      ["/admin/reports", ["reports.shift_cash.read", "reports.analytics.read"]],
       ["/admin/shifts", "shifts.read"],
       ["/admin/receivables", "receivables.read"],
       ["/admin/lgu-monitoring", "lgu-monitoring.read"],
@@ -100,9 +100,10 @@ export default function AdminDashboardShell({
     ];
 
     const permSet = new Set(permissions);
-    for (const [prefix, perm] of required) {
+    for (const [prefix, permOrPerms] of required) {
       if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
-        if (!permSet.has(perm)) router.replace("/admin");
+        const permsToCheck = Array.isArray(permOrPerms) ? permOrPerms : [permOrPerms];
+        if (!permsToCheck.some(p => permSet.has(p))) router.replace("/admin");
         return;
       }
     }

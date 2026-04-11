@@ -3,6 +3,7 @@
  * Ensures strict input validation and prevents mass assignment attacks.
  */
 import { z } from "zod";
+import { BOOKING_EXTRA_TYPES } from "@/lib/bookingExtras";
 
 // ─── Common Validators ────────────────────────────────────────────────────────
 
@@ -97,9 +98,18 @@ export const createBookingSchema = z.object({
   discount_id: z.string().uuid().optional().nullable(),
   // Booking Extras from initial creation
   extras: z.array(z.object({
-    extra_type: z.string().trim().min(1).max(100),
+    extra_type: z.enum(BOOKING_EXTRA_TYPES),
     quantity: z.number().int().min(1).max(20),
     unit_price: nonNegativeNumber,
+    custom_label: z.string().trim().min(1).max(150).optional().nullable(),
+  }).superRefine((data, ctx) => {
+    if (data.extra_type === "Custom Charge" && !String(data.custom_label || "").trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["custom_label"],
+        message: "Custom charge label is required",
+      });
+    }
   })).optional(),
 }).strict();
 
@@ -186,6 +196,7 @@ export const createMenuItemSchema = z.object({
   name: safeString.max(200),
   description: z.string().max(1000).optional().nullable(),
   price: positiveNumber,
+  staff_price: nonNegativeNumber.optional().nullable(),
   category_id: z.string().uuid().optional(),
   category: z.string().max(100).optional(),
   image_url: z.string().url().max(500).optional().nullable(),
@@ -193,6 +204,7 @@ export const createMenuItemSchema = z.object({
   preparation_time: z.number().int().min(0).max(120).optional(),
   // Feature 5 – LGU markup
   lgu_markup_percentage: nonNegativeNumber.max(100).optional(),
+  is_minimart: z.boolean().optional().default(false),
 }).strict();
 
 export const updateMenuItemSchema = createMenuItemSchema.partial();
@@ -218,6 +230,20 @@ export const createOrderSchema = z.object({
   is_lgu_order: z.boolean().optional(),
 }).strict();
 
+export const updateRestaurantOrderSchema = z.object({
+  status: z.enum(["Pending", "Preparing", "Served", "Charged to Room", "Paid", "Cancelled"]).optional(),
+  payment_method: z.enum(["Cash", "GCash", "Card", "Charged to Room"]).optional(),
+  payment_reference: z.string().trim().max(120).optional().nullable(),
+}).strict().superRefine((data, ctx) => {
+  if ((data.payment_method === "GCash" || data.payment_method === "Card") && !String(data.payment_reference || "").trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["payment_reference"],
+      message: "Reference number is required for GCash and card payments",
+    });
+  }
+});
+
 // ─── Booking Extensions Schema (Feature 1) ─────────────────────────────────────
 
 export const createExtensionSchema = z.object({
@@ -229,12 +255,25 @@ export const createExtensionSchema = z.object({
 
 // ─── Booking Extras Schema (Feature 6) ──────────────────────────────────────────
 
+const bookingExtraInputSchema = z.object({
+  extra_type: z.enum(BOOKING_EXTRA_TYPES, {
+    errorMap: () => ({ message: "Invalid extra type" }),
+  }),
+  quantity: z.number().int().min(1).max(20),
+  unit_price: nonNegativeNumber,
+  custom_label: z.string().trim().min(1).max(150).optional().nullable(),
+}).superRefine((data, ctx) => {
+  if (data.extra_type === "Custom Charge" && !String(data.custom_label || "").trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["custom_label"],
+      message: "Custom charge label is required",
+    });
+  }
+});
+
 export const createBookingExtrasSchema = z.object({
-  extras: z.array(z.object({
-    extra_type: z.string().trim().min(1, "Extra type is required").max(100),
-    quantity: z.number().int().min(1).max(20),
-    unit_price: nonNegativeNumber,
-  })).min(1, "At least one extra item required"),
+  extras: z.array(bookingExtraInputSchema).min(1, "At least one extra item required"),
 }).strict();
 
 // ─── Receivable Payment Schema (Feature 4) ──────────────────────────────────────

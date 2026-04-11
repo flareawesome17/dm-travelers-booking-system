@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { requirePermission } from "@/lib/rbac";
 import { getOrCreateActiveShiftLog } from "@/lib/shiftUtils";
 import { broadcastSystemMessage } from "@/lib/activity-hub";
+import { finalizeShiftCashReport } from "@/lib/shiftCashReports";
 
 export async function POST(req: NextRequest) {
   const auth = await requirePermission(req, "shifts.close");
@@ -19,11 +20,10 @@ export async function POST(req: NextRequest) {
     if (shiftLog.status === "CLOSED") {
       return NextResponse.json(
         { error: "This shift is already closed." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Calculate final totals from shift_transactions
     const { data: transactions, error: txErr } = await supabase
       .from("shift_transactions")
       .select("type, amount")
@@ -33,15 +33,14 @@ export async function POST(req: NextRequest) {
 
     const txList = transactions ?? [];
     const totalIncome = txList
-      .filter((t: any) => t.type === "INCOME")
-      .reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
+      .filter((transaction: any) => transaction.type === "INCOME")
+      .reduce((sum: number, transaction: any) => sum + Number(transaction.amount || 0), 0);
     const totalExpense = txList
-      .filter((t: any) => t.type === "EXPENSE")
-      .reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
+      .filter((transaction: any) => transaction.type === "EXPENSE")
+      .reduce((sum: number, transaction: any) => sum + Number(transaction.amount || 0), 0);
     const netTotal = totalIncome - totalExpense;
 
-    // Close the shift log
-    const { data: closedLog, error: cErr } = await supabase
+    const { data: closedLog, error: closeError } = await supabase
       .from("shift_logs")
       .update({
         status: "CLOSED",
@@ -57,9 +56,10 @@ export async function POST(req: NextRequest) {
       .select()
       .single();
 
-    if (cErr) return NextResponse.json({ error: cErr.message }, { status: 500 });
+    if (closeError) {
+      return NextResponse.json({ error: closeError.message }, { status: 500 });
+    }
 
-    // Write audit log
     await supabase.from("audit_log").insert({
       entity_type: "shift_log",
       entity_id: shiftLog.id,
@@ -75,12 +75,23 @@ export async function POST(req: NextRequest) {
       performed_by_admin_id: adminId,
     });
 
-    // Broadcast shift close to Activity Hub
-    broadcastSystemMessage({
-      content: `${shift.name} shift has been closed. Income: ₱${totalIncome.toLocaleString()} | Expenses: ₱${totalExpense.toLocaleString()} | Net: ₱${netTotal.toLocaleString()}.`,
-      category: "shift",
-      metadata: { shift_log_id: shiftLog.id, shift_name: shift.name },
-    }, supabase).catch(() => {});
+    let report_warning: string | null = null;
+    try {
+      await finalizeShiftCashReport(shiftLog.id, { supabase });
+    } catch (reportError) {
+      console.error("[SHIFT_REPORT_FINALIZE_ERROR]", reportError);
+      report_warning =
+        "Shift closed successfully, but the cash report snapshot could not be finalized. The report will fall back to live reconstruction until this is resolved.";
+    }
+
+    broadcastSystemMessage(
+      {
+        content: `${shift.name} shift has been closed. Income: PHP ${totalIncome.toLocaleString()} | Expenses: PHP ${totalExpense.toLocaleString()} | Net: PHP ${netTotal.toLocaleString()}.`,
+        category: "shift",
+        metadata: { shift_log_id: shiftLog.id, shift_name: shift.name },
+      },
+      supabase,
+    ).catch(() => {});
 
     return NextResponse.json({
       message: `${shift.name} shift closed successfully.`,
@@ -91,11 +102,12 @@ export async function POST(req: NextRequest) {
         net_total: netTotal,
         transaction_count: txList.length,
       },
+      report_warning,
     });
-  } catch (err: any) {
+  } catch (error: any) {
     return NextResponse.json(
-      { error: err?.message || "Internal server error" },
-      { status: 500 }
+      { error: error?.message || "Internal server error" },
+      { status: 500 },
     );
   }
 }

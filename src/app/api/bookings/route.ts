@@ -123,6 +123,7 @@ export async function POST(req: NextRequest) {
       const extrasToInsert = body.extras.map((extra: any) => ({
         booking_id: data.id,
         extra_type: extra.extra_type,
+        custom_label: extra.extra_type === "Custom Charge" ? extra.custom_label?.trim() || null : null,
         quantity: extra.quantity,
         unit_price: extra.unit_price,
         total_price: extra.quantity * extra.unit_price,

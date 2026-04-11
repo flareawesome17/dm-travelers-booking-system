@@ -50,6 +50,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const rows = body.extras.map((e) => ({
       booking_id: id,
       extra_type: e.extra_type,
+      custom_label: e.extra_type === "Custom Charge" ? e.custom_label?.trim() || null : null,
       quantity: e.quantity,
       unit_price: e.unit_price,
       total_price: e.quantity * e.unit_price,

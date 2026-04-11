@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmActionDialog } from "@/components/admin/ConfirmActionDialog";
 import { toast } from "sonner";
 import { usePermissions } from "@/context/PermissionsContext";
 import { format } from "date-fns";
@@ -37,6 +38,7 @@ export default function AdminReviewsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const { hasPermission } = usePermissions();
   const [actionId, setActionId] = useState<string | null>(null);
+  const [deleteConfirmReview, setDeleteConfirmReview] = useState<Review | null>(null);
 
   const fetchReviews = useCallback(async () => {
     const token = localStorage.getItem("admin_token");
@@ -93,8 +95,6 @@ export default function AdminReviewsPage() {
       return;
     }
 
-    if (!confirm("Are you sure you want to permanently delete this review?")) return;
-
     setActionId(id);
     const token = localStorage.getItem("admin_token");
     try {
@@ -111,6 +111,7 @@ export default function AdminReviewsPage() {
       toast.error(error instanceof Error ? error.message : "Deletion failed");
     } finally {
       setActionId(null);
+      setDeleteConfirmReview(null);
     }
   };
 
@@ -289,7 +290,7 @@ export default function AdminReviewsPage() {
                             size="sm"
                             variant="ghost"
                             className="flex-1 lg:flex-none h-9 text-xs font-medium text-slate-500 hover:text-red-600 hover:bg-red-50"
-                            onClick={() => handleDelete(review.id)}
+                            onClick={() => setDeleteConfirmReview(review)}
                             disabled={actionId === review.id}
                           >
                             <Trash2 className="h-3.5 w-3.5 mr-1.5" />
@@ -305,6 +306,26 @@ export default function AdminReviewsPage() {
           </div>
         )}
       </div>
+
+      <ConfirmActionDialog
+        open={!!deleteConfirmReview}
+        onOpenChange={(open) => { if (!open) setDeleteConfirmReview(null); }}
+        title="Delete this review?"
+        description={(
+          <>
+            Permanently delete the review from{" "}
+            <span className="font-semibold text-slate-800">
+              {deleteConfirmReview?.guest_name || "this guest"}
+            </span>
+            ? This action cannot be undone.
+          </>
+        )}
+        confirmLabel="Delete Review"
+        onConfirm={() => {
+          if (!deleteConfirmReview?.id) return;
+          return handleDelete(deleteConfirmReview.id);
+        }}
+      />
     </div>
   );
 }

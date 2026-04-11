@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   
   try {
     const body = await req.json();
-    const { order_source, customer_name, payment_method, booking_reference, notes, items, is_lgu_order } = body;
+    const { order_source, customer_name, payment_method, booking_reference, notes, items, is_lgu_order, is_staff_order } = body;
     const supabase = getSupabaseAdmin();
 
     const today = await manilaDateString();
@@ -29,6 +29,10 @@ export async function POST(req: NextRequest) {
 
     if (!items || !items.length) {
       return NextResponse.json({ error: "Order must contain items" }, { status: 400 });
+    }
+
+    if (is_lgu_order && is_staff_order) {
+      return NextResponse.json({ error: "LGU pricing and staff pricing cannot be applied to the same order" }, { status: 400 });
     }
 
     let booking_id = null;
@@ -71,13 +75,27 @@ export async function POST(req: NextRequest) {
        return NextResponse.json({ error: "One or more menu items not found" }, { status: 400 });
     }
 
+    if (is_staff_order) {
+      const missingStaffPrice = menuData.filter((item) => item.staff_price == null);
+      if (missingStaffPrice.length > 0) {
+        return NextResponse.json(
+          { error: `Staff price is not configured for: ${missingStaffPrice.map((item) => item.name || "Unnamed item").join(", ")}` },
+          { status: 400 },
+        );
+      }
+    }
+
     let subtotal = 0;
     const lineItems = items.map((clientItem: any) => {
       const mItem = menuData.find((m) => m.id === clientItem.menu_item_id);
       let price = Number(mItem.price || 0);
 
+      if (is_staff_order) {
+        price = Number(mItem.staff_price || 0);
+      }
+
       // Feature 5 - LGU Markup
-      if (is_lgu_order && mItem.lgu_markup_percentage) {
+      if (!is_staff_order && is_lgu_order && mItem.lgu_markup_percentage) {
         price = price + (price * (mItem.lgu_markup_percentage / 100));
       }
 
@@ -89,6 +107,7 @@ export async function POST(req: NextRequest) {
         menu_item_id: mItem.id,
         name: mItem.name,
         category: mItem.category,
+        is_minimart: Boolean(mItem.is_minimart),
         unit_price: price,
         quantity: qty,
         line_total: lineTotal
@@ -179,6 +198,7 @@ export async function POST(req: NextRequest) {
         payment_method: order_source === "Room Service" ? "Charged to Room" : (payment_method || "Pending Payment"),
         notes,
         is_lgu_order,
+        is_staff_order: Boolean(is_staff_order),
         status: initialStatus,
         subtotal,
         service_charge: 0,

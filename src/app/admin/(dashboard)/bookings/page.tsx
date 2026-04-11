@@ -33,6 +33,7 @@ import { ExtendStayModal } from "@/components/admin/bookings/ExtendStayModal";
 import { ManageExtrasModal } from "@/components/admin/bookings/ManageExtrasModal";
 import { AddExtraChargeModal } from "@/components/admin/bookings/AddExtraChargeModal";
 import { BookingAnalyticsStrip } from "@/components/admin/bookings/BookingAnalyticsStrip";
+import { ConfirmActionDialog } from "@/components/admin/ConfirmActionDialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "@/components/ui/sonner";
 import {
@@ -68,7 +69,7 @@ type BookingRow = {
       line_total: number;
     }[];
   }[]; booking_extras?: {
-    id: string; extra_type: string; quantity: number; unit_price: number; total_price: number;
+    id: string; extra_type: string; custom_label?: string | null; quantity: number; unit_price: number; total_price: number;
   }[]; actual_check_in_at?: string; actual_check_out_at?: string;
   total_amount?: number; deposit_paid?: number; balance_due?: number; restaurant_charges_total?: number;
   extras_total?: number; extensions_total?: number;
@@ -100,6 +101,7 @@ export default function AdminBookingsPage() {
   const [extendBooking, setExtendBooking] = useState<BookingRow | null>(null);
   const [extrasBooking, setExtrasBooking] = useState<BookingRow | null>(null);
   const [extraChargeBooking, setExtraChargeBooking] = useState<BookingRow | null>(null);
+  const [cancelBooking, setCancelBooking] = useState<BookingRow | null>(null);
   const [checkInBooking, setCheckInBooking] = useState<BookingRow | null>(null);
   const [checkInAt, setCheckInAt] = useState<string>("");
   const [checkOutBooking, setCheckOutBooking] = useState<BookingRow | null>(null);
@@ -157,6 +159,28 @@ export default function AdminBookingsPage() {
     fetchBookings();
     fetchSummary();
   }, [fetchBookings, fetchSummary]);
+
+  const handleCancelBooking = async () => {
+    const booking = cancelBooking;
+    if (!booking?.id) return;
+
+    try {
+      const res = await api(`/api/bookings/${booking.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "Cancelled" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(getErrorMessage(data) || "Failed to cancel.");
+        return;
+      }
+      toast.success("Booking cancelled.");
+      setCancelBooking(null);
+      refreshData();
+    } catch {
+      toast.error("Something went wrong.");
+    }
+  };
 
   useEffect(() => {
     const t = localStorage.getItem("admin_token");
@@ -518,7 +542,7 @@ export default function AdminBookingsPage() {
                                   <Banknote className="mr-2 h-4 w-4" /> Record Payment
                                 </DropdownMenuItem>
                               )}
-                              {canUpdate && b.status !== "Checked-In" && b.status !== "Checked-Out" && b.status !== "Cancelled" && (
+                              {canUpdate && b.status !== "Checked-Out" && b.status !== "Cancelled" && (
                                 <DropdownMenuItem onClick={() => setEditBooking(b)} className="cursor-pointer text-[#07008A] focus:text-[#07008A] focus:bg-[#07008A]/10 text-sm">
                                   <Pencil className="mr-2 h-4 w-4" /> Edit Details
                                 </DropdownMenuItem>
@@ -570,7 +594,7 @@ export default function AdminBookingsPage() {
                               
                               <DropdownMenuSeparator />
                               {canUpdate && b.status !== "Checked-In" && b.status !== "Checked-Out" && b.status !== "Cancelled" && (
-                                <DropdownMenuItem onClick={async () => { if (!b.id) return; try { const res = await api(`/api/bookings/${b.id}`, { method: "PATCH", body: JSON.stringify({ status: "Cancelled" }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Failed to cancel."); return; } toast.success("Cancelled."); refreshData(); } catch { toast.error("Something went wrong."); } }} className="text-red-500 focus:text-red-500 focus:bg-red-50 cursor-pointer text-sm">
+                                <DropdownMenuItem onClick={() => setCancelBooking(b)} className="text-red-500 focus:text-red-500 focus:bg-red-50 cursor-pointer text-sm">
                                   <XCircle className="mr-2 h-4 w-4" /> Cancel Booking
                                 </DropdownMenuItem>
                               )}
@@ -638,6 +662,23 @@ export default function AdminBookingsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmActionDialog
+        open={!!cancelBooking}
+        onOpenChange={(open) => { if (!open) setCancelBooking(null); }}
+        title="Cancel this booking?"
+        description={(
+          <>
+            This will mark booking{" "}
+            <span className="font-semibold text-slate-800">
+              {cancelBooking?.reference_number || "this booking"}
+            </span>
+            {" "}as cancelled. Use this only if the reservation should no longer proceed.
+          </>
+        )}
+        confirmLabel="Cancel Booking"
+        onConfirm={handleCancelBooking}
+      />
 
       {/* Check-in dialog */}
       <AlertDialog open={!!checkInBooking} onOpenChange={(o) => { if (!o) setCheckInBooking(null); }}>

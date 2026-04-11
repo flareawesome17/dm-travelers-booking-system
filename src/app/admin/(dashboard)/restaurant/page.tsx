@@ -29,13 +29,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePermissions } from "@/context/PermissionsContext";
 import { RestaurantOrderForm } from "@/components/admin/restaurant/RestaurantOrderForm";
 import { RestaurantReceiptModal } from "@/components/admin/restaurant/RestaurantReceiptModal";
+import { ConfirmActionDialog } from "@/components/admin/ConfirmActionDialog";
 import { ChevronLeft, ChevronRight, Search, Receipt } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 
-type MenuItem = { id: string; name?: string; description?: string | null; category?: string | null; price?: number | null; is_available?: boolean | null; image_url?: string | null; lgu_markup_percentage?: number | null; dynamic_available?: boolean; deficient_ingredients?: string };
+type MenuItem = { id: string; name?: string; description?: string | null; category?: string | null; price?: number | null; staff_price?: number | null; is_available?: boolean | null; image_url?: string | null; lgu_markup_percentage?: number | null; is_minimart?: boolean | null; dynamic_available?: boolean; deficient_ingredients?: string };
 type RestaurantCategory = { id: string; name: string; sort_order?: number | null };
 type BookingOption = { id: string; reference_number?: string; check_in_date?: string; check_out_date?: string; status?: string; is_lgu_booking?: boolean; guests?: { full_name?: string | null }; rooms?: { room_number?: string | null } };
-type RestaurantOrder = { id: string; booking_id?: string | null; room_id?: string | null; order_source?: string | null; customer_name?: string | null; payment_method?: string | null; status?: string | null; subtotal?: number | null; service_charge?: number | null; total_amount?: number | null; created_at?: string | null; notes?: string | null };
+type RestaurantOrder = { id: string; booking_id?: string | null; room_id?: string | null; order_source?: string | null; customer_name?: string | null; payment_method?: string | null; payment_reference?: string | null; status?: string | null; subtotal?: number | null; service_charge?: number | null; total_amount?: number | null; created_at?: string | null; notes?: string | null };
 
 export default function AdminRestaurantPage() {
   const [items, setItems] = useState<MenuItem[]>([]);
@@ -51,14 +52,18 @@ export default function AdminRestaurantPage() {
   const [editingOrder, setEditingOrder] = useState<RestaurantOrder | null>(null);
   const [paymentOrder, setPaymentOrder] = useState<RestaurantOrder | null>(null);
   const [receiptOrder, setReceiptOrder] = useState<RestaurantOrder | null>(null);
+  const [cancelOrder, setCancelOrder] = useState<RestaurantOrder | null>(null);
   const [payMethod, setPayMethod] = useState<string>("Cash");
+  const [payReference, setPayReference] = useState("");
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>("all");
   const [orderSourceFilter, setOrderSourceFilter] = useState<string>("all");
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [price, setPrice] = useState("");
+  const [staffPrice, setStaffPrice] = useState("");
   const [description, setDescription] = useState("");
   const [lguMarkup, setLguMarkup] = useState("");
+  const [isMinimart, setIsMinimart] = useState(false);
   const [isAvailable, setIsAvailable] = useState(true);
   const [saving, setSaving] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -113,9 +118,9 @@ export default function AdminRestaurantPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
-  const resetForm = () => { setName(""); setCategory(categories[0]?.name ?? ""); setPrice(""); setDescription(""); setLguMarkup(""); setIsAvailable(true); setEditingItem(null); setImageFile(null); setImagePreview(null); };
+  const resetForm = () => { setName(""); setCategory(categories[0]?.name ?? ""); setPrice(""); setStaffPrice(""); setDescription(""); setLguMarkup(""); setIsMinimart(false); setIsAvailable(true); setEditingItem(null); setImageFile(null); setImagePreview(null); };
   const openForCreate = () => { resetForm(); setOpen(true); };
-  const openForEdit = (item: MenuItem) => { setEditingItem(item); setName(item.name ?? ""); setCategory(item.category ?? categories[0]?.name ?? ""); setPrice(item.price != null ? String(item.price) : ""); setDescription(item.description ?? ""); setLguMarkup(item.lgu_markup_percentage != null ? String(item.lgu_markup_percentage) : ""); setIsAvailable(item.is_available ?? true); setImageFile(null); setImagePreview(item.image_url ?? null); setOpen(true); };
+  const openForEdit = (item: MenuItem) => { setEditingItem(item); setName(item.name ?? ""); setCategory(item.category ?? categories[0]?.name ?? ""); setPrice(item.price != null ? String(item.price) : ""); setStaffPrice(item.staff_price != null ? String(item.staff_price) : ""); setDescription(item.description ?? ""); setLguMarkup(item.lgu_markup_percentage != null ? String(item.lgu_markup_percentage) : ""); setIsMinimart(item.is_minimart ?? false); setIsAvailable(item.is_available ?? true); setImageFile(null); setImagePreview(item.image_url ?? null); setOpen(true); };
 
   const updateOrderStatus = async (orderId: string, updates: Partial<RestaurantOrder>) => {
     const token = localStorage.getItem("admin_token");
@@ -158,14 +163,22 @@ export default function AdminRestaurantPage() {
     }
   };
 
+  const handleCancelOrder = async () => {
+    if (!cancelOrder) return;
+    await updateOrderStatus(cancelOrder.id, { status: "Cancelled" });
+    setCancelOrder(null);
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const token = localStorage.getItem("admin_token");
     
     if (!name.trim() || !price.trim() || !category.trim()) { toast.error("Name, category, and price are required."); return; }
-    const numericPrice = Number(price);
-    if (!Number.isFinite(numericPrice) || numericPrice <= 0) { toast.error("Price must be a positive number."); return; }
-    setSaving(true);
+      const numericPrice = Number(price);
+      if (!Number.isFinite(numericPrice) || numericPrice <= 0) { toast.error("Price must be a positive number."); return; }
+      const numericStaffPrice = staffPrice.trim() ? Number(staffPrice) : null;
+      if (staffPrice.trim() && (!Number.isFinite(numericStaffPrice) || Number(numericStaffPrice) < 0)) { toast.error("Staff price must be zero or greater."); return; }
+      setSaving(true);
     try {
       const isEdit = Boolean(editingItem?.id);
       const endpoint = isEdit ? `/api/menu/${editingItem!.id}` : "/api/menu";
@@ -183,7 +196,7 @@ export default function AdminRestaurantPage() {
         imageUrlToUse = uploadData.url;
       }
       const numericLguMarkup = lguMarkup ? Number(lguMarkup) : undefined;
-      const res = await fetch(endpoint, { method, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: name.trim(), description: description.trim() || null, price: numericPrice, category, is_available: isAvailable, image_url: imageUrlToUse, lgu_markup_percentage: numericLguMarkup }) });
+      const res = await fetch(endpoint, { method, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: name.trim(), description: description.trim() || null, price: numericPrice, staff_price: numericStaffPrice, category, is_available: isAvailable, is_minimart: isMinimart, image_url: imageUrlToUse, lgu_markup_percentage: numericLguMarkup }) });
       const data = await res.json().catch(() => ({}));
       const errMsg = getErrorMessage(data);
       if (!res.ok) { toast.error(errMsg || "Failed to save."); return; }
@@ -230,8 +243,10 @@ export default function AdminRestaurantPage() {
                     <div className="space-y-2"><Label htmlFor="menu-name">Name</Label><Input id="menu-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Tapsilog" required /></div>
                     <div className="space-y-2"><Label htmlFor="menu-category">Category</Label><select id="menu-category" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={category} onChange={(e) => setCategory(e.target.value)} disabled={categoriesLoading || categories.length === 0}>{categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></div>
                     <div className="space-y-2"><Label htmlFor="menu-price">Price (₱)</Label><Input id="menu-price" type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="150" required /></div>
+                    <div className="space-y-2"><Label htmlFor="menu-staff-price">Staff Price (₱, optional)</Label><Input id="menu-staff-price" type="number" min={0} step="0.01" value={staffPrice} onChange={(e) => setStaffPrice(e.target.value)} placeholder="120" /></div>
                     <div className="space-y-2"><Label htmlFor="menu-lgu-markup">LGU Markup % (optional)</Label><Input id="menu-lgu-markup" type="number" min={0} max={100} step="1" value={lguMarkup} onChange={(e) => setLguMarkup(e.target.value)} placeholder="0" /></div>
                     <div className="space-y-2"><Label htmlFor="menu-description">Description (optional)</Label><Input id="menu-description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Short description..." /></div>
+                    <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={isMinimart} onChange={(e) => setIsMinimart(e.target.checked)} /><span>Mark as minimart item</span></label>
                     <div className="space-y-2"><Label htmlFor="menu-image">Image (optional)</Label><Input id="menu-image" type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0] ?? null; setImageFile(file); if (file) { setImagePreview(URL.createObjectURL(file)); } else { setImagePreview(editingItem?.image_url ?? null); } }} />{(imagePreview || editingItem?.image_url) && <div className="mt-2"><img src={imagePreview || editingItem?.image_url || ""} className="h-24 w-24 rounded-md object-cover border border-slate-200 bg-slate-100" alt="" /></div>}</div>
                     <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={isAvailable} onChange={(e) => setIsAvailable(e.target.checked)} /><span>Available</span></label>
                     <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Saving..." : editingItem ? "Update item" : "Save item"}</Button></div>
@@ -533,7 +548,7 @@ export default function AdminRestaurantPage() {
 
                                   {o.status === "Pending" && hasPermission("restaurant.update") && (
                                     <>
-                                      <DropdownMenuItem onClick={() => { setPaymentOrder(o); setPayMethod("Cash"); }} className="text-emerald-600 focus:text-emerald-700 focus:bg-emerald-50 cursor-pointer">
+                                      <DropdownMenuItem onClick={() => { setPaymentOrder(o); setPayMethod("Cash"); setPayReference(""); }} className="text-emerald-600 focus:text-emerald-700 focus:bg-emerald-50 cursor-pointer">
                                         <Banknote className="mr-2 h-4 w-4" /> Record Payment
                                       </DropdownMenuItem>
                                       <DropdownMenuItem onClick={() => updateOrderStatus(o.id, { status: "Served" })} className="text-blue-600 focus:text-blue-700 focus:bg-blue-50 cursor-pointer">
@@ -543,13 +558,13 @@ export default function AdminRestaurantPage() {
                                   )}
 
                                   {o.status === "Served" && hasPermission("restaurant.update") && (
-                                    <DropdownMenuItem onClick={() => { setPaymentOrder(o); setPayMethod("Cash"); }} className="text-emerald-600 focus:text-emerald-700 focus:bg-emerald-50 cursor-pointer">
+                                    <DropdownMenuItem onClick={() => { setPaymentOrder(o); setPayMethod("Cash"); setPayReference(""); }} className="text-emerald-600 focus:text-emerald-700 focus:bg-emerald-50 cursor-pointer">
                                       <Banknote className="mr-2 h-4 w-4" /> Record Payment
                                     </DropdownMenuItem>
                                   )}
 
-                                  {o.status !== "Cancelled" && o.status !== "Paid" && o.status !== "Charged to Room" && hasPermission("restaurant.update") && (
-                                    <DropdownMenuItem onClick={() => updateOrderStatus(o.id, { status: "Cancelled" })} className="text-red-500 focus:text-red-600 focus:bg-red-50 cursor-pointer">
+                                  {o.status !== "Cancelled" && o.status !== "Paid" && hasPermission("restaurant.update") && (
+                                    <DropdownMenuItem onClick={() => setCancelOrder(o)} className="text-red-500 focus:text-red-600 focus:bg-red-50 cursor-pointer">
                                       <XCircle className="mr-2 h-4 w-4" /> Cancel Order
                                     </DropdownMenuItem>
                                   )}
@@ -636,7 +651,13 @@ export default function AdminRestaurantPage() {
                 id="pay-method"
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-[#07008A]/20 focus:border-[#07008A]"
                 value={payMethod}
-                onChange={(e) => setPayMethod(e.target.value)}
+                onChange={(e) => {
+                  const nextMethod = e.target.value;
+                  setPayMethod(nextMethod);
+                  if (nextMethod === "Cash") {
+                    setPayReference("");
+                  }
+                }}
               >
                 <option value="Cash">Cash</option>
                 <option value="GCash">GCash</option>
@@ -644,16 +665,37 @@ export default function AdminRestaurantPage() {
               </select>
             </div>
 
+            {(payMethod === "GCash" || payMethod === "Card") && (
+              <div className="space-y-2">
+                <Label htmlFor="pay-reference">Reference No.</Label>
+                <Input
+                  id="pay-reference"
+                  value={payReference}
+                  onChange={(e) => setPayReference(e.target.value)}
+                  placeholder={payMethod === "GCash" ? "Enter GCash reference number" : "Enter card reference number"}
+                />
+                <p className="text-xs text-slate-500">
+                  Record the non-cash payment reference before closing the transaction.
+                </p>
+              </div>
+            )}
+
             <div className="flex justify-end gap-3 pt-4">
               <Button variant="outline" onClick={() => setPaymentOrder(null)}>Cancel</Button>
               <Button 
                 className="bg-[#07008A] hover:bg-[#05006a] text-white"
                 onClick={() => {
+                  if ((payMethod === "GCash" || payMethod === "Card") && !payReference.trim()) {
+                    toast.error("Reference number is required for GCash and card payments.");
+                    return;
+                  }
                   if (paymentOrder) {
                     updateOrderStatus(paymentOrder.id, { 
                       status: "Paid", 
-                      payment_method: payMethod 
+                      payment_method: payMethod,
+                      payment_reference: payMethod === "Cash" ? null : payReference.trim(),
                     });
+                    setPayReference("");
                     setPaymentOrder(null);
                   }
                 }}
@@ -664,6 +706,27 @@ export default function AdminRestaurantPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmActionDialog
+        open={!!cancelOrder}
+        onOpenChange={(open) => { if (!open) setCancelOrder(null); }}
+        title="Cancel this order?"
+        description={(
+          <>
+            This will mark the order for{" "}
+            <span className="font-semibold text-slate-800">
+              {cancelOrder?.customer_name || "this customer"}
+            </span>
+            {" "}as cancelled.
+            {cancelOrder?.status === "Charged to Room" && (
+              <> The <span className="font-semibold text-amber-700">₱{Number(cancelOrder?.total_amount ?? 0).toFixed(0)}</span> charge will be reversed from the linked booking.</>
+            )}
+            {" "}Continue only if the order should no longer be fulfilled.
+          </>
+        )}
+        confirmLabel="Cancel Order"
+        onConfirm={handleCancelOrder}
+      />
 
       {/* Restaurant Receipt Modal */}
       <RestaurantReceiptModal 

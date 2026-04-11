@@ -16,6 +16,7 @@ type RestaurantOrder = {
   customer_name?: string | null;
   order_source?: string | null;
   payment_method?: string | null;
+  payment_reference?: string | null;
   total_amount?: number | null;
   subtotal?: number | null;
   service_charge?: number | null;
@@ -125,6 +126,12 @@ export function RestaurantReceiptModal({ order: initialOrder, onClose }: Receipt
                 <span className="text-slate-500">Payment:</span>
                 <span className="font-medium">{order.payment_method}</span>
               </div>
+              {order.payment_reference ? (
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Ref No:</span>
+                  <span className="font-mono font-medium">{order.payment_reference}</span>
+                </div>
+              ) : null}
             </div>
 
             {/* Items Table */}

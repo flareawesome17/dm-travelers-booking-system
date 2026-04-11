@@ -5,6 +5,7 @@ import { UtensilsCrossed, Plus, Trash2, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
+import { ConfirmActionDialog } from "@/components/admin/ConfirmActionDialog";
 
 export function RecipeEditorModal({
   menuItem,
@@ -17,6 +18,7 @@ export function RecipeEditorModal({
   const [submitting, setSubmitting] = useState(false);
   const [inventoryItems, setInventoryItems] = useState<any[]>([]);
   const [recipeIngredients, setRecipeIngredients] = useState<any[]>([]);
+  const [ingredientToRemove, setIngredientToRemove] = useState<any | null>(null);
   
   const [selectedItemId, setSelectedItemId] = useState("");
   const [quantity, setQuantity] = useState("1");
@@ -96,6 +98,8 @@ export function RecipeEditorModal({
       toast.success("Ingredient removed");
     } catch (err) {
       toast.error("Failed to remove ingredient");
+    } finally {
+      setIngredientToRemove(null);
     }
   };
 
@@ -159,7 +163,7 @@ export function RecipeEditorModal({
                         Uses {r.quantity_required} {r.inventory_items?.recipe_unit || r.inventory_items?.unit} per order
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={() => handleRemove(r.id)} className="h-8 w-8 text-red-500 hover:bg-red-50">
+                    <Button variant="ghost" size="icon" onClick={() => setIngredientToRemove(r)} className="h-8 w-8 text-red-500 hover:bg-red-50">
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -168,6 +172,26 @@ export function RecipeEditorModal({
             </div>
           </div>
         )}
+
+        <ConfirmActionDialog
+          open={!!ingredientToRemove}
+          onOpenChange={(open) => { if (!open) setIngredientToRemove(null); }}
+          title="Remove this ingredient?"
+          description={(
+            <>
+              This will remove{" "}
+              <span className="font-semibold text-slate-800">
+                {ingredientToRemove?.inventory_items?.name || "this ingredient"}
+              </span>
+              {" "}from the recipe for {menuItem?.name}.
+            </>
+          )}
+          confirmLabel="Remove Ingredient"
+          onConfirm={() => {
+            if (!ingredientToRemove?.id) return;
+            return handleRemove(ingredientToRemove.id);
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

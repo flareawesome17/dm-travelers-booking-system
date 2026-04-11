@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/rbac";
 import { addShiftTransaction } from "@/lib/shiftUtils";
 import { apiError, dbError, internalError } from "@/lib/api-security";
 import { toMoneyNumber } from "@/lib/bookingTotals";
+import { updateRestaurantOrderSchema } from "@/lib/validation-schemas";
 
 import { manilaDateString as getManilaDate } from "@/lib/shiftUtils";
 
@@ -84,11 +85,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     const { id } = await params;
     const body = await req.json();
+    const parsed = updateRestaurantOrderSchema.safeParse(body);
+    if (!parsed.success) {
+      return apiError("invalid_input", parsed.error.issues[0]?.message || "Invalid restaurant order update", 400);
+    }
+    const updateBody = {
+      ...parsed.data,
+      payment_reference: parsed.data.payment_method === "Cash" || parsed.data.payment_method === "Charged to Room"
+        ? null
+        : parsed.data.payment_reference?.trim() || null,
+    };
     const supabase = getSupabaseAdmin();
 
     const { data: existingOrder, error: existingOrderError } = await supabase
       .from("restaurant_orders")
-      .select("id, status, total_amount, customer_name, payment_method, created_at, accounting_date")
+      .select("id, booking_id, status, total_amount, customer_name, payment_method, created_at, accounting_date")
       .eq("id", id)
       .single();
 
@@ -108,7 +119,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const { data, error } = await supabase
       .from("restaurant_orders")
-      .update(body)
+      .update(updateBody)
       .eq("id", id)
       .select("*")
       .single();
@@ -139,6 +150,31 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         type: "EXPENSE",
         category: "Restaurant",
       });
+    }
+
+    // Reverse booking charges when a "Charged to Room" order is cancelled
+    if (
+      previousStatus === "Charged to Room" &&
+      nextStatus === "Cancelled" &&
+      existingOrder.booking_id
+    ) {
+      const { data: booking, error: bookingError } = await supabase
+        .from("bookings")
+        .select("restaurant_charges_total, balance_due")
+        .eq("id", existingOrder.booking_id)
+        .single();
+
+      if (!bookingError && booking) {
+        const orderTotal = toMoneyNumber(existingOrder.total_amount);
+        await supabase
+          .from("bookings")
+          .update({
+            restaurant_charges_total: Math.max(0, toMoneyNumber(booking.restaurant_charges_total) - orderTotal),
+            balance_due: Math.max(0, toMoneyNumber(booking.balance_due) - orderTotal),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingOrder.booking_id);
+      }
     }
 
     return NextResponse.json(data);

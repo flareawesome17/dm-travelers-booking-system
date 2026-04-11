@@ -428,9 +428,12 @@ export default function AdminRolesPage() {
                           <div className="space-y-8">
                             {Object.entries(
                               filteredPermissions.reduce((acc, p) => {
-                                const group = p.name.split('.')[0] || "General";
-                                if (!acc[group]) acc[group] = [];
-                                acc[group].push(p);
+                                const parts = p.name.split('.');
+                                const groupName = parts.length >= 3 
+                                  ? `${parts[0]} (${parts[1].replace(/_/g, ' ')})` 
+                                  : (parts[0] || "General");
+                                if (!acc[groupName]) acc[groupName] = [];
+                                acc[groupName].push(p);
                                 return acc;
                               }, {} as Record<string, Permission[]>)
                             ).map(([group, perms]) => (
@@ -465,7 +468,12 @@ export default function AdminRolesPage() {
                                           }}
                                         />
                                         <span className={`text-[13px] font-semibold transition-colors ${checked ? "text-[#07008A]" : "text-slate-600"}`}>
-                                          {p.name.split('.').slice(1).join(' ') || p.name}
+                                          {(() => {
+                                            const parts = p.name.split('.');
+                                            if (parts.length >= 3) return parts.slice(2).join(' ').replace(/_/g, ' ');
+                                            if (parts.length === 2) return parts[1].replace(/_/g, ' ');
+                                            return p.name.replace(/_/g, ' ');
+                                          })()}
                                         </span>
                                       </label>
                                     );

@@ -9,12 +9,13 @@ import { cn, getErrorMessage } from "@/lib/utils";
 import { calculateBookingRoomSubtotal, getBookingChargeBreakdown } from "@/lib/bookingTotals";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarDays, Users, Tag, DollarSign, Percent } from "lucide-react";
+import { CalendarDays, Users, Tag, DollarSign, Percent, User, BedDouble, Sparkles, ReceiptText } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 
 type RoomData = {
   id: string;
+  name?: string;
   capacity?: number;
   max_occupancy?: number;
   room_number?: string;
@@ -97,7 +98,12 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
   const [specialBookingLabel, setSpecialBookingLabel] = useState(booking.special_booking_label ?? "");
   const [chequeNumber, setChequeNumber] = useState(booking.cheque_number ?? "");
   const [submitting, setSubmitting] = useState(false);
-  const [room, setRoom] = useState<RoomData | null>(null);
+  const [rooms, setRooms] = useState<RoomData[]>([]);
+  const [loadingRooms, setLoadingRooms] = useState(true);
+  const [roomId, setRoomId] = useState(booking.room_id ?? "");
+  const [ratePlan, setRatePlan] = useState<"24h" | "12h" | "5h" | "3h">((booking.rate_plan_kind as any) ?? "24h");
+  const [usePerGuestRate, setUsePerGuestRate] = useState(false);
+
   const [numAdults, setNumAdults] = useState(booking.num_adults ?? 1);
   const [numChildren, setNumChildren] = useState(booking.num_children ?? 0);
   const [discountValue, setDiscountValue] = useState<number>(booking.discount_value ?? 0);
@@ -112,49 +118,83 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
   const [roomAvailability, setRoomAvailability] = useState<{ id: string; check_in_date: string; check_out_date: string; status: string; rate_plan_kind?: string | null }[]>([]);
 
   useEffect(() => {
-    if (!booking.room_id) return;
-    
-    // Fetch individual room details to get capacity
-    fetch(`${apiUrl}/api/rooms/${booking.room_id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(r => {
-        if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);
-        return r.json();
-      })
-      .then(data => setRoom(data))
-      .catch(err => console.error("Failed to fetch room details:", err));
+    setLoadingRooms(true);
+    fetch(`${apiUrl}/api/rooms`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((data) => setRooms(Array.isArray(data) ? data : []))
+      .catch(() => setRooms([]))
+      .finally(() => setLoadingRooms(false));
+  }, [apiUrl, token]);
 
-    fetch(`${apiUrl}/api/rooms/${booking.room_id}/availability`, {
+  useEffect(() => {
+    if (!roomId) {
+      setRoomAvailability([]);
+      return;
+    }
+    fetch(`${apiUrl}/api/rooms/${roomId}/availability`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
       .then((data) => setRoomAvailability(Array.isArray(data) ? data : []))
       .catch(() => setRoomAvailability([]));
-  }, [apiUrl, token, booking.room_id]);
+  }, [apiUrl, token, roomId]);
 
-  const maxCapacity = room?.capacity || room?.max_occupancy || 2;
+  const selectedRoom = rooms.find((r) => r.id === roomId) || null;
+  const maxCapacity = selectedRoom?.capacity || selectedRoom?.max_occupancy || 2;
   const currentTotalGuests = numAdults + numChildren;
 
-  // Re-calculate discounts if they changed
+  // Derive Rates
+  const availableRatesForRoom: { kind: "24h" | "12h" | "5h" | "3h"; label: string; price: number }[] = [];
+  if (selectedRoom) {
+    const useLgu = isLguBooking && selectedRoom.lgu_rate_enabled;
+    const p24 = useLgu && selectedRoom.lgu_rate_24h_price != null ? selectedRoom.lgu_rate_24h_price : selectedRoom.rate_24h_price;
+    const p12 = useLgu && selectedRoom.lgu_rate_12h_price != null ? selectedRoom.lgu_rate_12h_price : selectedRoom.rate_12h_price;
+    const p5 = useLgu && selectedRoom.lgu_rate_5h_price != null ? selectedRoom.lgu_rate_5h_price : selectedRoom.rate_5h_price;
+    const p3 = useLgu && selectedRoom.lgu_rate_3h_price != null ? selectedRoom.lgu_rate_3h_price : selectedRoom.rate_3h_price;
+
+    if (selectedRoom.rate_24h_enabled && p24 != null) availableRatesForRoom.push({ kind: "24h", label: "24-hour", price: Number(p24) });
+    if (selectedRoom.rate_12h_enabled && p12 != null) availableRatesForRoom.push({ kind: "12h", label: "12-hour", price: Number(p12) });
+    if (selectedRoom.rate_5h_enabled && p5 != null) availableRatesForRoom.push({ kind: "5h", label: "5-hour", price: Number(p5) });
+    if (selectedRoom.rate_3h_enabled && p3 != null) availableRatesForRoom.push({ kind: "3h", label: "3-hour", price: Number(p3) });
+  }
+  const availableRates = availableRatesForRoom;
+  const selectedRate = availableRates.find((r) => r.kind === ratePlan);
+  const is24h = ratePlan === "24h";
+
+  const perGuestPlan = selectedRoom && Array.isArray((selectedRoom as any).rate_plans) ? ((selectedRoom as any).rate_plans as any[]).find((p) => p && typeof p === "object" && p.kind === "per_guest") : null;
+  const perGuestPrice = (() => {
+    if (!perGuestPlan) return null;
+    const anyPlan = perGuestPlan as any;
+    if (ratePlan === "24h" && anyPlan.price_24h != null) return Number(anyPlan.price_24h);
+    if (ratePlan === "12h" && anyPlan.price_12h != null) return Number(anyPlan.price_12h);
+    if (anyPlan.base_price != null) return Number(anyPlan.base_price);
+    return null;
+  })();
+
+  useEffect(() => {
+    if (!is24h && checkIn) setCheckOut(checkIn);
+  }, [is24h, checkIn]);
+
+  const durationEndDate = is24h ? checkOut : checkIn || "";
+  const nights = checkIn && durationEndDate ? Math.ceil((new Date(durationEndDate).getTime() - new Date(checkIn).getTime()) / (24 * 60 * 60 * 1000)) : 0;
+  const hours = checkIn && durationEndDate ? (new Date(durationEndDate).getTime() - new Date(checkIn).getTime()) / (1000 * 60 * 60) : 0;
+  let blocks = 1;
+  if (ratePlan === "24h") blocks = Math.max(1, nights);
+  else if (ratePlan === "12h") blocks = Math.max(1, Math.ceil(hours / 12));
+  else if (ratePlan === "5h") blocks = Math.max(1, Math.ceil(hours / 5));
+  else if (ratePlan === "3h") blocks = Math.max(1, Math.ceil(hours / 3));
+
+  const baseAmount = selectedRate ? selectedRate.price * blocks : 0;
+  const subtotalBeforeDiscount = usePerGuestRate && perGuestPrice != null ? perGuestPrice * currentTotalGuests : baseAmount;
+
+  // We bring over existing extras/extensions to sum them
   const { 
-    roomTotal: originalRoomTotal, 
     restaurantTotal, 
     extrasTotal, 
     extensionsTotal, 
     earlyCheckInFee, 
     lateCheckOutFee 
   } = getBookingChargeBreakdown(booking);
-
-  const storedSubtotalBeforeDiscount = originalRoomTotal + Number(booking.discount_amount || 0);
-  const recalculatedSubtotalBeforeDiscount = calculateBookingRoomSubtotal({
-    room,
-    ratePlanKind: booking.rate_plan_kind,
-    checkInDate: checkIn,
-    checkOutDate: checkOut,
-    isLguBooking,
-  });
-  const subtotalBeforeDiscount = recalculatedSubtotalBeforeDiscount ?? storedSubtotalBeforeDiscount;
 
   let calculatedDiscount = 0;
   if (discountType === "percent") {
@@ -165,6 +205,10 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
 
   const newRoomTotal = Math.max(0, subtotalBeforeDiscount - calculatedDiscount);
   const grandTotal = newRoomTotal + restaurantTotal + extrasTotal + extensionsTotal + earlyCheckInFee + lateCheckOutFee;
+
+  const rateHelper = is24h
+    ? "24-hour bookings require check-in and check-out dates. Total is based on nights."
+    : "Short-stay (12h/5h/3h) bookings use one booking date. Total is one block for the selected rate.";
   const deposit = Number(depositPaid) || 0;
   const balanceDue = Math.max(0, grandTotal - deposit);
 
@@ -224,15 +268,43 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!checkIn || !checkOut) {
-      toast.error("Check-in and check-out dates are required.");
+    if (!roomId) {
+      toast.error("Please select a room.");
       return;
     }
-    if (new Date(checkOut) <= new Date(checkIn)) {
-      toast.error("Check-out must be after check-in.");
+    if (!checkIn) {
+      toast.error("Please select a booking date.");
       return;
     }
-    if (selectionOverlaps(checkIn, checkOut)) {
+    if (is24h) {
+      if (!checkOut) {
+        toast.error("For 24-hour bookings, check-in and check-out dates are required.");
+        return;
+      }
+      if (new Date(checkOut) <= new Date(checkIn)) {
+        toast.error("Check-out must be after check-in for 24-hour bookings.");
+        return;
+      }
+    }
+    if (!selectedRate || !availableRates.some((r) => r.kind === ratePlan)) {
+      toast.error("Selected rate is not available for this room.");
+      return;
+    }
+
+    if (usePerGuestRate) {
+      if (perGuestPrice == null || perGuestPrice <= 0) {
+        toast.error("This room does not have a per guest rate configured.");
+        return;
+      }
+      if (currentTotalGuests <= 0) {
+        toast.error("Please enter at least one guest for the per guest rate.");
+        return;
+      }
+    }
+
+    const checkInToSend = checkIn;
+    const checkOutToSend = is24h ? checkOut : checkIn;
+    if (selectionOverlaps(checkInToSend, checkOutToSend)) {
       toast.error("Selected dates overlap an existing booking for this room.");
       return;
     }
@@ -247,27 +319,26 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
         },
         body: JSON.stringify({
           status,
-          check_in_date: checkIn,
-          check_out_date: checkOut,
-          special_requests: specialRequests.trim() || null,
+          room_id: roomId,
+          rate_plan_kind: ratePlan,
+          check_in_date: checkInToSend,
+          check_out_date: checkOutToSend,
+          special_requests: specialRequests,
           deposit_paid: deposit,
-          balance_due: balanceDue,
+          cheque_number: (deposit > 0 && chequeNumber.trim()) ? chequeNumber.trim() : null,
           is_lgu_booking: isLguBooking,
           is_special_booking: isSpecialBooking,
-          special_booking_label: isSpecialBooking ? specialBookingLabel.trim() || null : null,
-          num_children: numChildren,
-          discount_type: discountType,
-          discount_value: discountValue,
-          discount_amount: calculatedDiscount,
-          discount_id: discountId,
-          total_amount: newRoomTotal,
+          special_booking_label: isSpecialBooking ? specialBookingLabel.trim() : null,
           num_adults: numAdults,
-          cheque_number: chequeNumber.trim() || null,
+          num_children: numChildren,
+          discount_value: discountValue,
+          discount_type: discountType,
+          total_amount: newRoomTotal,
           guest: {
-            full_name: guestName.trim() || "Guest",
-            email: guestEmail.trim() || "",
-            phone_number: guestPhone.trim() || "",
-          },
+            full_name: guestName.trim(),
+            email: guestEmail.trim() || null,
+            phone_number: guestPhone.trim() || null,
+          }
         }),
       });
 
@@ -308,72 +379,169 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 pt-2">
+      
+      {/* ── Section 1: Guest Information ─────────────────────────── */}
       <div className="space-y-4">
-        {/* Reservation Status Section */}
-         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-3 block">Reservation Status</Label>
-            <select
-             className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-[#07008A]/20"
-             value={status}
-             onChange={(e) => setStatus(e.target.value)}
-           >
-             {STATUS_OPTIONS.map((s) => (
-               <option key={s} value={s}>
-                 {s}
-               </option>
-             ))}
-           </select>
-         </div>
-
-         {/* Guest Information Section */}
-         <div className="p-4 rounded-xl border border-slate-200 space-y-4">
-           <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">Guest Information</Label>
-           <div className="space-y-3">
-             <div className="space-y-1.5">
-               <Label className="text-[11px] text-slate-400">Full Name</Label>
-               <Input 
-                 value={guestName}
-                 onChange={(e) => setGuestName(e.target.value)}
-                 className="h-10 rounded-lg border-slate-200"
-                 placeholder="Guest full name"
-               />
-             </div>
-             <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-[11px] text-slate-400">Email Address</Label>
-                  <Input 
-                    value={guestEmail}
-                    onChange={(e) => setGuestEmail(e.target.value)}
-                    className="h-10 rounded-lg border-slate-200"
-                    placeholder="guest@mail.com"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-[11px] text-slate-400">Phone Number</Label>
-                  <Input 
-                    value={guestPhone}
-                    onChange={(e) => setGuestPhone(e.target.value)}
-                    className="h-10 rounded-lg border-slate-200"
-                    placeholder="09xx-xxx-xxxx"
-                  />
-                </div>
-             </div>
-           </div>
-         </div>
-
-        {/* Schedule Section */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="flex items-center gap-2 text-sm font-semibold text-[#07008A]">
+          <User className="h-4 w-4" />
+          Guest Information
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label className="text-xs font-medium text-slate-700">Check-in Date</Label>
+            <Label className="text-xs font-medium text-slate-700">Full name *</Label>
+            <Input 
+              value={guestName}
+              onChange={(e) => setGuestName(e.target.value)}
+              className="h-10 rounded-lg border-slate-200"
+              placeholder="Guest full name"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs font-medium text-slate-700">Email</Label>
+            <Input 
+              value={guestEmail}
+              onChange={(e) => setGuestEmail(e.target.value)}
+              className="h-10 rounded-lg border-slate-200"
+              placeholder="email@example.com"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label className="text-xs font-medium text-slate-700">Phone (optional)</Label>
+            <Input 
+              value={guestPhone}
+              onChange={(e) => setGuestPhone(e.target.value)}
+              className="h-10 rounded-lg border-slate-200"
+              placeholder="+63 912 345 6789"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs font-medium text-slate-700">Number of guests</Label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={currentTotalGuests}
+              onChange={(e) => {
+                const total = parseInt(e.target.value);
+                setNumAdults(total);
+                setNumChildren(0); // Simplify by keeping all as adults for total count
+              }}
+            >
+              {Array.from({ length: maxCapacity }, (_, i) => i + 1).map((n) => (
+                <option key={n} value={String(n)}>
+                  {n} {n === 1 ? "guest" : "guests"}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-slate-400">Room capacity: {maxCapacity}</p>
+          </div>
+        </div>
+      </div>
+
+      <hr className="border-slate-200" />
+
+      {/* ── Section 2: Room & Schedule ──────────────────────────── */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 text-sm font-semibold text-[#07008A]">
+          <BedDouble className="h-4 w-4" />
+          Room & Schedule
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-xs font-medium text-slate-700">Room *</Label>
+          <select
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            value={roomId}
+            onChange={(e) => setRoomId(e.target.value)}
+            disabled={loadingRooms}
+          >
+            <option value="" disabled>Select a room</option>
+            {rooms.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.room_number ? `${r.room_number} — ` : ""}{r.name || r.room_type} - Cap: {r.capacity}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {availableRates.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <Label>Rate plan</Label>
+              </div>
+              <div className="text-right text-xs text-slate-600">
+                <div className="font-medium text-slate-700">
+                  {is24h ? `${Math.max(1, nights || 0)} night(s)` : `${ratePlan} block`}
+                </div>
+                <div>
+                  Base Rate <span className="font-semibold text-[#07008A]">₱{Number(baseAmount).toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {availableRates.map((r) => {
+                const selected = ratePlan === r.kind;
+                return (
+                  <button
+                    key={r.kind}
+                    type="button"
+                    className={cn(
+                      "group relative rounded-xl border p-4 text-left transition-colors",
+                      selected
+                        ? "border-[#07008A] bg-[#07008A]/[0.04]"
+                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
+                    )}
+                    onClick={() => setRatePlan(r.kind)}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={cn(
+                            "mt-0.5 flex h-4 w-4 items-center justify-center rounded-full border",
+                            selected ? "border-[#07008A]" : "border-slate-300",
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "h-2 w-2 rounded-full transition-colors",
+                              selected ? "bg-[#07008A]" : "bg-transparent",
+                            )}
+                          />
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-slate-800">{r.label}</div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {r.kind === "24h" ? "Needs check-in & check-out dates" : "Uses one booking date"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-sm font-semibold text-[#07008A]">₱{r.price.toFixed(2)}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label className="text-xs font-medium text-slate-700">{is24h ? "Check-in date" : "Booking date"}</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   type="button"
                   variant="outline"
-                  className={cn("w-full justify-start text-left font-normal h-11 px-3 rounded-lg border-slate-200", !checkIn && "text-muted-foreground")}
+                  className={cn(
+                    "w-full justify-start text-left font-normal h-10 px-3 rounded-lg border-slate-200",
+                    !checkIn && "text-muted-foreground",
+                  )}
                 >
-                  <CalendarDays className="mr-2 h-4 w-4 text-slate-400" />
-                  {checkIn ? formatDisplay(checkIn) : "Select date"}
+                  <CalendarDays className="mr-2 h-4 w-4" />
+                  {checkIn ? formatDisplay(checkIn) : is24h ? "Select check-in date" : "Select booking date"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -382,10 +550,11 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
                   selected={checkIn ? parseYmd(checkIn) : undefined}
                   onSelect={(d) => {
                     if (!d) return;
-                    const ymd = toYmd(d);
                     if (isReservedDate(d)) return;
+                    const ymd = toYmd(d);
                     setCheckIn(ymd);
-                    if (checkOut && new Date(ymd) >= new Date(checkOut)) {
+                    if (!is24h) setCheckOut(ymd);
+                    if (is24h && checkOut && new Date(ymd) >= new Date(checkOut)) {
                       setCheckOut("");
                     }
                   }}
@@ -394,94 +563,263 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
                 />
               </PopoverContent>
             </Popover>
+            {!is24h && (
+              <p className="text-xs text-slate-500">
+                For {ratePlan} bookings, this single date is used for the stay.
+              </p>
+            )}
           </div>
-          <div className="space-y-2">
-            <Label className="text-xs font-medium text-slate-700">Check-out Date</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!checkIn}
-                  className={cn("w-full justify-start text-left font-normal h-11 px-3 rounded-lg border-slate-200", !checkOut && "text-muted-foreground")}
-                >
-                  <CalendarDays className="mr-2 h-4 w-4 text-slate-400" />
-                  {checkOut ? formatDisplay(checkOut) : "Select date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={checkOut ? parseYmd(checkOut) : undefined}
-                  onSelect={(d) => {
-                    if (!d || !checkIn) return;
-                    const ymd = toYmd(d);
-                    if (new Date(ymd) <= new Date(checkIn)) return;
-                    if (selectionOverlaps(checkIn, ymd)) {
-                      toast.error("Selected range overlaps an existing booking.");
-                      return;
-                    }
-                    setCheckOut(ymd);
-                  }}
-                  disabled={(day) => {
-                    if (!checkIn) return true;
-                    const ymd = toYmd(day);
-                    if (new Date(ymd) <= new Date(checkIn)) return true;
-                    return isReservedDate(day);
-                  }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-        </div>
-
-        {/* Occupancy Section */}
-        <div className="space-y-3">
-          <Label className="flex items-center gap-2 text-xs font-medium text-slate-700">
-            <Users className="h-4 w-4 text-slate-400" />
-            Guest Allocation
-          </Label>
-          <select
-            className="flex h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-[#07008A]/20"
-            value={currentTotalGuests}
-            onChange={(e) => {
-              const total = parseInt(e.target.value);
-              setNumAdults(total);
-              setNumChildren(0); // Simplify by keeping all as adults for total count
-            }}
-          >
-            {[...Array(maxCapacity)].map((_, i) => (
-              <option key={i + 1} value={i + 1}>
-                {i + 1} {i === 0 ? 'Guest' : 'Guests'} {i + 1 === maxCapacity ? '(Max Capacity)' : ''}
-              </option>
-            ))}
-          </select>
-          <div className="flex items-center gap-2 px-1">
-             <span className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">Room Rating:</span>
-             <Badge variant="secondary" className="bg-slate-100 text-slate-600 border-none h-5 px-1.5 text-[10px]">
-               Max {maxCapacity} person(s)
-             </Badge>
-          </div>
-        </div>
-
-        {/* Cheque Support */}
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-          <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-3 block">Payment Information</Label>
-          <div className="space-y-4">
+          {is24h && (
             <div className="space-y-2">
-              <Label className="text-xs font-medium text-slate-700">Cheque Number (If applicable)</Label>
-              <Input
-                value={chequeNumber}
-                onChange={(e) => setChequeNumber(e.target.value)}
-                placeholder="Enter cheque number..."
-                className="h-11 rounded-lg border-slate-200 focus:ring-[#07008A]/20"
-              />
+              <Label className="text-xs font-medium text-slate-700">Check-out date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!checkIn}
+                    className={cn(
+                      "w-full justify-start text-left font-normal h-10 px-3 rounded-lg border-slate-200",
+                      !checkOut && "text-muted-foreground",
+                    )}
+                  >
+                    <CalendarDays className="mr-2 h-4 w-4" />
+                    {checkOut ? formatDisplay(checkOut) : "Select check-out date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={checkOut ? parseYmd(checkOut) : undefined}
+                    onSelect={(d) => {
+                      if (!d || !checkIn) return;
+                      const ymd = toYmd(d);
+                      if (new Date(ymd) <= new Date(checkIn)) return;
+                      if (selectionOverlaps(checkIn, ymd)) {
+                         toast.error("Selected range overlaps an existing booking.");
+                         return;
+                      }
+                      setCheckOut(ymd);
+                    }}
+                    disabled={(day) => {
+                      if (!checkIn) return true;
+                      const ymd = toYmd(day);
+                      if (new Date(ymd) <= new Date(checkIn)) return true;
+                      return selectionOverlaps(checkIn, ymd);
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <p className="text-xs text-slate-500">Total nights are calculated from these dates.</p>
+            </div>
+          )}
+        </div>
+        <p className="text-[10px] text-blue-600/80 italic">{rateHelper}</p>
+      </div>
+
+      <hr className="border-slate-200" />
+
+      {/* ── Section 3: Booking Options ──────────────────────────── */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 text-sm font-semibold text-[#07008A]">
+          <Sparkles className="h-4 w-4" />
+          Booking Options
+        </div>
+
+        <div className="space-y-2 rounded-lg border px-3 py-2.5 bg-slate-50/70">
+          <label className="flex items-center gap-2">
+            <input
+              id="use_per_guest"
+              type="checkbox"
+              checked={usePerGuestRate}
+              onChange={(e) => setUsePerGuestRate(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300"
+            />
+            <div className="space-y-0.5">
+              <span className="text-sm font-medium text-slate-800">Use per guest rate (if available)</span>
+              <p className="text-xs text-slate-500">
+                Total is based on the room&apos;s per guest rate × number of guests.
+              </p>
+            </div>
+          </label>
+          {usePerGuestRate && (
+            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1 text-xs text-slate-600">
+                <div className="font-medium">Per guest price</div>
+                <div>
+                  {perGuestPrice != null && perGuestPrice > 0
+                    ? `₱${perGuestPrice.toFixed(2)} per guest`
+                    : "This room has no per guest rate configured."}
+                </div>
+              </div>
+              <div className="space-y-1 text-xs text-slate-600">
+                <div className="font-medium">Total guests for per guest rate</div>
+                <select
+                  className="mt-1 flex h-8 w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  value={currentTotalGuests}
+                  onChange={(e) => {
+                    const total = parseInt(e.target.value);
+                    setNumAdults(total);
+                    setNumChildren(0); // Simplify by keeping all as adults for total count
+                  }}
+                >
+                  {Array.from({ length: Math.min(maxCapacity, 6) }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={String(n)}>
+                      {n} {n === 1 ? "guest" : "guests"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Discounts */}
+        <div className="space-y-3 bg-gray-50/50 p-4 rounded-xl border border-gray-100">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+              <Tag className="w-4 h-4 text-emerald-600" />
+              Apply Discount
+            </label>
+            <div className="flex bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setDiscountType("fixed")}
+                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                  discountType === "fixed"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                Fixed (₱)
+              </button>
+              <button
+                type="button"
+                onClick={() => setDiscountType("percent")}
+                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                  discountType === "percent"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                Percent (%)
+              </button>
+            </div>
+          </div>
+          <div className="relative group">
+            <input
+              type="number"
+              min="0"
+              max={discountType === "percent" ? 100 : undefined}
+              value={discountValue || ""}
+              onChange={(e) => setDiscountValue(Number(e.target.value) || 0)}
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-gray-900 placeholder:text-gray-400 group-hover:border-gray-300 shadow-sm"
+              placeholder={discountType === "fixed" ? "Enter peso amount..." : "Enter percentage (0-100)..."}
+            />
+            <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-hover:text-emerald-500 transition-colors">
+              {discountType === "fixed" ? <DollarSign className="w-4 h-4" /> : <Percent className="w-4 h-4" />}
             </div>
           </div>
         </div>
 
-        {/* Notes & Requests */}
+        <div className="flex items-center gap-2 border rounded-lg px-3 py-2.5 bg-slate-50/70">
+          <input
+            id="is_lgu_booking"
+            type="checkbox"
+            checked={isLguBooking}
+            onChange={(e) => {
+               setIsLguBooking(e.target.checked);
+               if (e.target.checked) {
+                 setIsSpecialBooking(false);
+                 setSpecialBookingLabel("");
+               }
+            }}
+            className="h-4 w-4 rounded border-slate-300"
+          />
+          <div className="space-y-0.5">
+            <Label htmlFor="is_lgu_booking" className="text-sm font-medium text-slate-800">
+              Mark as LGU booking
+            </Label>
+            <p className="text-xs text-slate-500">
+              LGU-sponsored stays use predefined rates and delay payment collection.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-2 border rounded-lg px-3 py-2.5 bg-slate-50/70">
+          <input
+            id="is_special_booking"
+            type="checkbox"
+            checked={isSpecialBooking}
+            onChange={(e) => {
+               setIsSpecialBooking(e.target.checked);
+               if (e.target.checked) setIsLguBooking(false);
+               else setSpecialBookingLabel("");
+            }}
+            className="h-4 w-4 rounded border-slate-300 mt-1"
+          />
+          <div className="space-y-2 flex-1">
+            <div>
+              <Label htmlFor="is_special_booking" className="text-sm font-medium text-slate-800">
+                Special Booking (Delayed Payment)
+              </Label>
+              <p className="text-xs text-slate-500 mt-0.5">
+                For x-deals, agency agreements, or delayed payment arrangements.
+              </p>
+            </div>
+            {isSpecialBooking && (
+              <div className="pt-1">
+                <Label htmlFor="special_booking_label" className="text-xs mb-1 block">Special Label / Organization</Label>
+                <Input
+                  id="special_booking_label"
+                  value={specialBookingLabel}
+                  onChange={(e) => setSpecialBookingLabel(e.target.value)}
+                  placeholder="e.g., DOT Promo, VIP Deal"
+                  className="h-8 text-sm max-w-sm"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <hr className="border-slate-200" />
+
+      {/* ── Section 4: Validation & Payment ──────────────────────────── */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 text-sm font-semibold text-[#07008A]">
+          <ReceiptText className="h-4 w-4" />
+          Status & Documentation
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label className="text-xs font-medium text-slate-700">Reservation Status *</Label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs font-medium text-slate-700">Cheque Number (If applicable)</Label>
+            <Input
+              value={chequeNumber}
+              onChange={(e) => setChequeNumber(e.target.value)}
+              placeholder="Enter cheque number..."
+              className="h-10 border-slate-200"
+            />
+          </div>
+        </div>
+
         <div className="space-y-2">
           <Label className="text-xs font-medium text-slate-700">Notes / Special Requests</Label>
           <Textarea
@@ -492,151 +830,58 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
           />
         </div>
 
-        {/* Financial Overview (Simplified) */}
+        {/* Financial Recalculation Overview */}
         <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/30 space-y-3">
-          <div className="flex justify-between items-center">
-            <Label className="text-xs font-medium text-slate-600">Total Deposit Paid (PHP)</Label>
-            <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">Payments Locked</span>
+          <div className="flex justify-between items-center pb-2 border-b border-blue-100/50">
+            <span className="text-xs text-slate-600">Base Room Rate ({blocks} blocks)</span>
+            <span className="text-xs font-medium">₱{subtotalBeforeDiscount.toLocaleString()}</span>
           </div>
-          <Input
-            type="number"
-            disabled
-            value={depositPaid}
-            className="h-11 bg-white/50 border-blue-200 text-blue-900 font-bold text-lg rounded-lg"
-          />
-          {/* Discounts (Feature 7) */}
-          <div className="space-y-3 bg-gray-50/50 p-4 rounded-xl border border-gray-100">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                <Tag className="w-4 h-4 text-emerald-600" />
-                Apply Discount
-              </label>
-              <div className="flex bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setDiscountType("fixed")}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                    discountType === "fixed"
-                      ? "bg-indigo-600 text-white shadow-sm"
-                      : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  Fixed (₱)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDiscountType("percent")}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                    discountType === "percent"
-                      ? "bg-indigo-600 text-white shadow-sm"
-                      : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  Percent (%)
-                </button>
-              </div>
+          {calculatedDiscount > 0 && (
+          <div className="flex justify-between items-center pb-2 border-b border-blue-100/50 text-emerald-600">
+            <span className="text-xs">Discount</span>
+            <span className="text-xs font-medium">- ₱{calculatedDiscount.toLocaleString()}</span>
+          </div>
+          )}
+          {(restaurantTotal > 0 || extrasTotal > 0 || extensionsTotal > 0 || earlyCheckInFee > 0 || lateCheckOutFee > 0) && (
+            <div className="flex justify-between items-center pb-2 border-b border-blue-100/50">
+              <span className="text-xs text-slate-600 cursor-help" title="Manage these in Extras tab">Synced Extras/Extensions</span>
+              <span className="text-xs font-medium">₱{(restaurantTotal + extrasTotal + extensionsTotal + earlyCheckInFee + lateCheckOutFee).toLocaleString()}</span>
             </div>
-            <div className="relative group">
-              <input
-                type="number"
-                min="0"
-                max={discountType === "percent" ? 100 : undefined}
-                value={discountValue || ""}
-                onChange={(e) => setDiscountValue(Number(e.target.value) || 0)}
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-gray-900 placeholder:text-gray-400 group-hover:border-gray-300 shadow-sm"
-                placeholder={discountType === "fixed" ? "Enter peso amount..." : "Enter percentage (0-100)..."}
-              />
-              <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-hover:text-indigo-500 transition-colors">
-                {discountType === "fixed" ? <DollarSign className="w-4 h-4" /> : <Percent className="w-4 h-4" />}
-              </div>
-            </div>
+          )}
+          <div className="flex justify-between items-center pt-1">
+             <span className="text-slate-700 font-bold text-sm">Grand Total (Recalculated)</span>
+             <span className="text-[#07008A] font-bold text-sm">₱{grandTotal.toLocaleString()}</span>
+          </div>
+          
+          <div className="flex justify-between items-center pt-2">
+             <span className="text-xs text-slate-500 font-medium">Deposit Paid (Locked)</span>
+             <span className="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded uppercase tracking-wider">₱{deposit.toLocaleString()}</span>
           </div>
 
-          <div className="flex justify-between text-xs pt-1">
-             <span className="text-slate-500 font-medium">Grand Total: PHP {grandTotal.toLocaleString()}</span>
-             <span className={cn("font-bold", balanceDue > 0 ? "text-amber-600" : "text-emerald-600")}>
-               {balanceDue > 0 ? `Unpaid: PHP ${balanceDue.toLocaleString()}` : "Fully Paid"}
+          <div className="flex justify-between items-center pt-2 border-t border-blue-100/50">
+             <span className="text-xs text-slate-500 font-medium pb-2">Final Balance Expected</span>
+             <span className={cn("font-bold text-sm border px-2 py-0.5 rounded shadow-sm", balanceDue > 0 ? "text-amber-700 bg-amber-50 border-amber-200" : "text-emerald-700 bg-emerald-50 border-emerald-200")}>
+               {balanceDue > 0 ? `₱${balanceDue.toLocaleString()}` : "Fully Paid"}
              </span>
           </div>
         </div>
-
-        {/* Special Overrides Section */}
-        <div className="pt-2 grid grid-cols-2 gap-3">
-          <div className={cn(
-            "flex items-center gap-2 p-3 rounded-xl border transition-all cursor-pointer",
-            isLguBooking ? "bg-amber-50 border-amber-200" : "bg-slate-50 border-slate-100 hover:border-slate-200"
-          )} onClick={() => {
-            const nextValue = !isLguBooking;
-            setIsLguBooking(nextValue);
-            if (nextValue) {
-              setIsSpecialBooking(false);
-              setSpecialBookingLabel("");
-            }
-          }}>
-            <input
-              type="checkbox"
-              checked={isLguBooking}
-              readOnly
-              className="h-4 w-4 rounded-md border-slate-300 text-amber-600 focus:ring-amber-500"
-            />
-            <span className="text-xs font-semibold text-slate-700">LGU Tier</span>
-          </div>
-
-          <div className={cn(
-            "flex items-center gap-2 p-3 rounded-xl border transition-all cursor-pointer",
-            isSpecialBooking ? "bg-indigo-50 border-indigo-200" : "bg-slate-50 border-slate-100 hover:border-slate-200"
-          )} onClick={() => {
-            const nextValue = !isSpecialBooking;
-            setIsSpecialBooking(nextValue);
-            if (nextValue) {
-              setIsLguBooking(false);
-            } else {
-              setSpecialBookingLabel("");
-            }
-          }}>
-            <input
-              type="checkbox"
-              checked={isSpecialBooking}
-              readOnly
-              className="h-4 w-4 rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500"
-            />
-            <span className="text-xs font-semibold text-slate-700">Special Agency</span>
-          </div>
-        </div>
-
-        {isSpecialBooking && (
-          <div className="space-y-2 animate-in slide-in-from-top-2">
-            <Label className="text-xs font-medium text-indigo-900">Organization / Agency Name</Label>
-            <Input
-              value={specialBookingLabel}
-              onChange={(e) => setSpecialBookingLabel(e.target.value)}
-              placeholder="e.g. DOT Promo, Corporate VIP"
-              className="h-10 border-indigo-200 focus:ring-indigo-500"
-            />
-          </div>
-        )}
       </div>
 
-      <DialogFooter className="pt-4 mt-6 border-t border-slate-100">
+      <DialogFooter className="pt-4 mt-6 border-t border-slate-100 space-x-2">
         <Button 
           type="button" 
           variant="ghost" 
           onClick={onClose} 
-          className="text-slate-500 hover:text-slate-800 hover:bg-slate-100/50"
+          className="text-slate-500 hover:text-slate-800"
         >
           Cancel
         </Button>
         <Button 
           type="submit" 
           disabled={submitting} 
-          className="bg-[#07008A] hover:bg-[#05006a] text-white font-semibold px-8 rounded-lg shadow-md hover:shadow-blue-900/20"
+          className="bg-[#07008A] hover:bg-[#05006a] text-white font-semibold shadow-md"
         >
-          {submitting ? (
-            <span className="flex items-center gap-2">
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              Saving...
-            </span>
-          ) : "Apply Updates"}
+          {submitting ? "Saving..." : "Apply Updates"}
         </Button>
       </DialogFooter>
     </form>

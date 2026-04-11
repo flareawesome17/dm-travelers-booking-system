@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { requirePermission } from "@/lib/rbac";
+import { requireAnyPermission } from "@/lib/rbac";
 import { parseAndValidate, apiError, dbError } from "@/lib/api-security";
 import { updateSettingsSchema } from "@/lib/validation-schemas";
 import { clearSettingsCache } from "@/lib/settings";
 
+const SETTINGS_PERMS = [
+  "settings.read",
+  "settings.write",
+  "settings.general",
+  "settings.operations",
+  "settings.financial",
+  "settings.social",
+  "settings.extras",
+];
+
 export async function GET(req: NextRequest) {
-  const auth = await requirePermission(req, "settings.read");
+  const auth = await requireAnyPermission(req, SETTINGS_PERMS);
   if ("error" in auth) return auth.error;
 
   try {
@@ -35,7 +45,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requirePermission(req, "settings.write");
+  const auth = await requireAnyPermission(req, SETTINGS_PERMS);
   if ("error" in auth) return auth.error;
 
   const parsed = await parseAndValidate(req, updateSettingsSchema);

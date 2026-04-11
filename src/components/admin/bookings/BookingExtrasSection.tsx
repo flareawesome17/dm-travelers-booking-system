@@ -7,16 +7,28 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
 import { getErrorMessage } from "@/lib/utils";
 import { Plus, Trash2, Package } from "lucide-react";
-
-const EXTRA_TYPES = ["Extra Bed", "Extra Pillow", "Extra Blanket", "Extra Towel - Bath", "Extra Towel - Hand", "Extra Person"] as const;
-type ExtraType = (typeof EXTRA_TYPES)[number];
+import {
+  CUSTOM_BOOKING_EXTRA_TYPE,
+  getBookingExtraDisplayName,
+  PREDEFINED_BOOKING_EXTRA_TYPES,
+  type BookingExtraType,
+  type PredefinedBookingExtraType,
+} from "@/lib/bookingExtras";
 
 type ExtraRow = {
   id?: string;
-  extra_type: ExtraType;
+  extra_type: BookingExtraType;
+  custom_label?: string | null;
   quantity: number;
   unit_price: number;
   total_price: number;
+};
+
+type PendingExtraRow = {
+  extra_type: BookingExtraType;
+  custom_label?: string;
+  quantity: number;
+  unit_price: number;
 };
 
 type BookingExtrasSectionProps = {
@@ -26,8 +38,16 @@ type BookingExtrasSectionProps = {
   onSuccess?: () => void;
 };
 
-// Map extra_type to settings key
-const TYPE_TO_KEY: Record<ExtraType, string> = {
+const EMPTY_DEFAULT_PRICES: Record<PredefinedBookingExtraType, number> = {
+  "Extra Bed": 0,
+  "Extra Pillow": 0,
+  "Extra Blanket": 0,
+  "Extra Towel - Bath": 0,
+  "Extra Towel - Hand": 0,
+  "Extra Person": 0,
+};
+
+const TYPE_TO_KEY: Record<PredefinedBookingExtraType, string> = {
   "Extra Bed": "extra_bed_price",
   "Extra Pillow": "extra_pillow_price",
   "Extra Blanket": "extra_blanket_price",
@@ -36,14 +56,22 @@ const TYPE_TO_KEY: Record<ExtraType, string> = {
   "Extra Person": "extra_person_price",
 };
 
+function createCustomChargeRow(): PendingExtraRow {
+  return {
+    extra_type: CUSTOM_BOOKING_EXTRA_TYPE,
+    custom_label: "",
+    quantity: 1,
+    unit_price: 0,
+  };
+}
+
 export function BookingExtrasSection({ bookingId, token, onTotalChange, onSuccess }: BookingExtrasSectionProps) {
   const [extras, setExtras] = useState<ExtraRow[]>([]);
-  const [defaultPrices, setDefaultPrices] = useState<Record<string, number>>({});
+  const [defaultPrices, setDefaultPrices] = useState<Record<PredefinedBookingExtraType, number>>(EMPTY_DEFAULT_PRICES);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [pendingExtras, setPendingExtras] = useState<{ extra_type: ExtraType; quantity: number; unit_price: number }[]>([]);
+  const [pendingExtras, setPendingExtras] = useState<PendingExtraRow[]>([]);
 
-  // Load existing extras + default prices
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -57,13 +85,12 @@ export function BookingExtrasSection({ bookingId, token, onTotalChange, onSucces
         setExtras(Array.isArray(extrasData) ? extrasData : []);
 
         const settingsData = await settingsRes.json().catch(() => ({}));
-        const prices: Record<string, number> = {};
+        const prices = { ...EMPTY_DEFAULT_PRICES };
         if (settingsData && typeof settingsData === "object") {
-          for (const type of EXTRA_TYPES) {
+          for (const type of PREDEFINED_BOOKING_EXTRA_TYPES) {
             const key = TYPE_TO_KEY[type];
-            // settings could be array of {key, value} or object
             if (Array.isArray(settingsData)) {
-              const row = settingsData.find((s: { key: string }) => s.key === key);
+              const row = settingsData.find((setting: { key: string }) => setting.key === key);
               prices[type] = row ? Number(row.value) || 0 : 0;
             } else if (settingsData[key]) {
               prices[type] = Number(settingsData[key]) || 0;
@@ -71,65 +98,115 @@ export function BookingExtrasSection({ bookingId, token, onTotalChange, onSucces
           }
         }
         setDefaultPrices(prices);
-      } catch { /* ignore */ }
+      } catch {
+        // Ignore load errors and let existing UI state render.
+      }
       setLoading(false);
     };
+
     load();
   }, [bookingId, token]);
 
-  const extrasTotal = extras.reduce((s, e) => s + Number(e.total_price || 0), 0);
-  const pendingTotal = pendingExtras.reduce((s, e) => s + e.quantity * e.unit_price, 0);
+  const extrasTotal = extras.reduce((sum, extra) => sum + Number(extra.total_price || 0), 0);
+  const pendingTotal = pendingExtras.reduce((sum, extra) => sum + extra.quantity * extra.unit_price, 0);
 
-  const notifyTotal = useCallback((saved: ExtraRow[], pending: typeof pendingExtras) => {
-    const total = saved.reduce((s, e) => s + Number(e.total_price || 0), 0)
-      + pending.reduce((s, e) => s + e.quantity * e.unit_price, 0);
+  const notifyTotal = useCallback((saved: ExtraRow[], pending: PendingExtraRow[]) => {
+    const total = saved.reduce((sum, extra) => sum + Number(extra.total_price || 0), 0)
+      + pending.reduce((sum, extra) => sum + extra.quantity * extra.unit_price, 0);
     onTotalChange?.(total);
   }, [onTotalChange]);
 
   const addPending = () => {
-    // Find first type not already in use
-    const usedTypes = new Set([
-      ...extras.map((e) => e.extra_type),
-      ...pendingExtras.map((e) => e.extra_type),
-    ]);
-    const available = EXTRA_TYPES.find((t) => !usedTypes.has(t)) || EXTRA_TYPES[0];
-    const newItem = { extra_type: available, quantity: 1, unit_price: defaultPrices[available] || 0 };
-    const next = [...pendingExtras, newItem];
+    const usedTypes = new Set(
+      [
+        ...extras.map((extra) => extra.extra_type),
+        ...pendingExtras.map((extra) => extra.extra_type),
+      ].filter((type): type is PredefinedBookingExtraType => type !== CUSTOM_BOOKING_EXTRA_TYPE),
+    );
+
+    const available = PREDEFINED_BOOKING_EXTRA_TYPES.find((type) => !usedTypes.has(type)) || PREDEFINED_BOOKING_EXTRA_TYPES[0];
+    const next = [
+      ...pendingExtras,
+      { extra_type: available, quantity: 1, unit_price: defaultPrices[available] || 0 },
+    ];
+
+    setPendingExtras(next);
+    notifyTotal(extras, next);
+  };
+
+  const addCustomCharge = () => {
+    const next = [...pendingExtras, createCustomChargeRow()];
     setPendingExtras(next);
     notifyTotal(extras, next);
   };
 
   const removePending = (idx: number) => {
-    const next = pendingExtras.filter((_, i) => i !== idx);
+    const next = pendingExtras.filter((_, index) => index !== idx);
     setPendingExtras(next);
     notifyTotal(extras, next);
   };
 
-  const updatePending = (idx: number, field: string, value: string | number) => {
+  const updatePending = (idx: number, field: keyof PendingExtraRow, value: string | number) => {
     const next = [...pendingExtras];
+    const current = next[idx];
+
     if (field === "extra_type") {
-      const type = value as ExtraType;
-      next[idx] = { ...next[idx], extra_type: type, unit_price: defaultPrices[type] || next[idx].unit_price };
+      const type = value as BookingExtraType;
+      next[idx] = type === CUSTOM_BOOKING_EXTRA_TYPE
+        ? {
+            ...current,
+            extra_type: type,
+            custom_label: current.custom_label || "",
+          }
+        : {
+            extra_type: type,
+            quantity: current.quantity,
+            unit_price: defaultPrices[type as PredefinedBookingExtraType] || current.unit_price,
+            custom_label: "",
+          };
+    } else if (field === "custom_label") {
+      next[idx] = { ...current, custom_label: String(value) };
     } else if (field === "quantity") {
-      next[idx] = { ...next[idx], quantity: Math.max(1, Number(value) || 1) };
+      next[idx] = { ...current, quantity: Math.max(1, Number(value) || 1) };
     } else if (field === "unit_price") {
-      next[idx] = { ...next[idx], unit_price: Math.max(0, Number(value) || 0) };
+      next[idx] = { ...current, unit_price: Math.max(0, Number(value) || 0) };
     }
+
     setPendingExtras(next);
     notifyTotal(extras, next);
   };
 
   const savePending = async () => {
     if (!pendingExtras.length) return;
+
+    for (const extra of pendingExtras) {
+      if (extra.extra_type === CUSTOM_BOOKING_EXTRA_TYPE && !String(extra.custom_label || "").trim()) {
+        toast.error("Custom charge label is required.");
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const res = await fetch(`/api/bookings/${bookingId}/extras`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ extras: pendingExtras }),
+        body: JSON.stringify({
+          extras: pendingExtras.map((extra) => ({
+            extra_type: extra.extra_type,
+            custom_label: extra.extra_type === CUSTOM_BOOKING_EXTRA_TYPE ? extra.custom_label?.trim() || null : null,
+            quantity: extra.quantity,
+            unit_price: extra.unit_price,
+          })),
+        }),
       });
+
       const data = await res.json().catch(() => []);
-      if (!res.ok) { toast.error(getErrorMessage(data) || "Failed to save extras."); return; }
+      if (!res.ok) {
+        toast.error(getErrorMessage(data) || "Failed to save extras.");
+        return;
+      }
+
       const newExtras = Array.isArray(data) ? data : [];
       const combined = [...extras, ...newExtras];
       setExtras(combined);
@@ -137,63 +214,88 @@ export function BookingExtrasSection({ bookingId, token, onTotalChange, onSucces
       notifyTotal(combined, []);
       onSuccess?.();
       toast.success("Extras added!");
-    } catch { toast.error("Something went wrong."); } finally { setSaving(false); }
+    } catch {
+      toast.error("Something went wrong.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const deleteExtra = async (extra: ExtraRow) => {
     if (!extra.id) return;
+
     try {
       const res = await fetch(`/api/bookings/${bookingId}/extras/${extra.id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) { toast.error("Failed to remove extra."); return; }
-      const next = extras.filter((e) => e.id !== extra.id);
+
+      if (!res.ok) {
+        toast.error("Failed to remove extra.");
+        return;
+      }
+
+      const next = extras.filter((item) => item.id !== extra.id);
       setExtras(next);
       notifyTotal(next, pendingExtras);
       onSuccess?.();
       toast.success("Extra removed.");
-    } catch { toast.error("Something went wrong."); }
+    } catch {
+      toast.error("Something went wrong.");
+    }
   };
 
-  if (loading) return <div className="text-xs text-slate-400 py-2">Loading extras…</div>;
+  if (loading) return <div className="py-2 text-xs text-slate-400">Loading extras...</div>;
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
             <Package className="h-3.5 w-3.5" />
           </div>
           <span className="text-sm font-semibold text-slate-700">Booking Extras</span>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={addPending} className="h-7 text-xs">
-          <Plus className="h-3 w-3 mr-1" /> Add Extra
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={addPending} className="h-7 text-xs">
+            <Plus className="mr-1 h-3 w-3" /> Add Extra
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={addCustomCharge} className="h-7 text-xs">
+            <Plus className="mr-1 h-3 w-3" /> Custom Charge
+          </Button>
+        </div>
       </div>
 
-      {/* Existing saved extras */}
       {extras.length > 0 && (
-        <div className="rounded-lg border border-slate-200 overflow-hidden">
+        <div className="overflow-hidden rounded-lg border border-slate-200">
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-slate-50/80">
-                <th className="text-left py-2 px-3 text-slate-500 font-medium">Type</th>
-                <th className="text-center py-2 px-3 text-slate-500 font-medium">Qty</th>
-                <th className="text-right py-2 px-3 text-slate-500 font-medium">Price</th>
-                <th className="text-right py-2 px-3 text-slate-500 font-medium">Total</th>
-                <th className="w-8"></th>
+                <th className="px-3 py-2 text-left font-medium text-slate-500">Type</th>
+                <th className="px-3 py-2 text-center font-medium text-slate-500">Qty</th>
+                <th className="px-3 py-2 text-right font-medium text-slate-500">Price</th>
+                <th className="px-3 py-2 text-right font-medium text-slate-500">Total</th>
+                <th className="w-8" />
               </tr>
             </thead>
             <tbody>
-              {extras.map((e, i) => (
-                <tr key={e.id || i} className="border-t border-slate-100">
-                  <td className="py-2 px-3 font-medium text-slate-700">{e.extra_type}</td>
-                  <td className="py-2 px-3 text-center text-slate-600">{e.quantity}</td>
-                  <td className="py-2 px-3 text-right text-slate-600">₱{Number(e.unit_price).toFixed(2)}</td>
-                  <td className="py-2 px-3 text-right font-semibold text-[#07008A]">₱{Number(e.total_price).toFixed(2)}</td>
-                  <td className="py-2 px-1">
-                    <button type="button" onClick={() => deleteExtra(e)} className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500 transition-colors">
+              {extras.map((extra, index) => (
+                <tr key={extra.id || index} className="border-t border-slate-100">
+                  <td className="px-3 py-2">
+                    <div className="font-medium text-slate-700">{getBookingExtraDisplayName(extra)}</div>
+                    {extra.extra_type === CUSTOM_BOOKING_EXTRA_TYPE ? (
+                      <div className="text-[10px] uppercase tracking-wide text-slate-400">Custom Charge</div>
+                    ) : null}
+                  </td>
+                  <td className="px-3 py-2 text-center text-slate-600">{extra.quantity}</td>
+                  <td className="px-3 py-2 text-right text-slate-600">₱{Number(extra.unit_price).toFixed(2)}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-[#07008A]">₱{Number(extra.total_price).toFixed(2)}</td>
+                  <td className="px-1 py-2">
+                    <button
+                      type="button"
+                      onClick={() => deleteExtra(extra)}
+                      className="rounded p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                    >
                       <Trash2 className="h-3 w-3" />
                     </button>
                   </td>
@@ -204,49 +306,87 @@ export function BookingExtrasSection({ bookingId, token, onTotalChange, onSucces
         </div>
       )}
 
-      {/* Pending extras (not yet saved) */}
-      {pendingExtras.map((pe, idx) => (
-        <div key={idx} className="grid grid-cols-12 gap-2 items-end rounded-lg border border-dashed border-amber-300 bg-amber-50/30 p-2">
-          <div className="col-span-4">
+      {pendingExtras.map((extra, idx) => (
+        <div
+          key={`${extra.extra_type}-${idx}`}
+          className="grid grid-cols-12 items-end gap-2 rounded-lg border border-dashed border-amber-300 bg-amber-50/30 p-2"
+        >
+          <div className={extra.extra_type === CUSTOM_BOOKING_EXTRA_TYPE ? "col-span-3" : "col-span-4"}>
             <Label className="text-[10px]">Type</Label>
             <select
-              value={pe.extra_type}
-              onChange={(e) => updatePending(idx, "extra_type", e.target.value)}
+              value={extra.extra_type}
+              onChange={(event) => updatePending(idx, "extra_type", event.target.value)}
               className="flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-xs"
             >
-              {EXTRA_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
+              {PREDEFINED_BOOKING_EXTRA_TYPES.map((type) => (
+                <option key={type} value={type}>{type}</option>
               ))}
+              <option value={CUSTOM_BOOKING_EXTRA_TYPE}>{CUSTOM_BOOKING_EXTRA_TYPE}</option>
             </select>
           </div>
+
+          {extra.extra_type === CUSTOM_BOOKING_EXTRA_TYPE ? (
+            <div className="col-span-3">
+              <Label className="text-[10px]">Label</Label>
+              <Input
+                value={extra.custom_label || ""}
+                onChange={(event) => updatePending(idx, "custom_label", event.target.value)}
+                placeholder="e.g. Broken glass"
+                className="h-8 text-xs"
+              />
+            </div>
+          ) : null}
+
           <div className="col-span-2">
             <Label className="text-[10px]">Qty</Label>
-            <Input type="number" min={1} max={20} value={pe.quantity} onChange={(e) => updatePending(idx, "quantity", e.target.value)} className="h-8 text-xs" />
+            <Input
+              type="number"
+              min={1}
+              max={20}
+              value={extra.quantity}
+              onChange={(event) => updatePending(idx, "quantity", event.target.value)}
+              className="h-8 text-xs"
+            />
           </div>
           <div className="col-span-3">
             <Label className="text-[10px]">Price (₱)</Label>
-            <Input type="number" min={0} value={pe.unit_price} onChange={(e) => updatePending(idx, "unit_price", e.target.value)} className="h-8 text-xs" />
+            <Input
+              type="number"
+              min={0}
+              value={extra.unit_price}
+              onChange={(event) => updatePending(idx, "unit_price", event.target.value)}
+              className="h-8 text-xs"
+            />
           </div>
-          <div className="col-span-2 text-right text-xs font-semibold text-[#07008A] pb-1">
-            ₱{(pe.quantity * pe.unit_price).toFixed(2)}
+          <div className="col-span-1 pb-1 text-right text-xs font-semibold text-[#07008A]">
+            ₱{(extra.quantity * extra.unit_price).toFixed(2)}
           </div>
-          <div className="col-span-1 pb-1">
-            <button type="button" onClick={() => removePending(idx)} className="p-1 hover:bg-red-50 rounded text-red-400 hover:text-red-600">
+          <div className="col-span-12 flex justify-end sm:col-span-1 sm:block sm:pb-1">
+            <button
+              type="button"
+              onClick={() => removePending(idx)}
+              className="rounded p-1 text-red-400 hover:bg-red-50 hover:text-red-600"
+            >
               <Trash2 className="h-3 w-3" />
             </button>
           </div>
         </div>
       ))}
 
-      {/* Totals and save */}
       {(extras.length > 0 || pendingExtras.length > 0) && (
-        <div className="flex items-center justify-between rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
+        <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
           <span className="text-xs font-semibold text-slate-600">
             Extras Total: <span className="text-[#07008A]">₱{(extrasTotal + pendingTotal).toFixed(2)}</span>
           </span>
           {pendingExtras.length > 0 && (
-            <Button type="button" size="sm" onClick={savePending} disabled={saving} className="h-7 text-xs bg-[#07008A] hover:bg-[#05006a] text-white">
-              {saving ? "Saving…" : "Save Extras"}
+            <Button
+              type="button"
+              size="sm"
+              onClick={savePending}
+              disabled={saving}
+              className="h-7 bg-[#07008A] text-xs text-white hover:bg-[#05006a]"
+            >
+              {saving ? "Saving..." : "Save Extras"}
             </Button>
           )}
         </div>

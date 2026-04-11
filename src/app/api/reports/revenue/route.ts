@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { requirePermission } from "@/lib/rbac";
 
 export async function GET(req: NextRequest) {
-  const auth = await requirePermission(req, "reports.read");
+  const auth = await requirePermission(req, "reports.analytics.read");
   if ("error" in auth) return auth.error;
 
   const url = new URL(req.url);

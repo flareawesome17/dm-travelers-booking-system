@@ -37,10 +37,6 @@ export default function AdminSettingsPage() {
   const { hasPermission } = usePermissions();
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [pwCurrent, setPwCurrent] = useState("");
-  const [pwNew, setPwNew] = useState("");
-  const [pwConfirm, setPwConfirm] = useState("");
-  const [pwSaving, setPwSaving] = useState(false);
   const router = useRouter();
 
   const fetchSettings = useCallback(async () => {
@@ -137,46 +133,7 @@ export default function AdminSettingsPage() {
     }
   };
 
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const token = localStorage.getItem("admin_token");
-    
-    if (!pwCurrent.trim() || !pwNew.trim() || !pwConfirm.trim()) {
-      toast.error("Please fill out all password fields.");
-      return;
-    }
-    if (pwNew.length < 8) {
-      toast.error("New password must be at least 8 characters.");
-      return;
-    }
-    if (pwNew !== pwConfirm) {
-      toast.error("New password and confirmation do not match.");
-      return;
-    }
-
-    setPwSaving(true);
-    try {
-      const res = await fetch("/api/admin/me/password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ current_password: pwCurrent, new_password: pwNew }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const errMsg = getErrorMessage(data);
-        toast.error(errMsg || "Failed to change password.");
-        return;
-      }
-      toast.success("Password updated.");
-      setPwCurrent("");
-      setPwNew("");
-      setPwConfirm("");
-    } catch {
-      toast.error("Something went wrong.");
-    } finally {
-      setPwSaving(false);
-    }
-  };
+// Removed handleChangePassword
 
   if (loading) {
     return (
@@ -191,6 +148,31 @@ export default function AdminSettingsPage() {
     );
   }
 
+  const canSeeGeneral = hasPermission("settings.general") || hasPermission("settings.write") || hasPermission("settings.manage");
+  const canSeeOperations = hasPermission("settings.operations") || hasPermission("settings.write") || hasPermission("settings.manage");
+  const canSeeFinancial = hasPermission("settings.financial") || hasPermission("settings.write") || hasPermission("settings.manage");
+  const canSeeSocial = hasPermission("settings.social") || hasPermission("settings.write") || hasPermission("settings.manage");
+  const canSeeExtras = hasPermission("settings.extras") || hasPermission("settings.write") || hasPermission("settings.manage");
+
+  const defaultTab = canSeeGeneral ? "general" 
+    : canSeeOperations ? "operations" 
+    : canSeeFinancial ? "financial" 
+    : canSeeSocial ? "social" 
+    : canSeeExtras ? "extras" 
+    : "none";
+
+  const canSave = canSeeGeneral || canSeeOperations || canSeeFinancial || canSeeSocial || canSeeExtras;
+
+  if (!canSave) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-center h-[50vh]">
+        <SettingsIcon className="h-12 w-12 text-slate-300 mb-4" />
+        <h2 className="text-xl font-bold text-slate-700">Access Denied</h2>
+        <p className="text-slate-500 max-w-md mt-2">You don't have permission to view or manage any hotel settings modules.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -199,7 +181,7 @@ export default function AdminSettingsPage() {
           <p className="text-muted-foreground mt-1 text-sm">Manage your property details and system preferences</p>
         </motion.div>
         
-        {hasPermission("settings.write") && (
+        {canSave && (
           <Button 
             onClick={handleSave} 
             disabled={saving}
@@ -211,32 +193,40 @@ export default function AdminSettingsPage() {
         )}
       </div>
 
-      <Tabs defaultValue="general" className="w-full">
+      <Tabs defaultValue={defaultTab} className="w-full">
         <div className="w-full overflow-x-auto pb-1 mb-6 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
           <TabsList className="flex w-max min-w-full bg-slate-100 p-1 border">
-            <TabsTrigger value="general" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-              <Building2 className="h-4 w-4 mr-2" /> General
-            </TabsTrigger>
-            <TabsTrigger value="operations" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-              <Clock className="h-4 w-4 mr-2" /> Operations
-            </TabsTrigger>
-            <TabsTrigger value="financial" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-              <Banknote className="h-4 w-4 mr-2" /> Financial
-            </TabsTrigger>
-            <TabsTrigger value="social" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-              <Share2 className="h-4 w-4 mr-2" /> Social
-            </TabsTrigger>
-            <TabsTrigger value="extras" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-              <Package className="h-4 w-4 mr-2" /> Extras
-            </TabsTrigger>
-            <TabsTrigger value="security" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-              <SettingsIcon className="h-4 w-4 mr-2" /> Security
-            </TabsTrigger>
+            {canSeeGeneral && (
+              <TabsTrigger value="general" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                <Building2 className="h-4 w-4 mr-2" /> General
+              </TabsTrigger>
+            )}
+            {canSeeOperations && (
+              <TabsTrigger value="operations" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                <Clock className="h-4 w-4 mr-2" /> Operations
+              </TabsTrigger>
+            )}
+            {canSeeFinancial && (
+              <TabsTrigger value="financial" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                <Banknote className="h-4 w-4 mr-2" /> Financial
+              </TabsTrigger>
+            )}
+            {canSeeSocial && (
+              <TabsTrigger value="social" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                <Share2 className="h-4 w-4 mr-2" /> Social
+              </TabsTrigger>
+            )}
+            {canSeeExtras && (
+              <TabsTrigger value="extras" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                <Package className="h-4 w-4 mr-2" /> Extras
+              </TabsTrigger>
+            )}
           </TabsList>
         </div>
 
         {/* General Settings */}
-        <TabsContent value="general">
+        {canSeeGeneral && (
+          <TabsContent value="general">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             {/* Left Column: Main Property Info */}
             <div className="lg:col-span-2">
@@ -337,7 +327,7 @@ export default function AdminSettingsPage() {
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      disabled={!hasPermission("settings.write")}
+                      disabled={!canSeeGeneral}
                       onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
@@ -384,7 +374,7 @@ export default function AdminSettingsPage() {
                     />
                     <img src={settings.hotel_logo || "/logo.png"} alt="Hotel Logo" className="h-20 w-auto object-contain mb-4" />
                     <p className="text-[10px] text-white/60 text-center uppercase tracking-widest font-bold group-hover:text-white transition-colors">
-                      {hasPermission("settings.write") ? "Click to Upload Logo" : "Logo Preview"}
+                      {canSeeGeneral ? "Click to Upload Logo" : "Logo Preview"}
                     </p>
                   </div>
                   <div className="space-y-2">
@@ -428,9 +418,11 @@ export default function AdminSettingsPage() {
             </div>
           </div>
         </TabsContent>
+        )}
 
         {/* Operations Settings */}
-        <TabsContent value="operations">
+        {canSeeOperations && (
+          <TabsContent value="operations">
           <div className="mx-auto max-w-4xl space-y-6">
             <Card className="border-0 shadow-sm">
               <CardHeader className="border-b bg-slate-50/30">
@@ -444,7 +436,7 @@ export default function AdminSettingsPage() {
                     <Select 
                       value={settings.timezone || "Asia/Manila"} 
                       onValueChange={(value) => handleUpdate("timezone", value)}
-                      disabled={!hasPermission("settings.write")}
+                      disabled={!canSeeOperations}
                     >
                       <SelectTrigger id="timezone" className="w-full">
                         <SelectValue placeholder="Select timezone" />
@@ -466,7 +458,7 @@ export default function AdminSettingsPage() {
                       placeholder="+08:00"
                       value={settings.timezone_offset || "+08:00"} 
                       onChange={e => handleUpdate("timezone_offset", e.target.value)} 
-                      disabled={!hasPermission("settings.write")}
+                      disabled={!canSeeOperations}
                     />
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">ISO 8601 offset (e.g., +08:00, -05:00)</p>
                   </div>
@@ -585,9 +577,11 @@ export default function AdminSettingsPage() {
             </Card>
           </div>
         </TabsContent>
+        )}
 
         {/* Financial Settings */}
-        <TabsContent value="financial">
+        {canSeeFinancial && (
+          <TabsContent value="financial">
           <Card className="border-0 shadow-sm max-w-3xl mx-auto">
             <CardHeader className="border-b bg-slate-50/30">
               <CardTitle className="text-base font-bold">Accounting & Billing</CardTitle>
@@ -625,9 +619,11 @@ export default function AdminSettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
         {/* Social Settings */}
-        <TabsContent value="social">
+        {canSeeSocial && (
+          <TabsContent value="social">
           <Card className="border-0 shadow-sm max-w-3xl mx-auto">
             <CardHeader className="border-b bg-slate-50/30">
               <CardTitle className="text-base font-bold">Social Media & Links</CardTitle>
@@ -655,9 +651,11 @@ export default function AdminSettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
         {/* Extras Settings */}
-        <TabsContent value="extras">
+        {canSeeExtras && (
+          <TabsContent value="extras">
           <Card className="border-0 shadow-sm max-w-3xl mx-auto">
             <CardHeader className="border-b bg-slate-50/30">
               <CardTitle className="text-base font-bold">Extras Pricing</CardTitle>
@@ -723,56 +721,9 @@ export default function AdminSettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
-        {/* Security */}
-        <TabsContent value="security">
-          <Card className="border-0 shadow-sm max-w-3xl mx-auto">
-            <CardHeader className="border-b bg-slate-50/30">
-              <CardTitle className="text-base font-bold">Change Password</CardTitle>
-              <CardDescription>Update your own admin password</CardDescription>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6">
-              <form className="space-y-4" onSubmit={handleChangePassword}>
-                <div className="space-y-2">
-                  <Label htmlFor="current-password">Current password</Label>
-                  <Input
-                    id="current-password"
-                    type="password"
-                    value={pwCurrent}
-                    onChange={(e) => setPwCurrent(e.target.value)}
-                    autoComplete="current-password"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="new-password">New password</Label>
-                  <Input
-                    id="new-password"
-                    type="password"
-                    value={pwNew}
-                    onChange={(e) => setPwNew(e.target.value)}
-                    autoComplete="new-password"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-password">Confirm new password</Label>
-                  <Input
-                    id="confirm-password"
-                    type="password"
-                    value={pwConfirm}
-                    onChange={(e) => setPwConfirm(e.target.value)}
-                    autoComplete="new-password"
-                  />
-                </div>
-                <div className="flex justify-end">
-                  <Button type="submit" disabled={pwSaving} className="bg-[#07008A] hover:bg-[#05006a] text-white">
-                    {pwSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                    {pwSaving ? "Updating..." : "Update password"}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        {/* Security Settings removed */}
       </Tabs>
     </div>
   );

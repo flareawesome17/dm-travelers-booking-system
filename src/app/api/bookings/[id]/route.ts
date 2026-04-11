@@ -141,7 +141,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
               : discountValue,
           ),
         );
-        const roomTotal = roundMoney(Math.max(0, subtotalBeforeDiscount - discountAmount));
+        const roomTotal = "total_amount" in body 
+          ? toMoneyNumber(body.total_amount) 
+          : roundMoney(Math.max(0, subtotalBeforeDiscount - discountAmount));
 
         const restaurantTotal = toMoneyNumber(body.restaurant_charges_total ?? existingBooking.restaurant_charges_total);
         const extrasTotal = toMoneyNumber(body.extras_total ?? existingBooking.extras_total);

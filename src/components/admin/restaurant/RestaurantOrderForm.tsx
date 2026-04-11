@@ -8,7 +8,7 @@ import { getErrorMessage } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 
-type MenuItem = { id: string; name?: string; category?: string | null; price?: number | null; image_url?: string | null; lgu_markup_percentage?: number | null };
+type MenuItem = { id: string; name?: string; category?: string | null; price?: number | null; staff_price?: number | null; image_url?: string | null; lgu_markup_percentage?: number | null; is_minimart?: boolean | null };
 type BookingOption = { id: string; reference_number?: string; status?: string; payment_status?: string; guests?: { full_name?: string | null }; rooms?: { room_number?: string | null }; is_lgu_booking?: boolean };
 
 type OrderFormProps = {
@@ -28,6 +28,7 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
   const [orderItemSearch, setOrderItemSearch] = useState("");
   const [orderLines, setOrderLines] = useState<{ menu_item_id: string; quantity: number }[]>([]);
   const [isLguOrder, setIsLguOrder] = useState(false);
+  const [isStaffOrder, setIsStaffOrder] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeDiscount, setActiveDiscount] = useState<any>(null);
 
@@ -46,6 +47,9 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
   const getItemPrice = (item: MenuItem | undefined) => {
     if (!item) return 0;
     const basePrice = Number(item.price || 0);
+    if (isStaffOrder && item.staff_price != null) {
+      return Number(item.staff_price || 0);
+    }
     if (isLguOrder && item.lgu_markup_percentage) {
       return basePrice + (basePrice * (item.lgu_markup_percentage / 100));
     }
@@ -101,9 +105,15 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
   const subtotal = useMemo(() => {
     return orderLines.reduce((sum, line) => {
       const item = items.find((i) => i.id === line.menu_item_id);
-      return sum + (getItemPrice(item) * line.quantity);
+      const basePrice = Number(item?.price || 0);
+      const linePrice = isStaffOrder && item?.staff_price != null
+        ? Number(item.staff_price || 0)
+        : isLguOrder && item?.lgu_markup_percentage
+          ? basePrice + (basePrice * (item.lgu_markup_percentage / 100))
+          : basePrice;
+      return sum + (linePrice * line.quantity);
     }, 0);
-  }, [orderLines, items, isLguOrder]);
+  }, [orderLines, items, isLguOrder, isStaffOrder]);
 
   const discountAmount = useMemo(() => {
     if (!activeDiscount) return 0;
@@ -119,6 +129,16 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
     e.preventDefault();
     if (orderLines.length === 0) { toast.error("Please add at least one item to the order."); return; }
     if (orderSource === "Room Service" && !orderBookingRef.trim()) { toast.error("Booking reference is required for Room Service."); return; }
+    if (isStaffOrder) {
+      const missingStaffPrice = orderLines
+        .map((line) => items.find((item) => item.id === line.menu_item_id))
+        .filter((item): item is MenuItem => Boolean(item))
+        .filter((item) => item.staff_price == null);
+      if (missingStaffPrice.length > 0) {
+        toast.error(`Staff price is not configured for: ${missingStaffPrice.map((item) => item.name || "Unnamed item").join(", ")}`);
+        return;
+      }
+    }
     
     setSaving(true);
     const token = localStorage.getItem("admin_token");
@@ -134,6 +154,7 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
           payment_method: orderSource === "Room Service" ? "Charged to Room" : paymentMethod,
           booking_reference: orderSource === "Room Service" ? orderBookingRef.trim() || null : null,
           is_lgu_order: isLguOrder,
+          is_staff_order: isStaffOrder,
           notes: orderNotes.trim() || null,
           items: orderLines,
         }),
@@ -211,13 +232,30 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
             <div className="space-y-2">
               <Label className="text-xs font-bold uppercase text-slate-500">Pricing Tier</Label>
               <label className="flex items-center gap-2 h-10 px-3 border border-slate-200 rounded-md bg-white shadow-sm hover:border-[#07008A]/20 cursor-pointer transition-all active:scale-[0.98]">
-                <input 
-                  type="checkbox" 
-                  className="rounded border-slate-300 text-[#07008A] focus:ring-[#07008A]" 
-                  checked={isLguOrder} 
-                  onChange={(e) => setIsLguOrder(e.target.checked)} 
+                <input
+                  type="checkbox"
+                  className="rounded border-slate-300 text-[#07008A] focus:ring-[#07008A]"
+                  checked={isLguOrder}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setIsLguOrder(checked);
+                    if (checked) setIsStaffOrder(false);
+                  }}
                 />
                 <span className="text-sm font-medium text-slate-700">LGU Sponsored</span>
+              </label>
+              <label className="mt-2 flex items-center gap-2 h-10 px-3 border border-slate-200 rounded-md bg-white shadow-sm hover:border-[#07008A]/20 cursor-pointer transition-all active:scale-[0.98]">
+                <input
+                  type="checkbox"
+                  className="rounded border-slate-300 text-[#07008A] focus:ring-[#07008A]"
+                  checked={isStaffOrder}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setIsStaffOrder(checked);
+                    if (checked) setIsLguOrder(false);
+                  }}
+                />
+                <span className="text-sm font-medium text-slate-700">Use Staff Price</span>
               </label>
             </div>
           </div>
@@ -255,6 +293,7 @@ export function RestaurantOrderForm({ items, bookings, onSuccess, onCancel }: Or
                           setCustomerName(b.guests.full_name);
                         }
                         setIsLguOrder(!!b.is_lgu_booking);
+                        setIsStaffOrder(false);
                       }
                     }} 
                   >

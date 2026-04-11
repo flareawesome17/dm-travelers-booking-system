@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Percent, RefreshCw, Search, Ticket, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import DiscountList from "@/components/admin/discounts/DiscountList";
 import DiscountForm from "@/components/admin/discounts/DiscountForm";
+import { ConfirmActionDialog } from "@/components/admin/ConfirmActionDialog";
 import { usePermissions } from "@/context/PermissionsContext";
 
 export default function DiscountsPage() {
@@ -22,6 +23,7 @@ export default function DiscountsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDiscount, setEditingDiscount] = useState<any>(null);
+  const [deleteConfirmDiscount, setDeleteConfirmDiscount] = useState<any>(null);
   
   const { hasPermission } = usePermissions();
   const canRead = hasPermission("discounts.read");
@@ -29,7 +31,7 @@ export default function DiscountsPage() {
   const canUpdate = hasPermission("discounts.update");
   const canDelete = hasPermission("discounts.delete");
 
-  const fetchDiscounts = async () => {
+  const fetchDiscounts = useCallback(async () => {
     if (!canRead) return;
     setLoading(true);
     try {
@@ -42,20 +44,19 @@ export default function DiscountsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [canRead]);
 
   useEffect(() => {
     if (canRead) {
       fetchDiscounts();
     }
-  }, [canRead]);
+  }, [canRead, fetchDiscounts]);
 
   const handleDelete = async (id: string) => {
     if (!canDelete) {
       toast.error("You do not have permission to delete discounts");
       return;
     }
-    if (!confirm("Are you sure you want to delete this discount? This cannot be undone.")) return;
 
     try {
       const res = await fetch(`/api/discounts/${id}`, { method: "DELETE" });
@@ -64,6 +65,8 @@ export default function DiscountsPage() {
       toast.success("Discount deleted");
     } catch (error) {
       toast.error("Failed to delete discount");
+    } finally {
+      setDeleteConfirmDiscount(null);
     }
   };
 
@@ -180,7 +183,10 @@ export default function DiscountsPage() {
                 toast.error("You do not have permission to update discounts");
               }
             }}
-            onDelete={handleDelete}
+            onDelete={(id) => {
+              const selectedDiscount = discounts.find((discount) => discount.id === id) || { id };
+              setDeleteConfirmDiscount(selectedDiscount);
+            }}
           />
         </div>
       )}
@@ -214,6 +220,26 @@ export default function DiscountsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmActionDialog
+        open={!!deleteConfirmDiscount}
+        onOpenChange={(open) => { if (!open) setDeleteConfirmDiscount(null); }}
+        title="Delete this discount?"
+        description={(
+          <>
+            This will permanently remove{" "}
+            <span className="font-semibold text-slate-800">
+              {deleteConfirmDiscount?.name || "this discount"}
+            </span>
+            . This action cannot be undone.
+          </>
+        )}
+        confirmLabel="Delete Discount"
+        onConfirm={() => {
+          if (!deleteConfirmDiscount?.id) return;
+          return handleDelete(deleteConfirmDiscount.id);
+        }}
+      />
     </div>
   );
 }

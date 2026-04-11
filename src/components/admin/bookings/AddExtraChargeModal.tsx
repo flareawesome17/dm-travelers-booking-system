@@ -42,7 +42,8 @@ export function AddExtraChargeModal({ open, onClose, onSuccess, booking, token }
       const payload = {
         extras: [
           {
-            extra_type: chargeName.trim(),
+            extra_type: "Custom Charge",
+            custom_label: chargeName.trim(),
             quantity: 1,
             unit_price: numAmount,
           }
