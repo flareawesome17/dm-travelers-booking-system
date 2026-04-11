@@ -1,13 +1,23 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
 import { getErrorMessage } from "@/lib/utils";
-import { ArrowRight, Banknote, Building2, ReceiptText, ShieldCheck } from "lucide-react";
+import { ArrowRight, Banknote, Building2, ReceiptText } from "lucide-react";
+import {
+  AdminModal,
+  AdminModalBody,
+  AdminModalDescription,
+  AdminModalFooter,
+  AdminModalHeader,
+  AdminModalTitle,
+  AdminPanelCard,
+  AdminPanelCardContent,
+} from "@/components/admin/ui";
 
 type CollectPaymentModalProps = {
   open: boolean;
@@ -81,35 +91,28 @@ export function CollectPaymentModal({ open, onClose, receivable, token, onSucces
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-2xl max-h-[95vh] overflow-y-auto border-0 bg-transparent p-0 shadow-none scrollbar-hide">
-        <div className="rounded-[28px] border border-[#07008A]/10 bg-[linear-gradient(145deg,rgba(255,255,255,0.98),rgba(248,248,255,0.94))] shadow-[0_30px_90px_rgba(7,0,138,0.12)] backdrop-blur">
-          <div className="relative overflow-hidden rounded-[28px]">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(7,0,138,0.12),transparent_38%),radial-gradient(circle_at_bottom_left,rgba(245,158,11,0.12),transparent_30%)]" />
-            <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: "linear-gradient(to right, rgba(7,0,138,0.14) 1px, transparent 1px), linear-gradient(to bottom, rgba(7,0,138,0.12) 1px, transparent 1px)", backgroundSize: "22px 22px" }} />
+      <AdminModal size="xl" stickyFooter>
+        <AdminModalHeader className="space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-2">
+              <AdminModalTitle className="flex items-center gap-2 text-2xl text-slate-900">
+                <Banknote className="h-6 w-6 text-[#07008A]" />
+                Record receivable payment
+              </AdminModalTitle>
+              <AdminModalDescription className="max-w-2xl">
+                Capture a collection, sync the booking balance, and keep the receivables ledger current in one step.
+              </AdminModalDescription>
+            </div>
+            <div className="hidden h-12 w-12 items-center justify-center rounded-2xl bg-[#07008A]/10 text-[#07008A] sm:flex">
+              <Banknote className="h-5 w-5" />
+            </div>
+          </div>
+        </AdminModalHeader>
 
-            <div className="relative p-6 sm:p-7">
-              <DialogHeader className="space-y-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-3">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-[#07008A]/10 bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#07008A]">
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                      Quick Collect
-                    </div>
-                    <DialogTitle className="text-2xl font-bold tracking-tight text-slate-900">
-                      Record receivable payment
-                    </DialogTitle>
-                    <p className="max-w-xl text-sm text-slate-500">
-                      Capture a collection, sync the booking balance, and keep the receivables ledger current in one step.
-                    </p>
-                  </div>
-                  <div className="hidden h-14 w-14 items-center justify-center rounded-2xl border border-white/60 bg-white/80 text-[#07008A] shadow-sm sm:flex">
-                    <Banknote className="h-6 w-6" />
-                  </div>
-                </div>
-              </DialogHeader>
-
-              <div className="mt-6 grid gap-4 lg:grid-cols-[1.25fr_0.95fr]">
-                <div className="rounded-[24px] border border-slate-200/80 bg-white/92 p-5 shadow-sm">
+        <AdminModalBody>
+          <div className="grid gap-4 lg:grid-cols-[1.25fr_0.95fr]">
+            <AdminPanelCard density="compact">
+              <AdminPanelCardContent className="space-y-5">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Collection target</p>
@@ -135,7 +138,7 @@ export function CollectPaymentModal({ open, onClose, receivable, token, onSucces
                     </div>
                   </div>
 
-                  <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
                       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Outstanding</p>
                       <p className="mt-2 text-lg font-bold text-slate-900">PHP {outstanding.toFixed(2)}</p>
@@ -150,7 +153,7 @@ export function CollectPaymentModal({ open, onClose, receivable, token, onSucces
                     </div>
                   </div>
 
-                  <div className="mt-5 space-y-3">
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <Label htmlFor="collect-amount" className="text-sm font-semibold text-slate-700">
                         Payment amount
@@ -185,11 +188,12 @@ export function CollectPaymentModal({ open, onClose, receivable, token, onSucces
                           PHP {value.toFixed(2)}
                         </Button>
                       ))}
+                      </div>
                     </div>
-                  </div>
-                </div>
+              </AdminPanelCardContent>
+            </AdminPanelCard>
 
-                <div className="rounded-[24px] border border-[#07008A]/12 bg-[#07008A] p-5 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+            <section className="rounded-[calc(var(--admin-panel-radius)+0.125rem)] border border-[#07008A]/12 bg-[#07008A] p-5 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
                   <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/65">
                     <ReceiptText className="h-3.5 w-3.5" />
                     Settlement details
@@ -256,31 +260,29 @@ export function CollectPaymentModal({ open, onClose, receivable, token, onSucces
                       </p>
                     </div>
                   </div>
-                </div>
-              </div>
-
-              <DialogFooter className="mt-6 flex-col gap-3 border-t border-slate-200/70 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-xs text-slate-400">
-                  Audit-safe collection entry with synchronized booking balance.
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" className="rounded-full" onClick={onClose}>
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={submitting || paymentAmount <= 0}
-                    className="rounded-full bg-emerald-600 px-5 text-white hover:bg-emerald-700"
-                  >
-                    {submitting ? "Recording..." : `Collect PHP ${paymentAmount.toFixed(2)}`}
-                  </Button>
-                </div>
-              </DialogFooter>
-            </div>
+            </section>
           </div>
-        </div>
-      </DialogContent>
+        </AdminModalBody>
+
+        <AdminModalFooter className="sm:justify-between">
+          <p className="text-xs text-slate-400">
+            Audit-safe collection entry with synchronized booking balance.
+          </p>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" className="rounded-full" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={submitting || paymentAmount <= 0}
+              className="rounded-full bg-emerald-600 px-5 text-white hover:bg-emerald-700"
+            >
+              {submitting ? "Recording..." : `Collect PHP ${paymentAmount.toFixed(2)}`}
+            </Button>
+          </div>
+        </AdminModalFooter>
+      </AdminModal>
     </Dialog>
   );
 }

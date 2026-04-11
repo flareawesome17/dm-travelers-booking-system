@@ -14,16 +14,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn, getErrorMessage } from "@/lib/utils";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { BookingForm } from "@/components/admin/bookings/BookingForm";
 import { EditBookingForm } from "@/components/admin/bookings/EditBookingForm";
 import { RecordPaymentModal } from "@/components/admin/bookings/RecordPaymentModal";
@@ -45,6 +40,17 @@ import {
 } from "@/lib/bookingAnalytics";
 import { getBookingChargeBreakdown } from "@/lib/bookingTotals";
 import { usePermissions } from "@/context/PermissionsContext";
+import {
+  AdminConfirmDialog,
+  AdminModal,
+  AdminModalBody,
+  AdminModalHeader,
+  AdminModalTitle,
+  AdminPanelCard,
+  AdminPanelCardContent,
+  AdminPanelCardHeader,
+  AdminPanelCardTitle,
+} from "@/components/admin/ui";
 
 const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   confirmed: "default", "pending payment": "secondary", "pending verification": "secondary",
@@ -102,6 +108,7 @@ export default function AdminBookingsPage() {
   const [extrasBooking, setExtrasBooking] = useState<BookingRow | null>(null);
   const [extraChargeBooking, setExtraChargeBooking] = useState<BookingRow | null>(null);
   const [cancelBooking, setCancelBooking] = useState<BookingRow | null>(null);
+  const [deleteBooking, setDeleteBooking] = useState<BookingRow | null>(null);
   const [checkInBooking, setCheckInBooking] = useState<BookingRow | null>(null);
   const [checkInAt, setCheckInAt] = useState<string>("");
   const [checkOutBooking, setCheckOutBooking] = useState<BookingRow | null>(null);
@@ -176,6 +183,25 @@ export default function AdminBookingsPage() {
       }
       toast.success("Booking cancelled.");
       setCancelBooking(null);
+      refreshData();
+    } catch {
+      toast.error("Something went wrong.");
+    }
+  };
+
+  const handleDeleteBooking = async () => {
+    const booking = deleteBooking;
+    if (!booking?.id) return;
+
+    try {
+      const res = await api(`/api/bookings/${booking.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(getErrorMessage(data) || "Failed.");
+        return;
+      }
+      toast.success("Deleted.");
+      setDeleteBooking(null);
       refreshData();
     } catch {
       toast.error("Something went wrong.");
@@ -335,13 +361,13 @@ export default function AdminBookingsPage() {
           onCardClick={handleAnalyticsCardClick}
         />
       </motion.div>
-      <Card className="border border-slate-200/80 shadow-xs bg-white overflow-hidden">
-        <CardHeader className="border-b border-slate-100 bg-slate-50/40 px-5 py-4 flex flex-row items-center justify-between">
+      <AdminPanelCard>
+        <AdminPanelCardHeader className="items-center">
           <div className="flex items-center gap-3">
-            <CardTitle className="text-lg font-semibold text-[#07008A] flex items-center gap-2">
+            <AdminPanelCardTitle className="flex items-center gap-2">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#07008A]/10 text-[#07008A]"><CalendarCheck className="h-5 w-5" /></div>
               <span>All Bookings</span>
-            </CardTitle>
+            </AdminPanelCardTitle>
             <span className="hidden sm:inline-block ml-1 text-xs font-medium rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{filtered.length} filtered / {list.length} total</span>
           </div>
           {canCreate && (
@@ -349,14 +375,16 @@ export default function AdminBookingsPage() {
               <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={() => setOpen(true)}>
                 <Plus className="h-4 w-4 mr-1" /> New booking
               </Button>
-              <DialogContent className="admin-modal-responsive [--admin-modal-width:68rem] max-h-[92vh] overflow-y-auto modal-scrollbar p-5 sm:p-6">
-                <DialogHeader><DialogTitle>Add new booking</DialogTitle></DialogHeader>
+              <AdminModal size="xl">
+                <AdminModalHeader><AdminModalTitle>Add new booking</AdminModalTitle></AdminModalHeader>
+                <AdminModalBody>
                 <BookingForm apiUrl="" token={typeof window !== "undefined" ? localStorage.getItem("admin_token") || "" : ""} onSuccess={() => { refreshData(); }} onClose={() => setOpen(false)} />
-              </DialogContent>
+                </AdminModalBody>
+              </AdminModal>
             </Dialog>
           )}
-        </CardHeader>
-        <CardContent className="p-0">
+        </AdminPanelCardHeader>
+        <AdminPanelCardContent className="px-0 py-0">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 py-4 border-b bg-slate-50/60 gap-4">
             <div className="relative w-full sm:max-w-md">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -599,17 +627,9 @@ export default function AdminBookingsPage() {
                                 </DropdownMenuItem>
                               )}
                               {canDelete && (
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer text-sm">
-                                      <Trash2 className="mr-2 h-4 w-4" /> Delete Booking
-                                    </DropdownMenuItem>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader><AlertDialogTitle>Delete this booking?</AlertDialogTitle><AlertDialogDescription>This will permanently delete booking <span className="font-semibold">{b.reference_number}</span>. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                                    <AlertDialogFooter><AlertDialogCancel>Keep Booking</AlertDialogCancel><AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={async () => { if (!b.id) return; try { const res = await api(`/api/bookings/${b.id}`, { method: "DELETE" }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Failed."); return; } toast.success("Deleted."); refreshData(); } catch { toast.error("Something went wrong."); } }}>Delete booking</AlertDialogAction></AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
+                                <DropdownMenuItem onClick={() => setDeleteBooking(b)} className="text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer text-sm">
+                                  <Trash2 className="mr-2 h-4 w-4" /> Delete Booking
+                                </DropdownMenuItem>
                               )}
                            </DropdownMenuContent>
                          </DropdownMenu>
@@ -633,26 +653,29 @@ export default function AdminBookingsPage() {
             )}
             </>
           )}
-        </CardContent>
-      </Card>
+        </AdminPanelCardContent>
+      </AdminPanelCard>
 
       {/* Edit dialog */}
       <Dialog open={!!editBooking} onOpenChange={(o) => { if (!o) setEditBooking(null); }}>
-        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto custom-scrollbar">
-          <DialogHeader><DialogTitle>Edit booking</DialogTitle></DialogHeader>
+        <AdminModal size="md">
+          <AdminModalHeader><AdminModalTitle>Edit booking</AdminModalTitle></AdminModalHeader>
+          <AdminModalBody>
           {editBooking?.id && <EditBookingForm apiUrl="" token={token()} booking={editBooking as any} onSuccess={() => { refreshData(); }} onClose={() => setEditBooking(null)} />}
-        </DialogContent>
+          </AdminModalBody>
+        </AdminModal>
       </Dialog>
 
       {/* Payment Modal */}
       <Dialog open={!!paymentBooking} onOpenChange={(o) => { if (!o) setPaymentBooking(null); }}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-[#07008A] flex items-center gap-2">
+        <AdminModal size="md">
+          <AdminModalHeader>
+            <AdminModalTitle className="flex items-center gap-2">
               <Banknote className="h-5 w-5" />
               Record Payment
-            </DialogTitle>
-          </DialogHeader>
+            </AdminModalTitle>
+          </AdminModalHeader>
+          <AdminModalBody>
           {paymentBooking && (
             <RecordPaymentModal 
               booking={paymentBooking as any}
@@ -660,7 +683,8 @@ export default function AdminBookingsPage() {
               onClose={() => setPaymentBooking(null)}
             />
           )}
-        </DialogContent>
+          </AdminModalBody>
+        </AdminModal>
       </Dialog>
 
       <ConfirmActionDialog
@@ -680,25 +704,53 @@ export default function AdminBookingsPage() {
         onConfirm={handleCancelBooking}
       />
 
-      {/* Check-in dialog */}
-      <AlertDialog open={!!checkInBooking} onOpenChange={(o) => { if (!o) setCheckInBooking(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Confirm check-in?</AlertDialogTitle><AlertDialogDescription>This will mark the booking as <span className="font-semibold">Checked-In</span>. Early check-in fees apply automatically if before 2:00 PM.</AlertDialogDescription></AlertDialogHeader>
-          <div className="space-y-2">
+      <AdminConfirmDialog
+        open={!!deleteBooking}
+        onOpenChange={(open) => { if (!open) setDeleteBooking(null); }}
+        title="Delete this booking?"
+        description={(
+          <>
+            This will permanently delete booking{" "}
+            <span className="font-semibold text-slate-800">
+              {deleteBooking?.reference_number || "this booking"}
+            </span>
+            . This action cannot be undone.
+          </>
+        )}
+        confirmLabel="Delete booking"
+        onConfirm={handleDeleteBooking}
+      />
+
+      <AdminConfirmDialog
+        open={!!checkInBooking}
+        onOpenChange={(open) => { if (!open) setCheckInBooking(null); }}
+        title="Confirm check-in?"
+        description={<>This will mark the booking as <span className="font-semibold">Checked-In</span>. Early check-in fees apply automatically if before 2:00 PM.</>}
+        confirmLabel="Confirm check-in"
+        confirmClassName="bg-emerald-600 text-white hover:bg-emerald-700"
+        intent="neutral"
+        onConfirm={async () => { const b = checkInBooking; if (!b?.id) return; try { const tzOffset = localStorage.getItem("app_timezone_offset") || "+08:00"; const actual = checkInAt ? new Date(`${checkInAt}${tzOffset}`).toISOString() : new Date().toISOString(); const res = await api(`/api/bookings/${b.id}/check-in`, { method: "POST", body: JSON.stringify({ actual_check_in_at: actual }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Check-in failed."); return; } const fee = Number((data as { early_checkin_fee_applied?: number }).early_checkin_fee_applied || 0); toast.success(fee > 0 ? `Checked in. Early fee: ₱${fee.toFixed(2)}.` : "Checked in."); setCheckInBooking(null); refreshData(); } catch { toast.error("Something went wrong."); } }}
+      >
+        <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700">Actual check-in time</label>
             <input type="datetime-local" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={checkInAt} onChange={(e) => setCheckInAt(e.target.value)} />
             {checkInBooking?.check_in_date && <p className="text-xs text-slate-500">Reserved: <span className="font-medium">{`${String(checkInBooking.check_in_date).slice(0, 10)} 14:00`}</span></p>}
             {(() => { const p = computeEarlyCheckInPreview(); return <p className={cn("text-xs", p.fee > 0 ? "text-slate-700" : "text-slate-500")}>Breakdown: <span className="font-semibold text-[#07008A]">₱{p.fee.toFixed(2)}</span> (<span className="font-mono">₱{p.rate.toFixed(2)}</span> × <span className="font-mono">{p.hoursEarly}</span> hour{p.hoursEarly !== 1 ? "s" : ""} early) — {p.reason}</p>; })()}
           </div>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel>                  <AlertDialogAction className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={async () => { const b = checkInBooking; if (!b?.id) return; try { const tzOffset = localStorage.getItem("app_timezone_offset") || "+08:00"; const actual = checkInAt ? new Date(`${checkInAt}${tzOffset}`).toISOString() : new Date().toISOString(); const res = await api(`/api/bookings/${b.id}/check-in`, { method: "POST", body: JSON.stringify({ actual_check_in_at: actual }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Check-in failed."); return; } const fee = Number((data as { early_checkin_fee_applied?: number }).early_checkin_fee_applied || 0); toast.success(fee > 0 ? `Checked in. Early fee: ₱${fee.toFixed(2)}.` : "Checked in."); setCheckInBooking(null); refreshData(); } catch { toast.error("Something went wrong."); } }}>Confirm check-in</AlertDialogAction></AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        
+      </AdminConfirmDialog>
 
-      {/* Check-out dialog */}
-      <AlertDialog open={!!checkOutBooking} onOpenChange={(o) => { if (!o) setCheckOutBooking(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Confirm check-out?</AlertDialogTitle><AlertDialogDescription>This will mark the booking as <span className="font-semibold">Checked-Out</span>. Late check-out fees apply automatically after the designated checkout time.</AlertDialogDescription></AlertDialogHeader>
-          <div className="space-y-2">
+      <AdminConfirmDialog
+        open={!!checkOutBooking}
+        onOpenChange={(open) => { if (!open) setCheckOutBooking(null); }}
+        title="Confirm check-out?"
+        description={<>This will mark the booking as <span className="font-semibold">Checked-Out</span>. Late check-out fees apply automatically after the designated checkout time.</>}
+        confirmLabel="Confirm check-out"
+        confirmClassName="bg-amber-600 text-white hover:bg-amber-700"
+        intent="warning"
+        onConfirm={async () => { const b = checkOutBooking; if (!b?.id) return; try { const tzOffset = localStorage.getItem("app_timezone_offset") || "+08:00"; const actual = checkOutAt ? new Date(`${checkOutAt}${tzOffset}`).toISOString() : new Date().toISOString(); const res = await api(`/api/bookings/${b.id}/check-out`, { method: "POST", body: JSON.stringify({ actual_check_out_at: actual }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Check-out failed."); return; } const fee = Number((data as { late_checkout_fee_applied?: number }).late_checkout_fee_applied || 0); toast.success(fee > 0 ? `Checked out. Late fee: ₱${fee.toFixed(2)}.` : "Checked out."); setCheckOutBooking(null); refreshData(); } catch { toast.error("Something went wrong."); } }}
+      >
+        <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700">Actual check-out time</label>
             <input type="datetime-local" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={checkOutAt} onChange={(e) => setCheckOutAt(e.target.value)} />
             {checkOutBooking && (
@@ -728,9 +780,8 @@ export default function AdminBookingsPage() {
             )}
             {(() => { const p = computeLateCheckOutPreview(); return <p className={cn("text-xs", p.fee > 0 ? "text-slate-700" : "text-slate-500")}>Breakdown: <span className="font-semibold text-[#07008A]">₱{p.fee.toFixed(2)}</span> (<span className="font-mono">₱{p.rate.toFixed(2)}</span> × <span className="font-mono">{p.hoursLate}</span> hour{p.hoursLate !== 1 ? "s" : ""} late) — {p.reason}</p>; })()}
           </div>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-amber-600 hover:bg-amber-700 text-white" onClick={async () => { const b = checkOutBooking; if (!b?.id) return; try { const tzOffset = localStorage.getItem("app_timezone_offset") || "+08:00"; const actual = checkOutAt ? new Date(`${checkOutAt}${tzOffset}`).toISOString() : new Date().toISOString(); const res = await api(`/api/bookings/${b.id}/check-out`, { method: "POST", body: JSON.stringify({ actual_check_out_at: actual }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { toast.error(getErrorMessage(data) || "Check-out failed."); return; } const fee = Number((data as { late_checkout_fee_applied?: number }).late_checkout_fee_applied || 0); toast.success(fee > 0 ? `Checked out. Late fee: ₱${fee.toFixed(2)}.` : "Checked out."); setCheckOutBooking(null); refreshData(); } catch { toast.error("Something went wrong."); } }}>Confirm check-out</AlertDialogAction></AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        
+      </AdminConfirmDialog>
 
       {/* Receipt Modal */}
       <ReceiptModal 

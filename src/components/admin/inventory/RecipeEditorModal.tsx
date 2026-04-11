@@ -2,10 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { UtensilsCrossed, Plus, Trash2, Loader2 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import { ConfirmActionDialog } from "@/components/admin/ConfirmActionDialog";
+import {
+  AdminModal,
+  AdminModalBody,
+  AdminModalHeader,
+  AdminModalTitle,
+} from "@/components/admin/ui";
 
 export function RecipeEditorModal({
   menuItem,
@@ -105,14 +111,15 @@ export function RecipeEditorModal({
 
   return (
     <Dialog open={true} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="admin-modal-responsive [--admin-modal-width:56rem] max-h-[90vh] overflow-y-auto modal-scrollbar p-5 sm:p-6">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      <AdminModal size="lg">
+        <AdminModalHeader>
+          <AdminModalTitle className="flex items-center gap-2">
             <UtensilsCrossed className="h-5 w-5 text-[#07008A]" />
             Items & Recipes for {menuItem?.name}
-          </DialogTitle>
-        </DialogHeader>
+          </AdminModalTitle>
+        </AdminModalHeader>
 
+        <AdminModalBody>
         {loading ? (
           <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-slate-400" /></div>
         ) : (
@@ -172,6 +179,7 @@ export function RecipeEditorModal({
             </div>
           </div>
         )}
+        </AdminModalBody>
 
         <ConfirmActionDialog
           open={!!ingredientToRemove}
@@ -192,7 +200,7 @@ export function RecipeEditorModal({
             return handleRemove(ingredientToRemove.id);
           }}
         />
-      </DialogContent>
+      </AdminModal>
     </Dialog>
   );
 }

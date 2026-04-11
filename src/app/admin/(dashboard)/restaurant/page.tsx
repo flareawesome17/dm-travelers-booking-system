@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +32,13 @@ import { RestaurantReceiptModal } from "@/components/admin/restaurant/Restaurant
 import { ConfirmActionDialog } from "@/components/admin/ConfirmActionDialog";
 import { ChevronLeft, ChevronRight, Search, Receipt } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  AdminModal,
+  AdminModalBody,
+  AdminModalFooter,
+  AdminModalHeader,
+  AdminModalTitle,
+} from "@/components/admin/ui";
 
 type MenuItem = { id: string; name?: string; description?: string | null; category?: string | null; price?: number | null; staff_price?: number | null; is_available?: boolean | null; image_url?: string | null; lgu_markup_percentage?: number | null; is_minimart?: boolean | null; dynamic_available?: boolean; deficient_ingredients?: string };
 type RestaurantCategory = { id: string; name: string; sort_order?: number | null };
@@ -238,8 +245,9 @@ export default function AdminRestaurantPage() {
             {hasPermission("restaurant.create") && (
               <Dialog open={open} onOpenChange={setOpen}>
                 <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={openForCreate}><Plus className="h-4 w-4 mr-1" /> Add item</Button>
-                <DialogContent className="admin-modal-responsive [--admin-modal-width:40rem] max-h-[90vh] overflow-y-auto modal-scrollbar p-5 sm:p-6"><DialogHeader><DialogTitle>{editingItem ? "Edit menu item" : "Add menu item"}</DialogTitle></DialogHeader>
-                  <form className="space-y-4" onSubmit={handleSave}>
+                <AdminModal size="md" stickyFooter scrollMode="shell"><AdminModalHeader><AdminModalTitle>{editingItem ? "Edit menu item" : "Add menu item"}</AdminModalTitle></AdminModalHeader>
+                  <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSave}>
+                    <AdminModalBody className="space-y-4">
                     <div className="space-y-2"><Label htmlFor="menu-name">Name</Label><Input id="menu-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Tapsilog" required /></div>
                     <div className="space-y-2"><Label htmlFor="menu-category">Category</Label><select id="menu-category" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={category} onChange={(e) => setCategory(e.target.value)} disabled={categoriesLoading || categories.length === 0}>{categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></div>
                     <div className="space-y-2"><Label htmlFor="menu-price">Price (₱)</Label><Input id="menu-price" type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="150" required /></div>
@@ -249,9 +257,9 @@ export default function AdminRestaurantPage() {
                     <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={isMinimart} onChange={(e) => setIsMinimart(e.target.checked)} /><span>Mark as minimart item</span></label>
                     <div className="space-y-2"><Label htmlFor="menu-image">Image (optional)</Label><Input id="menu-image" type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0] ?? null; setImageFile(file); if (file) { setImagePreview(URL.createObjectURL(file)); } else { setImagePreview(editingItem?.image_url ?? null); } }} />{(imagePreview || editingItem?.image_url) && <div className="mt-2"><img src={imagePreview || editingItem?.image_url || ""} className="h-24 w-24 rounded-md object-cover border border-slate-200 bg-slate-100" alt="" /></div>}</div>
                     <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={isAvailable} onChange={(e) => setIsAvailable(e.target.checked)} /><span>Available</span></label>
-                    <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Saving..." : editingItem ? "Update item" : "Save item"}</Button></div>
+                    </AdminModalBody><AdminModalFooter><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Saving..." : editingItem ? "Update item" : "Save item"}</Button></AdminModalFooter>
                   </form>
-                </DialogContent>
+                </AdminModal>
               </Dialog>
             )}
           </div>
@@ -382,14 +390,14 @@ export default function AdminRestaurantPage() {
           {hasPermission("restaurant.create") && (
             <Dialog open={orderOpen} onOpenChange={setOrderOpen}>
               <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={() => { setOrderOpen(true); }}><Plus className="h-4 w-4 mr-1" /> New Order</Button>
-              <DialogContent className="admin-modal-responsive [--admin-modal-width:90rem] flex h-[min(94vh,58rem)] flex-col gap-0 overflow-hidden p-5 sm:p-6">
-                <DialogHeader className="mb-4">
-                  <DialogTitle className="text-[#07008A] text-xl">Add Restaurant Order</DialogTitle>
-                </DialogHeader>
-                <div className="min-h-0 flex-1 overflow-hidden">
+              <AdminModal size="full" scrollMode="shell">
+                <AdminModalHeader>
+                  <AdminModalTitle className="text-xl">Add Restaurant Order</AdminModalTitle>
+                </AdminModalHeader>
+                <AdminModalBody className="min-h-0 flex-1 overflow-hidden p-0 sm:px-6 sm:pb-6">
                   <RestaurantOrderForm items={items} bookings={bookings} onSuccess={() => { setOrderOpen(false); loadOrders(); }} onCancel={() => setOrderOpen(false)} />
-                </div>
-              </DialogContent>
+                </AdminModalBody>
+              </AdminModal>
             </Dialog>
           )}
         </CardHeader>
@@ -626,14 +634,14 @@ export default function AdminRestaurantPage() {
 
       {/* Restaurant Payment Modal */}
       <Dialog open={!!paymentOrder} onOpenChange={(o) => !o && setPaymentOrder(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-[#07008A] flex items-center gap-2">
+        <AdminModal size="sm">
+          <AdminModalHeader>
+            <AdminModalTitle className="flex items-center gap-2">
               <Banknote className="h-5 w-5" />
               Record Restaurant Payment
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
+            </AdminModalTitle>
+          </AdminModalHeader>
+          <AdminModalBody className="space-y-4 py-4">
             <div className="rounded-lg bg-slate-50 p-4 border border-slate-100">
               <div className="flex justify-between text-sm text-slate-500 mb-1">
                 <span>Order Total</span>
@@ -679,8 +687,8 @@ export default function AdminRestaurantPage() {
                 </p>
               </div>
             )}
-
-            <div className="flex justify-end gap-3 pt-4">
+          </AdminModalBody>
+          <AdminModalFooter>
               <Button variant="outline" onClick={() => setPaymentOrder(null)}>Cancel</Button>
               <Button 
                 className="bg-[#07008A] hover:bg-[#05006a] text-white"
@@ -702,9 +710,8 @@ export default function AdminRestaurantPage() {
               >
                 Confirm Payment
               </Button>
-            </div>
-          </div>
-        </DialogContent>
+          </AdminModalFooter>
+        </AdminModal>
       </Dialog>
 
       <ConfirmActionDialog

@@ -3,13 +3,20 @@
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Pencil, Save, X } from "lucide-react";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
+import {
+  AdminModal,
+  AdminModalBody,
+  AdminModalFooter,
+  AdminModalHeader,
+  AdminModalTitle,
+} from "@/components/admin/ui";
 
 const editSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -75,14 +82,15 @@ export function EditItemModal({
 
   return (
     <Dialog open={true} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="admin-modal-responsive [--admin-modal-width:36rem] max-h-[90vh] overflow-y-auto modal-scrollbar p-5 sm:p-6">
-        <DialogHeader>
-          <DialogTitle className="text-[#07008A] flex items-center gap-2">
+      <AdminModal size="md">
+        <AdminModalHeader>
+          <AdminModalTitle className="flex items-center gap-2">
             <Pencil className="h-5 w-5" />
             Edit inventory item
-          </DialogTitle>
-        </DialogHeader>
+          </AdminModalTitle>
+        </AdminModalHeader>
         <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+          <AdminModalBody className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="edit-item-name">Item name</Label>
             <Input id="edit-item-name" {...form.register("name")} placeholder="Cooking Oil" required />
@@ -119,16 +127,17 @@ export function EditItemModal({
             )}
           </div>
 
-          <DialogFooter className="pt-2">
+          </AdminModalBody>
+          <AdminModalFooter>
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               <X className="mr-2 h-4 w-4" /> Cancel
             </Button>
             <Button type="submit" className="bg-[#07008A] hover:bg-[#05006a]" disabled={loading}>
               <Save className="mr-2 h-4 w-4" /> {loading ? "Updating..." : "Update item"}
             </Button>
-          </DialogFooter>
+          </AdminModalFooter>
         </form>
-      </DialogContent>
+      </AdminModal>
     </Dialog>
   );
 }

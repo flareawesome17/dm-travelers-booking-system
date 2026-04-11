@@ -1,13 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
 import { PlusCircle } from "lucide-react";
 import { getErrorMessage } from "@/lib/utils";
+import {
+  AdminModal,
+  AdminModalBody,
+  AdminModalDescription,
+  AdminModalFooter,
+  AdminModalHeader,
+  AdminModalTitle,
+} from "@/components/admin/ui";
 
 type AddExtraChargeModalProps = {
   open: boolean;
@@ -79,21 +87,21 @@ export function AddExtraChargeModal({ open, onClose, onSuccess, booking, token }
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-[425px]">
+      <AdminModal size="sm">
         <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+          <AdminModalHeader>
+            <AdminModalTitle className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-red-700">
                 <PlusCircle className="h-4 w-4" />
               </div>
               Add Extra Charge
-            </DialogTitle>
-            <DialogDescription>
+            </AdminModalTitle>
+            <AdminModalDescription>
               Add a custom extra charge (e.g. Missing Linens, Damage Fee) to {booking.reference_number || "this booking"}.
-            </DialogDescription>
-          </DialogHeader>
+            </AdminModalDescription>
+          </AdminModalHeader>
 
-          <div className="grid gap-4 py-4">
+          <AdminModalBody className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="chargeName">Charge Name</Label>
               <Input
@@ -117,18 +125,18 @@ export function AddExtraChargeModal({ open, onClose, onSuccess, booking, token }
                 disabled={loading}
               />
             </div>
-          </div>
+          </AdminModalBody>
 
-          <DialogFooter>
+          <AdminModalFooter>
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
             <Button type="submit" disabled={loading} className="bg-red-600 hover:bg-red-700 text-white">
               {loading ? "Adding..." : "Add Charge"}
             </Button>
-          </DialogFooter>
+          </AdminModalFooter>
         </form>
-      </DialogContent>
+      </AdminModal>
     </Dialog>
   );
 }

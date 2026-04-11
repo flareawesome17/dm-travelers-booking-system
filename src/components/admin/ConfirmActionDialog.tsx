@@ -1,16 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { AdminConfirmDialog } from "@/components/admin/ui";
 
 type ConfirmActionDialogProps = {
   open: boolean;
@@ -20,6 +11,7 @@ type ConfirmActionDialogProps = {
   confirmLabel?: string;
   cancelLabel?: string;
   confirmClassName?: string;
+  intent?: "danger" | "warning" | "neutral";
   onConfirm: () => void | Promise<void>;
 };
 
@@ -31,22 +23,20 @@ export function ConfirmActionDialog({
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   confirmClassName = "bg-red-600 hover:bg-red-700 text-white",
+  intent = "danger",
   onConfirm,
 }: ConfirmActionDialogProps) {
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>{cancelLabel}</AlertDialogCancel>
-          <AlertDialogAction className={confirmClassName} onClick={onConfirm}>
-            {confirmLabel}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <AdminConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={title}
+      description={description}
+      confirmLabel={confirmLabel}
+      cancelLabel={cancelLabel}
+      confirmClassName={confirmClassName}
+      intent={intent}
+      onConfirm={onConfirm}
+    />
   );
 }

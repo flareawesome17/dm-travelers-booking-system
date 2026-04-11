@@ -5,11 +5,12 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PackageOpen, ArrowUpRight, ArrowDownRight, ClipboardEdit, TrendingUp, TrendingDown, AlertCircle } from "lucide-react";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
+import { AdminModal, AdminModalBody, AdminModalFooter } from "@/components/admin/ui";
 
 const adjustSchema = z.object({
   type: z.enum(["IN", "OUT", "ADJUSTMENT"]),
@@ -112,7 +113,7 @@ export function StockAdjustmentModal({
 
   return (
     <Dialog open={true} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="admin-modal-responsive [--admin-modal-width:32rem] max-h-[90vh] overflow-y-auto modal-scrollbar p-0">
+      <AdminModal size="sm">
         {/* Header */}
         <div className="bg-gradient-to-br from-[#07008A] to-[#0a00b8] px-6 py-5 rounded-t-lg">
           <div className="flex items-center gap-3">
@@ -136,9 +137,10 @@ export function StockAdjustmentModal({
           </div>
         </div>
 
-        <form onSubmit={form.handleSubmit(onSubmit)} className="px-6 py-5 space-y-5">
-          {/* Type Selector */}
-          <div className="space-y-2">
+        <AdminModalBody className="px-0 py-0">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5 px-6 py-5">
+            {/* Type Selector */}
+            <div className="space-y-2">
             <Label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Adjustment Type</Label>
             <div className="grid grid-cols-3 gap-2">
               {(["IN", "OUT", "ADJUSTMENT"] as const).map((t) => {
@@ -262,19 +264,20 @@ export function StockAdjustmentModal({
             {form.formState.errors.notes && <p className="text-red-500 text-xs">{form.formState.errors.notes.message}</p>}
           </div>
 
-          {/* Footer */}
-          <DialogFooter className="pt-2 gap-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button
-              type="submit"
-              disabled={loading}
-              className={`min-w-[160px] ${type === "IN" ? "bg-emerald-600 hover:bg-emerald-700" : type === "OUT" ? "bg-amber-600 hover:bg-amber-700" : "bg-[#07008A] hover:bg-[#05006a]"}`}
-            >
-              {loading ? "Saving..." : type === "IN" ? "Confirm Stock In" : type === "OUT" ? "Confirm Stock Out" : "Set Stock Level"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
+            {/* Footer */}
+            <AdminModalFooter className="px-0 pb-0 pt-2">
+              <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+              <Button
+                type="submit"
+                disabled={loading}
+                className={`min-w-[160px] ${type === "IN" ? "bg-emerald-600 hover:bg-emerald-700" : type === "OUT" ? "bg-amber-600 hover:bg-amber-700" : "bg-[#07008A] hover:bg-[#05006a]"}`}
+              >
+                {loading ? "Saving..." : type === "IN" ? "Confirm Stock In" : type === "OUT" ? "Confirm Stock Out" : "Set Stock Level"}
+              </Button>
+            </AdminModalFooter>
+          </form>
+        </AdminModalBody>
+      </AdminModal>
     </Dialog>
   );
 }

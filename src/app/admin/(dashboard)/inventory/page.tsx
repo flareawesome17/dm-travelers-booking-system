@@ -13,11 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
-} from "@/components/ui/alert-dialog";
+import { Dialog } from "@/components/ui/dialog";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger
 } from "@/components/ui/tooltip";
@@ -28,6 +24,14 @@ import { EditItemModal } from "@/components/admin/inventory/EditItemModal";
 import { RecipeEditorModal } from "@/components/admin/inventory/RecipeEditorModal";
 import { toast } from "@/components/ui/sonner";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  AdminConfirmDialog,
+  AdminModal,
+  AdminModalBody,
+  AdminModalFooter,
+  AdminModalHeader,
+  AdminModalTitle,
+} from "@/components/admin/ui";
 
 const ITEMS_PER_PAGE = 10;
 const MOVEMENTS_PER_PAGE = 15;
@@ -243,11 +247,12 @@ export default function InventoryPage() {
 
       {/* Add Item Dialog */}
       <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) resetCreateForm(); }}>
-        <DialogContent className="admin-modal-responsive [--admin-modal-width:36rem] max-h-[90vh] overflow-y-auto modal-scrollbar p-5 sm:p-6">
-          <DialogHeader>
-            <DialogTitle className="text-[#07008A]">Add inventory item</DialogTitle>
-          </DialogHeader>
+        <AdminModal size="md">
+          <AdminModalHeader>
+            <AdminModalTitle>Add inventory item</AdminModalTitle>
+          </AdminModalHeader>
           <form className="space-y-4" onSubmit={handleCreateNew}>
+            <AdminModalBody className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="inventory-item-name">Item name</Label>
               <Input id="inventory-item-name" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} placeholder="Cooking Oil" required />
@@ -278,12 +283,13 @@ export default function InventoryPage() {
                 </div>
               )}
             </div>
-            <DialogFooter className="pt-2">
+            </AdminModalBody>
+            <AdminModalFooter>
               <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} disabled={createSubmitting}>Cancel</Button>
               <Button type="submit" className="bg-[#07008A] hover:bg-[#05006a]" disabled={createSubmitting}>{createSubmitting ? "Saving..." : "Save item"}</Button>
-            </DialogFooter>
+            </AdminModalFooter>
           </form>
-        </DialogContent>
+        </AdminModal>
       </Dialog>
 
       <Tabs defaultValue="stock" className="space-y-6">
@@ -579,26 +585,14 @@ export default function InventoryPage() {
         <RecipeEditorModal menuItem={recipeItem} onClose={() => setRecipeItem(null)} />
       )}
 
-      {/* Delete Confirmation Alert Dialog */}
-      <AlertDialog open={!!deleteConfirmItem} onOpenChange={(open) => !open && setDeleteConfirmItem(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-red-600 flex items-center gap-2">
-              <Trash2 className="h-5 w-5" />
-              Delete {deleteConfirmItem?.name}?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this inventory item? This will archive the item and prevent it from appearing in current stock lists, but historical records will be preserved.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => deleteConfirmItem && handleDeleteItem(deleteConfirmItem.id)} className="bg-red-600 hover:bg-red-700">
-              Delete Item
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <AdminConfirmDialog
+        open={!!deleteConfirmItem}
+        onOpenChange={(open) => { if (!open) setDeleteConfirmItem(null); }}
+        title={`Delete ${deleteConfirmItem?.name ?? "this item"}?`}
+        description="This will archive the item and remove it from current stock operations while preserving historical records."
+        confirmLabel="Delete Item"
+        onConfirm={() => deleteConfirmItem && handleDeleteItem(deleteConfirmItem.id)}
+      />
     </>
   );
 }
