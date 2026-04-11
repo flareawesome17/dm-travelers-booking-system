@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getExtensionCost } from "@/lib/bookingExtensionPricing";
 import { toast } from "@/components/ui/sonner";
 import { cn, getErrorMessage } from "@/lib/utils";
 import { Clock, CalendarPlus, ArrowRight } from "lucide-react";
@@ -24,6 +25,10 @@ type ExtendStayModalProps = {
       rate_12h_price?: number | null;
       rate_5h_price?: number | null;
       rate_3h_price?: number | null;
+      rate_24h_late_checkout_fee?: number | null;
+      rate_12h_late_checkout_fee?: number | null;
+      rate_5h_late_checkout_fee?: number | null;
+      rate_3h_late_checkout_fee?: number | null;
       lgu_rate_enabled?: boolean;
       lgu_rate_24h_price?: number | null;
       lgu_rate_12h_price?: number | null;
@@ -53,36 +58,21 @@ export function ExtendStayModal({ open, onClose, booking, token, onSuccess }: Ex
 
   const ratePlan = booking.rate_plan_kind || "24h";
   const room = booking.rooms;
-
-  // Auto-calculate cost from room rate
-  const hourlyRate = (() => {
-    if (!room) return 0;
-    const useLgu = booking.is_lgu_booking && room.lgu_rate_enabled;
-    const p24 = useLgu && room.lgu_rate_24h_price != null ? room.lgu_rate_24h_price : room.rate_24h_price;
-    const p12 = useLgu && room.lgu_rate_12h_price != null ? room.lgu_rate_12h_price : room.rate_12h_price;
-    const p5 = useLgu && room.lgu_rate_5h_price != null ? room.lgu_rate_5h_price : room.rate_5h_price;
-    const p3 = useLgu && room.lgu_rate_3h_price != null ? room.lgu_rate_3h_price : room.rate_3h_price;
-    
-    const r24 = Number(p24 || 0);
-    const r12 = Number(p12 || 0);
-    const r5 = Number(p5 || 0);
-    const r3 = Number(p3 || 0);
-    // Use the current rate plan to derive hourly cost
-    if (ratePlan === "3h" && r3 > 0) return r3 / 3;
-    if (ratePlan === "5h" && r5 > 0) return r5 / 5;
-    if (ratePlan === "12h" && r12 > 0) return r12 / 12;
-    if (r24 > 0) return r24 / 24;
-    if (r12 > 0) return r12 / 12;
-    if (r5 > 0) return r5 / 5;
-    if (r3 > 0) return r3 / 3;
-    return 0;
-  })();
-
-  const useLguConfig = booking.is_lgu_booking && room?.lgu_rate_enabled;
-  const p24Daily = useLguConfig && room?.lgu_rate_24h_price != null ? room.lgu_rate_24h_price : room?.rate_24h_price;
-  const dailyRate = Number(p24Daily || 0) || hourlyRate * 24;
   const dv = Number(durationValue) || 0;
-  const additionalCost = durationType === "hours" ? hourlyRate * dv : dailyRate * dv;
+  const { hourlyRate, dailyRate, additionalCost } = getExtensionCost({
+    room,
+    ratePlanKind: ratePlan,
+    isLguBooking: booking.is_lgu_booking,
+    durationType,
+    durationValue: dv,
+  });
+  const hasHourlyRate = hourlyRate > 0;
+  const canSubmit =
+    !submitting &&
+    dv > 0 &&
+    availability.state !== "conflict" &&
+    availability.state !== "checking" &&
+    (durationType === "days" || hasHourlyRate);
 
   // Calculate new checkout
   const currentCheckout = booking.reserved_checkout_datetime || booking.check_out_date || "";
@@ -149,6 +139,10 @@ export function ExtendStayModal({ open, onClose, booking, token, onSuccess }: Ex
   const handleSubmit = async () => {
     if (!dv || dv <= 0) { toast.error("Enter a valid duration."); return; }
     if (!newCheckout) { toast.error("Cannot compute new checkout date."); return; }
+    if (durationType === "hours" && !hasHourlyRate) {
+      toast.error("No late check-out hourly rate is configured for this room.");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -241,6 +235,11 @@ export function ExtendStayModal({ open, onClose, booking, token, onSuccess }: Ex
               <span className="text-sm font-semibold text-[#07008A]">Additional cost</span>
               <span className="text-lg font-bold text-[#07008A]">₱{additionalCost.toFixed(0)}</span>
             </div>
+            {durationType === "hours" && !hasHourlyRate && (
+              <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-700">
+                No late check-out hourly rate is configured for this room.
+              </div>
+            )}
             {newCheckout && (
               <div className="space-y-2 pt-1">
                 <div className="flex items-center gap-2 text-xs text-slate-600">
@@ -294,7 +293,7 @@ export function ExtendStayModal({ open, onClose, booking, token, onSuccess }: Ex
           <Button
             type="button"
             onClick={handleSubmit}
-            disabled={submitting || !dv || dv <= 0 || availability.state === "conflict" || availability.state === "checking"}
+            disabled={!canSubmit}
             className={cn(
               "text-white",
               availability.state === "conflict"

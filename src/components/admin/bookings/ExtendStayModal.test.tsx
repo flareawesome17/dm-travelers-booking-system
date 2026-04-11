@@ -25,6 +25,7 @@ describe("ExtendStayModal", () => {
       rate_plan_kind: "24h",
       rooms: {
         rate_24h_price: 2380,
+        rate_24h_late_checkout_fee: 120,
       },
     },
   };
@@ -68,6 +69,18 @@ describe("ExtendStayModal", () => {
     expect(screen.getByText(/first conflict starts/i)).toBeInTheDocument();
     expect(screen.getByText(/conflict detected/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /cannot extend/i })).toBeDisabled();
+  });
+
+  it("uses the room late check-out fee as the hourly extension rate", () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise(() => {})) as any,
+    );
+
+    render(<ExtendStayModal {...props} />);
+
+    expect(screen.getByText("₱120")).toBeInTheDocument();
+    expect(screen.getByText("₱360")).toBeInTheDocument();
   });
 
   it("refreshes stale conflict state when the duration changes and enables submit on availability", async () => {

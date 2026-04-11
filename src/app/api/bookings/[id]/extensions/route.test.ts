@@ -35,8 +35,46 @@ vi.mock("@/lib/api-security", async () => {
 
 import { GET, POST } from "./route";
 
-function createSupabaseMock() {
+function createSupabaseMock(options?: {
+  roomPricing?: Record<string, unknown>;
+  conflictingBookings?: Record<string, unknown>[];
+}) {
   const bookingUpdateEqMock = vi.fn(async () => ({ error: null }));
+  const bookingExtensionInsertMock = vi.fn(() => ({
+    select: vi.fn(() => ({
+      single: vi.fn(async () => ({
+        data: { id: "extension-1" },
+        error: null,
+      })),
+    })),
+  }));
+  const roomPricing = options?.roomPricing ?? {
+    rate_24h_price: 2380,
+    rate_24h_late_checkout_fee: 120,
+    rate_12h_late_checkout_fee: 100,
+    rate_5h_late_checkout_fee: 90,
+    rate_3h_late_checkout_fee: 80,
+    lgu_rate_enabled: false,
+    lgu_rate_24h_price: null,
+    lgu_rate_12h_price: null,
+    lgu_rate_5h_price: null,
+    lgu_rate_3h_price: null,
+  };
+  const conflictingBookings = options?.conflictingBookings ?? [
+    {
+      id: "booking-2",
+      room_id: "room-207",
+      reference_number: "REF-207",
+      status: "Pending Payment",
+      check_in_date: "2026-04-11",
+      check_out_date: "2026-04-12",
+      reserved_checkin_datetime: null,
+      reserved_checkout_datetime: null,
+      actual_check_in_at: null,
+      rate_plan_kind: "24h",
+      verification_code_expires_at: null,
+    },
+  ];
 
   return {
     from: vi.fn((table: string) => {
@@ -69,6 +107,7 @@ function createSupabaseMock() {
                       reserved_checkout_datetime: null,
                       actual_check_in_at: "2026-04-08T06:00:00.000Z",
                       rate_plan_kind: "24h",
+                      is_lgu_booking: false,
                       extensions_total: 0,
                       balance_due: 0,
                     },
@@ -81,21 +120,7 @@ function createSupabaseMock() {
                 return {
                   neq: vi.fn(() => ({
                     order: vi.fn(async () => ({
-                      data: [
-                        {
-                          id: "booking-2",
-                          room_id: "room-207",
-                          reference_number: "REF-207",
-                          status: "Pending Payment",
-                          check_in_date: "2026-04-11",
-                          check_out_date: "2026-04-12",
-                          reserved_checkin_datetime: null,
-                          reserved_checkout_datetime: null,
-                          actual_check_in_at: null,
-                          rate_plan_kind: "24h",
-                          verification_code_expires_at: null,
-                        },
-                      ],
+                      data: conflictingBookings,
                       error: null,
                     })),
                   })),
@@ -111,13 +136,12 @@ function createSupabaseMock() {
         };
       }
 
-      if (table === "booking_extensions") {
+      if (table === "rooms") {
         return {
-          select: vi.fn(async () => ({ data: [], error: null })),
-          insert: vi.fn(() => ({
-            select: vi.fn(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
               single: vi.fn(async () => ({
-                data: { id: "extension-1" },
+                data: roomPricing,
                 error: null,
               })),
             })),
@@ -125,9 +149,17 @@ function createSupabaseMock() {
         };
       }
 
+      if (table === "booking_extensions") {
+        return {
+          select: vi.fn(async () => ({ data: [], error: null })),
+          insert: bookingExtensionInsertMock,
+        };
+      }
+
       throw new Error(`Unexpected table: ${table}`);
     }),
     bookingUpdateEqMock,
+    bookingExtensionInsertMock,
   };
 }
 
@@ -191,5 +223,33 @@ describe("booking extensions route", () => {
 
     expect(response.status).toBe(403);
     expect(body).toEqual({ error: { code: "forbidden" } });
+  });
+
+  it("prices hourly extensions from the room late check-out fee instead of the client payload", async () => {
+    const supabaseState = createSupabaseMock({ conflictingBookings: [] });
+    getSupabaseAdminMock.mockReturnValue(supabaseState);
+    parseAndValidateMock.mockResolvedValue({
+      success: true,
+      data: {
+        duration_type: "hours",
+        duration_value: 3,
+        additional_cost: 1,
+        new_checkout_date: "2026-04-09T15:00:00.000Z",
+      },
+    });
+
+    const response = await POST({} as any, { params: Promise.resolve({ id: "booking-1" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(body).toEqual({ id: "extension-1" });
+    expect(supabaseState.bookingExtensionInsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        duration_type: "hours",
+        duration_value: 3,
+        additional_cost: 360,
+      }),
+    );
+    expect(supabaseState.bookingUpdateEqMock).toHaveBeenCalled();
   });
 });

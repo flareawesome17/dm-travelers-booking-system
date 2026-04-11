@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { requirePermission } from "@/lib/rbac";
 import { parseAndValidate, dbError, internalError } from "@/lib/api-security";
+import { getExtensionCost } from "@/lib/bookingExtensionPricing";
 import { createExtensionSchema } from "@/lib/validation-schemas";
 import { toMoneyNumber } from "@/lib/bookingTotals";
 import { getExtensionConflictResult } from "@/lib/bookingExtensionConflicts";
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Verify booking exists and is Checked-In
     const { data: booking, error: bErr } = await supabase
       .from("bookings")
-      .select("id, status, room_id, extensions_total, balance_due, check_out_date, reserved_checkout_datetime, actual_check_in_at, rate_plan_kind")
+      .select("id, status, room_id, extensions_total, balance_due, check_out_date, reserved_checkout_datetime, actual_check_in_at, rate_plan_kind, is_lgu_booking")
       .eq("id", id)
       .single();
 
@@ -99,6 +100,59 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       );
     }
 
+    if (!booking.room_id) {
+      return NextResponse.json(
+        { error: { code: "room_missing", message: "Booking has no room assigned for extension pricing." } },
+        { status: 422 }
+      );
+    }
+
+    const { data: room, error: roomErr } = await supabase
+      .from("rooms")
+      .select(`
+        rate_24h_price,
+        rate_12h_price,
+        rate_5h_price,
+        rate_3h_price,
+        rate_24h_late_checkout_fee,
+        rate_12h_late_checkout_fee,
+        rate_5h_late_checkout_fee,
+        rate_3h_late_checkout_fee,
+        lgu_rate_enabled,
+        lgu_rate_24h_price,
+        lgu_rate_12h_price,
+        lgu_rate_5h_price,
+        lgu_rate_3h_price
+      `)
+      .eq("id", booking.room_id)
+      .single();
+
+    if (roomErr || !room) return dbError(roomErr, "Failed to load room pricing");
+
+    const { hourlyRate, dailyRate, additionalCost } = getExtensionCost({
+      room,
+      ratePlanKind: booking.rate_plan_kind,
+      isLguBooking: booking.is_lgu_booking,
+      durationType: body.duration_type,
+      durationValue: body.duration_value,
+    });
+
+    if (body.duration_type === "hours" && hourlyRate <= 0) {
+      return NextResponse.json(
+        { error: { code: "pricing_not_configured", message: "No late check-out hourly rate is configured for this room." } },
+        { status: 422 }
+      );
+    }
+
+    if (body.duration_type === "days" && dailyRate <= 0) {
+      return NextResponse.json(
+        { error: { code: "pricing_not_configured", message: "No daily extension rate is configured for this room." } },
+        { status: 422 }
+      );
+    }
+
+    const addedCost = toMoneyNumber(Math.round(additionalCost * 100) / 100);
+
     // Insert extension record
     const { data: ext, error: extErr } = await supabase
       .from("booking_extensions")
@@ -106,7 +160,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         booking_id: id,
         duration_type: body.duration_type,
         duration_value: body.duration_value,
-        additional_cost: body.additional_cost,
+        additional_cost: addedCost,
         new_checkout_date: body.new_checkout_date,
         approved_by_admin_id: typeof auth.payload?.sub === "string" ? auth.payload.sub : null,
       })
@@ -116,7 +170,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (extErr) return dbError(extErr, "Failed to create extension");
 
     // Update booking totals
-    const addedCost = toMoneyNumber(body.additional_cost);
     const newExtensionsTotal = toMoneyNumber(booking.extensions_total) + addedCost;
     const newBalanceDue = toMoneyNumber(booking.balance_due) + addedCost;
     const { error: upErr } = await supabase
