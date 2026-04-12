@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { requirePermission } from "@/lib/rbac";
-import { dbError, internalError } from "@/lib/api-security";
+import { apiError, dbError, internalError } from "@/lib/api-security";
 import { syncReceivableForBooking } from "@/lib/receivables";
 import { computeReservedDatetimes } from "@/lib/booking-dates";
 import { calculateBookingRoomSubtotal, toMoneyNumber } from "@/lib/bookingTotals";
@@ -17,6 +17,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     const { id } = await params;
     const body = await req.json();
+    const supabase = getSupabaseAdmin();
+
+    if ("room_id" in body) {
+      const { data: existingRoomAssignment, error: existingRoomAssignmentError } = await supabase
+        .from("bookings")
+        .select("room_id")
+        .eq("id", id)
+        .single();
+
+      if (existingRoomAssignmentError || !existingRoomAssignment) {
+        return dbError(existingRoomAssignmentError, "Failed to load booking for room transfer validation");
+      }
+
+      if ((body.room_id ?? null) !== (existingRoomAssignment.room_id ?? null)) {
+        return apiError(
+          "room_transfer_required",
+          "Changing the assigned room requires the dedicated room transfer flow.",
+          409,
+        );
+      }
+    }
 
     const allowedFields = [
       "status", "room_id", "check_in_date", "check_out_date",
@@ -33,8 +54,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (key in body) updateData[key] = body[key];
     }
     updateData.updated_at = new Date().toISOString();
-
-    const supabase = getSupabaseAdmin();
     const shouldRecalculatePricing = [
       "room_id",
       "check_in_date",

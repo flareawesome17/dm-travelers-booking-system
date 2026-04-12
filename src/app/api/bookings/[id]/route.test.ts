@@ -155,4 +155,55 @@ describe("PATCH /api/bookings/[id]", () => {
     );
     expect(body.balance_due).toBe(2380);
   });
+
+  it("rejects direct room changes and requires the transfer flow", async () => {
+    let updateCalled = false;
+
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === "bookings") {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                single: vi.fn(async () => ({
+                  data: { room_id: "room-1" },
+                  error: null,
+                })),
+              })),
+            })),
+            update: vi.fn(() => {
+              updateCalled = true;
+              return {
+                eq: vi.fn(),
+              };
+            }),
+          };
+        }
+
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    };
+
+    getSupabaseAdminMock.mockReturnValue(supabase);
+
+    const response = await PATCH(
+      {
+        json: async () => ({
+          room_id: "room-2",
+        }),
+      } as any,
+      { params: Promise.resolve({ id: "booking-1" }) },
+    );
+
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body).toEqual({
+      error: {
+        code: "room_transfer_required",
+        message: "Changing the assigned room requires the dedicated room transfer flow.",
+      },
+    });
+    expect(updateCalled).toBe(false);
+  });
 });

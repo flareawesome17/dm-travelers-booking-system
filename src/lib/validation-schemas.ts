@@ -253,6 +253,11 @@ export const createExtensionSchema = z.object({
   new_checkout_date: z.string().min(1, "New checkout date required"),
 }).strict();
 
+export const transferBookingRoomSchema = z.object({
+  target_room_id: z.string().uuid("Invalid target room ID"),
+  reason: z.string().trim().max(500).optional().nullable(),
+}).strict();
+
 // ─── Booking Extras Schema (Feature 6) ──────────────────────────────────────────
 
 const bookingExtraInputSchema = z.object({

@@ -20,6 +20,8 @@ type RoomData = {
   max_occupancy?: number;
   room_number?: string;
   room_type?: string;
+  status?: string;
+  is_active?: boolean;
   rate_24h_enabled?: boolean;
   rate_24h_price?: number | null;
   rate_12h_enabled?: boolean;
@@ -88,6 +90,7 @@ const STATUS_OPTIONS = [
 ];
 
 export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: EditBookingFormProps) {
+  const originalRoomId = booking.room_id ?? "";
   const [status, setStatus] = useState(booking.status ?? "Confirmed");
   const [checkIn, setCheckIn] = useState(booking.check_in_date?.slice(0, 10) ?? "");
   const [checkOut, setCheckOut] = useState(booking.check_out_date?.slice(0, 10) ?? "");
@@ -140,6 +143,9 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
   }, [apiUrl, token, roomId]);
 
   const selectedRoom = rooms.find((r) => r.id === roomId) || null;
+  const isRoomTransfer = Boolean(roomId && roomId !== originalRoomId);
+  const isCheckedInTransfer = isRoomTransfer && booking.status === "Checked-In";
+  const transferableRooms = rooms.filter((r) => r.id === originalRoomId || (r.is_active !== false && r.status === "Available"));
   const maxCapacity = selectedRoom?.capacity || selectedRoom?.max_occupancy || 2;
   const currentTotalGuests = numAdults + numChildren;
 
@@ -204,7 +210,8 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
   }
 
   const newRoomTotal = Math.max(0, subtotalBeforeDiscount - calculatedDiscount);
-  const grandTotal = newRoomTotal + restaurantTotal + extrasTotal + extensionsTotal + earlyCheckInFee + lateCheckOutFee;
+  const previewRoomTotal = isCheckedInTransfer ? Number(booking.total_amount || 0) : newRoomTotal;
+  const grandTotal = previewRoomTotal + restaurantTotal + extrasTotal + extensionsTotal + earlyCheckInFee + lateCheckOutFee;
 
   const rateHelper = is24h
     ? "24-hour bookings require check-in and check-out dates. Total is based on nights."
@@ -311,35 +318,39 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
 
     setSubmitting(true);
     try {
-      const res = await fetch(`${apiUrl}/api/bookings/${booking.id}`, {
-        method: "PATCH",
+      const res = await fetch(`${apiUrl}/api/bookings/${booking.id}${isRoomTransfer ? "/transfer-room" : ""}`, {
+        method: isRoomTransfer ? "POST" : "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          status,
-          room_id: roomId,
-          rate_plan_kind: ratePlan,
-          check_in_date: checkInToSend,
-          check_out_date: checkOutToSend,
-          special_requests: specialRequests,
-          deposit_paid: deposit,
-          cheque_number: (deposit > 0 && chequeNumber.trim()) ? chequeNumber.trim() : null,
-          is_lgu_booking: isLguBooking,
-          is_special_booking: isSpecialBooking,
-          special_booking_label: isSpecialBooking ? specialBookingLabel.trim() : null,
-          num_adults: numAdults,
-          num_children: numChildren,
-          discount_value: discountValue,
-          discount_type: discountType,
-          total_amount: newRoomTotal,
-          guest: {
-            full_name: guestName.trim(),
-            email: guestEmail.trim() || null,
-            phone_number: guestPhone.trim() || null,
-          }
-        }),
+        body: JSON.stringify(
+          isRoomTransfer
+            ? { target_room_id: roomId }
+            : {
+                status,
+                room_id: roomId,
+                rate_plan_kind: ratePlan,
+                check_in_date: checkInToSend,
+                check_out_date: checkOutToSend,
+                special_requests: specialRequests,
+                deposit_paid: deposit,
+                cheque_number: (deposit > 0 && chequeNumber.trim()) ? chequeNumber.trim() : null,
+                is_lgu_booking: isLguBooking,
+                is_special_booking: isSpecialBooking,
+                special_booking_label: isSpecialBooking ? specialBookingLabel.trim() : null,
+                num_adults: numAdults,
+                num_children: numChildren,
+                discount_value: discountValue,
+                discount_type: discountType,
+                total_amount: newRoomTotal,
+                guest: {
+                  full_name: guestName.trim(),
+                  email: guestEmail.trim() || null,
+                  phone_number: guestPhone.trim() || null,
+                }
+              },
+        ),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -348,25 +359,29 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
         return;
       }
 
-      const receivableSync = (data as { receivable_sync?: { action?: string } }).receivable_sync;
-      const createdOrSyncedReceivable =
-        (isLguBooking || isSpecialBooking) &&
-        receivableSync &&
-        receivableSync.action !== "none" &&
-        receivableSync.action !== "deleted" &&
-        receivableSync.action !== "archived";
-
-      if (createdOrSyncedReceivable) {
-        toast.success(
-          <span>
-            Receivable created.{" "}
-            <Link href="/admin/receivables" className="font-semibold text-[#07008A] underline underline-offset-2">
-              View in Ledger -&gt;
-            </Link>
-          </span>,
-        );
+      if (isRoomTransfer) {
+        toast.success("Room transferred.");
       } else {
-        toast.success("Booking updated.");
+        const receivableSync = (data as { receivable_sync?: { action?: string } }).receivable_sync;
+        const createdOrSyncedReceivable =
+          (isLguBooking || isSpecialBooking) &&
+          receivableSync &&
+          receivableSync.action !== "none" &&
+          receivableSync.action !== "deleted" &&
+          receivableSync.action !== "archived";
+
+        if (createdOrSyncedReceivable) {
+          toast.success(
+            <span>
+              Receivable created.{" "}
+              <Link href="/admin/receivables" className="font-semibold text-[#07008A] underline underline-offset-2">
+                View in Ledger -&gt;
+              </Link>
+            </span>,
+          );
+        } else {
+          toast.success("Booking updated.");
+        }
       }
       onSuccess(data);
       onClose();
@@ -457,13 +472,22 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
             disabled={loadingRooms}
           >
             <option value="" disabled>Select a room</option>
-            {rooms.map((r) => (
+            {transferableRooms.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.room_number ? `${r.room_number} — ` : ""}{r.name || r.room_type} - Cap: {r.capacity}
+                {r.id === originalRoomId ? " (Current)" : ""}
               </option>
             ))}
           </select>
         </div>
+
+        {isRoomTransfer && (
+          <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-700">
+            {isCheckedInTransfer
+              ? "Room transfer detected. The guest stays checked in, linked booking data stays attached, the old room becomes Available, and the new room becomes Occupied. Save any other booking detail changes after the transfer completes."
+              : "Room transfer detected. Linked booking data stays attached to this booking, and the room total will be repriced against the selected room. Save any other booking detail changes after the transfer completes."}
+          </div>
+        )}
 
         {availableRates.length > 0 && (
           <div className="space-y-2">
@@ -833,8 +857,8 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
         {/* Financial Recalculation Overview */}
         <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/30 space-y-3">
           <div className="flex justify-between items-center pb-2 border-b border-blue-100/50">
-            <span className="text-xs text-slate-600">Base Room Rate ({blocks} blocks)</span>
-            <span className="text-xs font-medium">₱{subtotalBeforeDiscount.toLocaleString()}</span>
+            <span className="text-xs text-slate-600">{isCheckedInTransfer ? "Room Total (Preserved)" : `Base Room Rate (${blocks} blocks)`}</span>
+            <span className="text-xs font-medium">₱{(isCheckedInTransfer ? previewRoomTotal : subtotalBeforeDiscount).toLocaleString()}</span>
           </div>
           {calculatedDiscount > 0 && (
           <div className="flex justify-between items-center pb-2 border-b border-blue-100/50 text-emerald-600">
@@ -849,7 +873,7 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
             </div>
           )}
           <div className="flex justify-between items-center pt-1">
-             <span className="text-slate-700 font-bold text-sm">Grand Total (Recalculated)</span>
+             <span className="text-slate-700 font-bold text-sm">{isCheckedInTransfer ? "Grand Total (Preserved)" : "Grand Total (Recalculated)"}</span>
              <span className="text-[#07008A] font-bold text-sm">₱{grandTotal.toLocaleString()}</span>
           </div>
           
@@ -881,7 +905,7 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
           disabled={submitting} 
           className="bg-[#07008A] hover:bg-[#05006a] text-white font-semibold shadow-md"
         >
-          {submitting ? "Saving..." : "Apply Updates"}
+          {submitting ? (isRoomTransfer ? "Transferring..." : "Saving...") : (isRoomTransfer ? "Transfer Room" : "Update")}
         </Button>
       </DialogFooter>
     </form>
