@@ -68,7 +68,34 @@ describe("ReportsPage", () => {
             activity_row_count: 0,
             turnover_row_count: 0,
           },
-          activity_rows: [],
+          activity_rows: [
+            {
+              booking_id: "booking-1",
+              room_no: "105",
+              guest_name: "Lucky Webon",
+              scheduled_check_in_at: null,
+              scheduled_check_out_at: null,
+              remaining_balance_due: 200,
+              check_in_at: "2026-04-11T14:00:00.000Z",
+              check_out_at: null,
+              room_rate: 0,
+              extra_bed_amount: 0,
+              extra_person_amount: 0,
+              linens_amount: 0,
+              charge_amount: 200,
+              minimart_amount: 0,
+              food_amount: 0,
+              cash_amount: 0,
+              gcash_amount: 0,
+              card_amount: 0,
+              cheque_amount: 0,
+              qrph_amount: 0,
+              total_amount: 0,
+              payment_count: 0,
+              reference_numbers: [],
+              latest_activity_at: "2026-04-11T14:00:00.000Z",
+            },
+          ],
           turnover_rows: [],
           expense_summary: { cash_paid: 0, non_cash_paid: 0, total: 0, expense_count: 0 },
           export_template_version: 1,
@@ -120,6 +147,9 @@ describe("ReportsPage", () => {
     await waitFor(() => {
       expect(screen.getByText("Morning Shift Cash-on-Hand Report")).toBeInTheDocument();
     });
+
+    expect(screen.getByText("Payment Methods")).toBeInTheDocument();
+    expect(screen.getAllByText("Lucky Webon").length).toBeGreaterThan(0);
 
     const requestedUrls = adminFetchOrRedirectMock.mock.calls.map((call) => call[1]);
     expect(requestedUrls.filter((url) => url === "/api/reports/shifts/current")).toHaveLength(1);

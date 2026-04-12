@@ -163,16 +163,33 @@ function ShiftMetricCard({
 }) {
   return (
     <Card className="border border-slate-200 shadow-xs">
-      <CardContent className="p-5">
+      <CardContent className="p-4 sm:p-5">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{label}</p>
-        <p className="mt-2 text-2xl font-black tracking-tight text-[#07008A]">{value}</p>
-        <p className="mt-1 text-xs text-slate-500">{helper}</p>
+        <p className="mt-2 text-[1.75rem] font-black tracking-tight text-[#07008A] sm:text-2xl">{value}</p>
+        <p className="mt-1 max-w-[24ch] text-xs leading-5 text-slate-500">{helper}</p>
       </CardContent>
     </Card>
   );
 }
 
-function ShiftRowsTable({
+function MobileField({
+  label,
+  value,
+  emphasis = false,
+}: {
+  label: string;
+  value: string;
+  emphasis?: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">{label}</p>
+      <p className={`mt-1 text-sm ${emphasis ? "font-semibold text-slate-900" : "text-slate-700"}`}>{value}</p>
+    </div>
+  );
+}
+
+function LegacyShiftRowsTable({
   rows,
   emptyLabel,
   variant = "activity",
@@ -300,6 +317,223 @@ function ShiftRowsTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+function ShiftRowsTable({
+  rows,
+  emptyLabel,
+  variant = "activity",
+}: {
+  rows: ShiftRow[] | TurnoverRow[];
+  emptyLabel: string;
+  variant?: "activity" | "turnover";
+}) {
+  if (rows.length === 0) {
+    return (
+      <div className="py-10">
+        <EmptyState icon={LayoutList} title={emptyLabel} description="Nothing is recorded for this section yet." />
+      </div>
+    );
+  }
+
+  if (variant === "turnover") {
+    return (
+      <>
+        <div className="space-y-3 p-3 lg:hidden">
+          {(rows as TurnoverRow[]).map((row, index) => (
+            <article key={`${row.room_no}-${row.guest_name}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Room {row.room_no || "-"}</p>
+                  <h3 className="mt-1 text-base font-semibold text-slate-900">{row.guest_name}</h3>
+                </div>
+                <Badge variant="outline" className="shrink-0">Carry-In</Badge>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <MobileField label="Check-In" value={formatDateTime(row.check_in_at)} />
+                <MobileField label="Check-Out" value={formatDateTime(row.check_out_at)} />
+                <MobileField label="Collectible" value={formatCurrency(row.collectible_amount || row.total_amount)} emphasis />
+                <MobileField label="Source Shift" value={row.source_shift_name || "-"} />
+              </div>
+
+              <div className="mt-4">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Accommodation</p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <MobileField label="Room Rate" value={formatCurrency(row.room_rate)} />
+                  <MobileField label="Bed" value={formatCurrency(row.extra_bed_amount)} />
+                  <MobileField label="Person" value={formatCurrency(row.extra_person_amount)} />
+                  <MobileField label="Linens" value={formatCurrency(row.linens_amount)} />
+                  <MobileField label="Charge" value={formatCurrency(row.charge_amount)} />
+                  <MobileField label="Minimart" value={formatCurrency(row.minimart_amount)} />
+                  <MobileField label="Food" value={formatCurrency(row.food_amount)} />
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+
+        <div className="hidden overflow-x-auto lg:block">
+          <table className="min-w-[1100px] w-full text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr>
+                {[
+                  "Room",
+                  "Guest",
+                  "Check-In",
+                  "Check-Out",
+                  "Room Rate",
+                  "Bed",
+                  "Person",
+                  "Linens",
+                  "Charge",
+                  "Minimart",
+                  "Food",
+                  "Collectible",
+                  "Source Shift",
+                ].map((label) => (
+                  <th key={label} className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {(rows as TurnoverRow[]).map((row, index) => (
+                <tr key={`${row.room_no}-${row.guest_name}-${index}`} className="hover:bg-slate-50/70">
+                  <td className="px-3 py-3 font-semibold text-slate-800">{row.room_no || "-"}</td>
+                  <td className="px-3 py-3 text-slate-700">{row.guest_name}</td>
+                  <td className="px-3 py-3 text-slate-500">{formatDateTime(row.check_in_at)}</td>
+                  <td className="px-3 py-3 text-slate-500">{formatDateTime(row.check_out_at)}</td>
+                  <td className="px-3 py-3">{formatCurrency(row.room_rate)}</td>
+                  <td className="px-3 py-3">{formatCurrency(row.extra_bed_amount)}</td>
+                  <td className="px-3 py-3">{formatCurrency(row.extra_person_amount)}</td>
+                  <td className="px-3 py-3">{formatCurrency(row.linens_amount)}</td>
+                  <td className="px-3 py-3">{formatCurrency(row.charge_amount)}</td>
+                  <td className="px-3 py-3">{formatCurrency(row.minimart_amount)}</td>
+                  <td className="px-3 py-3">{formatCurrency(row.food_amount)}</td>
+                  <td className="px-3 py-3 font-semibold text-amber-700">{formatCurrency(row.collectible_amount || row.total_amount)}</td>
+                  <td className="px-3 py-3 text-slate-500">{row.source_shift_name || "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="space-y-3 p-3 lg:hidden">
+        {rows.map((row, index) => {
+          const isActivity = "cash_amount" in row;
+          const activityRow = row as ShiftRow;
+
+          return (
+            <article key={`${row.room_no}-${row.guest_name}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Room {row.room_no || "-"}</p>
+                  <h3 className="mt-1 text-base font-semibold text-slate-900">{row.guest_name}</h3>
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <MobileField label="Check-In" value={formatDateTime(row.check_in_at)} />
+                <MobileField label="Check-Out" value={formatDateTime(row.check_out_at)} />
+              </div>
+
+              <div className="mt-4">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Accommodation</p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <MobileField label="Room Rate" value={formatCurrency(row.room_rate)} />
+                  <MobileField label="Bed" value={formatCurrency(row.extra_bed_amount)} />
+                  <MobileField label="Person" value={formatCurrency(row.extra_person_amount)} />
+                  <MobileField label="Linens" value={formatCurrency(row.linens_amount)} />
+                  <MobileField label="Charge" value={formatCurrency(row.charge_amount)} />
+                  <MobileField label="Minimart" value={formatCurrency(row.minimart_amount)} />
+                  <MobileField label="Food" value={formatCurrency(row.food_amount)} />
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Payment Methods</p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <MobileField label="Cash" value={isActivity ? formatCurrency(activityRow.cash_amount) : "-"} emphasis={isActivity && activityRow.cash_amount > 0} />
+                  <MobileField label="GCash" value={isActivity ? formatCurrency(activityRow.gcash_amount) : "-"} emphasis={isActivity && activityRow.gcash_amount > 0} />
+                  <MobileField label="Card" value={isActivity ? formatCurrency(activityRow.card_amount) : "-"} emphasis={isActivity && activityRow.card_amount > 0} />
+                  <MobileField label="Cheque" value={isActivity ? formatCurrency(activityRow.cheque_amount) : "-"} emphasis={isActivity && activityRow.cheque_amount > 0} />
+                  <MobileField label="QRPh" value={isActivity ? formatCurrency(activityRow.qrph_amount) : "-"} emphasis={isActivity && activityRow.qrph_amount > 0} />
+                  <MobileField label="Ref No." value={isActivity ? activityRow.reference_numbers.join(", ") || "-" : "-"} />
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      <div className="hidden overflow-x-auto lg:block">
+        <table className="min-w-[1300px] w-full text-sm">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              {[
+                "Room",
+                "Guest",
+                "Check-In",
+                "Check-Out",
+                "Room Rate",
+                "Bed",
+                "Person",
+                "Linens",
+                "Charge",
+                "Minimart",
+                "Food",
+                "Cash",
+                "GCash",
+                "Card",
+                "Cheque",
+                "QRPh",
+                "Ref No.",
+              ].map((label) => (
+                <th key={label} className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  {label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {rows.map((row, index) => {
+              const isActivity = "cash_amount" in row;
+              return (
+                <tr key={`${row.room_no}-${row.guest_name}-${index}`} className="hover:bg-slate-50/70">
+                  <td className="px-3 py-3 font-semibold text-slate-800">{row.room_no || "-"}</td>
+                  <td className="px-3 py-3 text-slate-700">{row.guest_name}</td>
+                  <td className="px-3 py-3 text-slate-500">{formatDateTime(row.check_in_at)}</td>
+                  <td className="px-3 py-3 text-slate-500">{formatDateTime(row.check_out_at)}</td>
+                  <td className="px-3 py-3">{formatCurrency(row.room_rate)}</td>
+                  <td className="px-3 py-3">{formatCurrency(row.extra_bed_amount)}</td>
+                  <td className="px-3 py-3">{formatCurrency(row.extra_person_amount)}</td>
+                  <td className="px-3 py-3">{formatCurrency(row.linens_amount)}</td>
+                  <td className="px-3 py-3">{formatCurrency(row.charge_amount)}</td>
+                  <td className="px-3 py-3">{formatCurrency(row.minimart_amount)}</td>
+                  <td className="px-3 py-3">{formatCurrency(row.food_amount)}</td>
+                  <td className="px-3 py-3">{isActivity ? formatCurrency((row as ShiftRow).cash_amount) : "-"}</td>
+                  <td className="px-3 py-3">{isActivity ? formatCurrency((row as ShiftRow).gcash_amount) : "-"}</td>
+                  <td className="px-3 py-3">{isActivity ? formatCurrency((row as ShiftRow).card_amount) : "-"}</td>
+                  <td className="px-3 py-3">{isActivity ? formatCurrency((row as ShiftRow).cheque_amount) : "-"}</td>
+                  <td className="px-3 py-3">{isActivity ? formatCurrency((row as ShiftRow).qrph_amount) : "-"}</td>
+                  <td className="px-3 py-3 text-slate-500">
+                    {isActivity ? (row as ShiftRow).reference_numbers.join(", ") || "-" : "-"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 
@@ -528,23 +762,23 @@ export default function AdminReportsPage() {
   }
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-5 pb-12 sm:space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-[#07008A]">Reports</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
             Shift cash-on-hand is now the primary front-desk report. Revenue analytics remain available as a secondary view.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => {
+        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+          <Button className="w-full sm:w-auto" variant="outline" onClick={() => {
             if (canReadShiftCash) void fetchShiftData();
             if (canReadAnalytics) void fetchAnalytics();
           }}>
             Refresh
           </Button>
           {canExportReports && (
-            <Button onClick={handleExport} disabled={!visibleReport}>
+            <Button className="w-full sm:w-auto" onClick={handleExport} disabled={!visibleReport}>
               <Download className="mr-2 h-4 w-4" /> Export XLSX
             </Button>
           )}
@@ -552,7 +786,7 @@ export default function AdminReportsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className={`grid w-full max-w-md ${canReadShiftCash && canReadAnalytics ? "grid-cols-2" : "grid-cols-1"}`}>
+        <TabsList className={`grid w-full max-w-none sm:max-w-md ${canReadShiftCash && canReadAnalytics ? "grid-cols-2" : "grid-cols-1"}`}>
           {canReadShiftCash && <TabsTrigger value="shift">Shift Cash Report</TabsTrigger>}
           {canReadAnalytics && <TabsTrigger value="analytics">Analytics</TabsTrigger>}
         </TabsList>
@@ -609,7 +843,7 @@ export default function AdminReportsPage() {
                     </CardTitle>
                     <CardDescription>Recent finalized shift ledgers and their reports.</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-2 max-h-[560px] overflow-y-auto">
+                  <CardContent className="space-y-2 max-h-[360px] overflow-y-auto sm:max-h-[560px]">
                     {history.length === 0 ? (
                       <EmptyState icon={History} title="No closed shifts" description="Closed shifts will appear here." />
                     ) : (
@@ -662,7 +896,7 @@ export default function AdminReportsPage() {
                         </div>
                       </div>
                     </CardHeader>
-                    <CardContent className="space-y-6 p-6">
+                    <CardContent className="space-y-5 p-4 sm:space-y-6 sm:p-6">
                       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         <ShiftMetricCard label="Cash On Hand" value={formatCurrency(visibleReport.summary.cash_on_hand)} helper="Cash receipts minus cash-paid expenses" />
                         <ShiftMetricCard label="Cash Receipts" value={formatCurrency(visibleReport.summary.total_cash)} helper="Only the cash column contributes to cash on hand" />
@@ -706,9 +940,9 @@ export default function AdminReportsPage() {
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <Tabs value={period} onValueChange={setPeriod}>
-              <TabsList>
+              <TabsList className="grid w-full grid-cols-4 sm:w-auto">
                 <TabsTrigger value="daily">Daily</TabsTrigger>
                 <TabsTrigger value="weekly">Weekly</TabsTrigger>
                 <TabsTrigger value="monthly">Monthly</TabsTrigger>
@@ -719,7 +953,7 @@ export default function AdminReportsPage() {
             {hasPermission("expenses.create") && (
               <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline">
+                  <Button variant="outline" className="w-full sm:w-auto">
                     <Plus className="mr-2 h-4 w-4" /> Add Expense
                   </Button>
                 </DialogTrigger>
@@ -737,7 +971,7 @@ export default function AdminReportsPage() {
                         required
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
                         <Label htmlFor="expense-amount">Amount</Label>
                         <Input
@@ -788,7 +1022,7 @@ export default function AdminReportsPage() {
           </div>
 
           {analyticsLoading ? (
-            <div className="grid gap-6 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-3 md:gap-6">
               <Skeleton className="h-32 w-full" />
               <Skeleton className="h-32 w-full" />
               <Skeleton className="h-32 w-full" />
@@ -801,7 +1035,7 @@ export default function AdminReportsPage() {
                 <ShiftMetricCard label="Net Profit" value={formatCurrency(analytics.net_profit)} helper="Revenue minus expenses" />
               </div>
 
-              <div className="grid gap-6 lg:grid-cols-2">
+              <div className="grid gap-4 lg:grid-cols-2 lg:gap-6">
                 <Card className="border border-slate-200 shadow-xs">
                   <CardHeader>
                     <CardTitle className="text-base text-[#07008A]">Revenue By Source</CardTitle>
@@ -845,7 +1079,29 @@ export default function AdminReportsPage() {
                       <EmptyState icon={Banknote} title="No expenses recorded" description="There are no expenses in this period." />
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
+                    <>
+                    <div className="space-y-3 p-3 lg:hidden">
+                      {analytics.expenses_list.map((expense) => (
+                        <article key={expense.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{expense.date}</p>
+                              <h3 className="mt-1 text-base font-semibold text-slate-900">{expense.description}</h3>
+                            </div>
+                            <p className="text-base font-bold text-rose-600">{formatCurrency(expense.amount)}</p>
+                          </div>
+                          <div className="mt-4 grid grid-cols-2 gap-2">
+                            <MobileField label="Category" value={expense.category} />
+                            <MobileField label="Recorded By" value={expense.performed_by_user?.name || "System"} />
+                          </div>
+                          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Notes</p>
+                            <p className="mt-1 text-sm text-slate-600">{expense.notes || "-"}</p>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                    <div className="hidden overflow-x-auto lg:block">
                       <table className="w-full min-w-[760px] text-sm">
                         <thead className="border-b border-slate-200 bg-slate-50">
                           <tr>
@@ -870,6 +1126,7 @@ export default function AdminReportsPage() {
                         </tbody>
                       </table>
                     </div>
+                    </>
                   )}
                 </CardContent>
               </Card>
