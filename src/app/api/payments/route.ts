@@ -80,12 +80,7 @@ export async function POST(req: NextRequest) {
       });
     } catch (shiftError) {
       console.error("[PAYMENT_SHIFT_SYNC_ERROR]", shiftError);
-      
-      const { error: rollbackError } = await supabase.from("payments").delete().eq("id", paymentRecord.id);
-      if (rollbackError) {
-        console.error("[PAYMENT_SHIFT_SYNC_ROLLBACK_ERROR]", rollbackError);
-      }
-      return internalError();
+      // Keep the payment even if shift sync fails; this matches public payment handling.
     }
 
     // 3. Calculate new totals

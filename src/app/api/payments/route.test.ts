@@ -232,4 +232,28 @@ describe("POST /api/payments", () => {
       status: "Confirmed",
     });
   });
+
+  it("keeps the payment when shift sync fails instead of returning a 500", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const supabaseState = createSupabaseMock();
+    getSupabaseAdminMock.mockReturnValue(supabaseState.supabase);
+    findLatestReceivableForBookingMock.mockResolvedValue({
+      active: {
+        id: "receivable-1",
+        amount_paid: 100,
+      },
+    });
+    addShiftTransactionMock.mockRejectedValue(new Error("shift sync failed"));
+
+    const response = await POST({} as any);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(supabaseState.bookingUpdateEqMock).toHaveBeenCalledWith("id", "booking-1");
+    expect(body).toMatchObject({
+      success: true,
+      balance_due: 700,
+      status: "Confirmed",
+    });
+  });
 });

@@ -137,6 +137,7 @@ export async function recordHotelTreasuryInflow(params: RecordHotelTreasuryInflo
     .from("payments")
     .select("id, booking_id, amount, transaction_id, status")
     .eq("transaction_id", paymongoPaymentId)
+    .eq("method", "QRPh")
     .maybeSingle();
 
   if (paymentRow && String(paymentRow.status) !== "Success") {

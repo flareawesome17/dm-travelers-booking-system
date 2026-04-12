@@ -71,6 +71,8 @@ export async function settlePublicBookingPayment(params: SettlePublicBookingPaym
     .from("payments")
     .select("id")
     .eq("transaction_id", params.paymentId)
+    .eq("booking_id", params.bookingId)
+    .eq("method", "QRPh")
     .maybeSingle();
 
   if (!existingPayment) {
