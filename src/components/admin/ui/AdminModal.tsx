@@ -58,16 +58,17 @@ const AdminModal = React.forwardRef<
 ));
 AdminModal.displayName = "AdminModal";
 
-const AdminModalHeader = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentPropsWithoutRef<typeof DialogHeader>
->(({ className, ...props }, ref) => (
-  <DialogHeader
-    ref={ref}
-    className={cn("admin-modal-header gap-2 px-5 py-4 text-left sm:px-6", className)}
-    {...props}
-  />
-));
+function AdminModalHeader({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof DialogHeader>) {
+  return (
+    <DialogHeader
+      className={cn("admin-modal-header gap-2 px-5 py-4 text-left sm:px-6", className)}
+      {...props}
+    />
+  );
+}
 AdminModalHeader.displayName = "AdminModalHeader";
 
 const AdminModalTitle = React.forwardRef<
@@ -102,14 +103,13 @@ const AdminModalBody = React.forwardRef<
 ));
 AdminModalBody.displayName = "AdminModalBody";
 
-const AdminModalFooter = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentPropsWithoutRef<typeof DialogFooter>
->(({ className, ...props }, ref) => {
+function AdminModalFooter({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof DialogFooter>) {
   const { stickyFooter } = React.useContext(AdminModalContext);
   return (
     <DialogFooter
-      ref={ref}
       className={cn(
         "admin-modal-footer gap-2 px-5 py-4 sm:px-6",
         stickyFooter && "sticky bottom-0 mt-auto",
@@ -118,7 +118,7 @@ const AdminModalFooter = React.forwardRef<
       {...props}
     />
   );
-});
+}
 AdminModalFooter.displayName = "AdminModalFooter";
 
 export {

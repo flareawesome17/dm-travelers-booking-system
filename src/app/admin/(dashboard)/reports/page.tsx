@@ -152,6 +152,18 @@ function formatDateTime(value: string | null | undefined) {
   }).format(new Date(value));
 }
 
+function getAccountsReceivableOutstanding(row: ShiftRow | TurnoverRow) {
+  if ("collectible_amount" in row) {
+    return Number(row.collectible_amount || row.total_amount || 0);
+  }
+
+  return Number(row.remaining_balance_due || 0);
+}
+
+function canExportAccountsReceivable(row: ShiftRow | TurnoverRow) {
+  return Boolean(row.booking_id);
+}
+
 function ShiftMetricCard({
   label,
   value,
@@ -324,10 +336,18 @@ function ShiftRowsTable({
   rows,
   emptyLabel,
   variant = "activity",
+  reportId,
+  canExportSupportIr = false,
+  exportingBookingId = null,
+  onExportSupportIr,
 }: {
   rows: ShiftRow[] | TurnoverRow[];
   emptyLabel: string;
   variant?: "activity" | "turnover";
+  reportId?: string | null;
+  canExportSupportIr?: boolean;
+  exportingBookingId?: string | null;
+  onExportSupportIr?: (bookingId: string) => void;
 }) {
   if (rows.length === 0) {
     return (
@@ -370,6 +390,25 @@ function ShiftRowsTable({
                   <MobileField label="Food" value={formatCurrency(row.food_amount)} />
                 </div>
               </div>
+
+              {canExportSupportIr && reportId ? (
+                <div className="mt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    disabled={!canExportAccountsReceivable(row) || !row.booking_id}
+                    onClick={() => row.booking_id && onExportSupportIr?.(row.booking_id)}
+                  >
+                    {exportingBookingId === row.booking_id ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <ReceiptText className="mr-2 h-4 w-4" />
+                    )}
+                    {exportingBookingId === row.booking_id ? "Generating..." : "Generate AR IR"}
+                  </Button>
+                </div>
+              ) : null}
             </article>
           ))}
         </div>
@@ -392,6 +431,7 @@ function ShiftRowsTable({
                   "Food",
                   "Collectible",
                   "Source Shift",
+                  ...(canExportSupportIr && reportId ? ["AR IR"] : []),
                 ].map((label) => (
                   <th key={label} className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
                     {label}
@@ -415,6 +455,24 @@ function ShiftRowsTable({
                   <td className="px-3 py-3">{formatCurrency(row.food_amount)}</td>
                   <td className="px-3 py-3 font-semibold text-amber-700">{formatCurrency(row.collectible_amount || row.total_amount)}</td>
                   <td className="px-3 py-3 text-slate-500">{row.source_shift_name || "-"}</td>
+                  {canExportSupportIr && reportId ? (
+                    <td className="px-3 py-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!canExportAccountsReceivable(row) || !row.booking_id}
+                        onClick={() => row.booking_id && onExportSupportIr?.(row.booking_id)}
+                      >
+                        {exportingBookingId === row.booking_id ? (
+                          <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <ReceiptText className="mr-2 h-3.5 w-3.5" />
+                        )}
+                        {exportingBookingId === row.booking_id ? "Generating..." : "Generate AR IR"}
+                      </Button>
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>
@@ -469,6 +527,25 @@ function ShiftRowsTable({
                   <MobileField label="Ref No." value={isActivity ? activityRow.reference_numbers.join(", ") || "-" : "-"} />
                 </div>
               </div>
+
+              {canExportSupportIr && reportId ? (
+                <div className="mt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    disabled={!canExportAccountsReceivable(row) || !row.booking_id}
+                    onClick={() => row.booking_id && onExportSupportIr?.(row.booking_id)}
+                  >
+                    {exportingBookingId === row.booking_id ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <ReceiptText className="mr-2 h-4 w-4" />
+                    )}
+                    {exportingBookingId === row.booking_id ? "Generating..." : "Generate AR IR"}
+                  </Button>
+                </div>
+              ) : null}
             </article>
           );
         })}
@@ -496,6 +573,7 @@ function ShiftRowsTable({
                 "Cheque",
                 "QRPh",
                 "Ref No.",
+                ...(canExportSupportIr && reportId ? ["AR IR"] : []),
               ].map((label) => (
                 <th key={label} className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   {label}
@@ -527,6 +605,24 @@ function ShiftRowsTable({
                   <td className="px-3 py-3 text-slate-500">
                     {isActivity ? (row as ShiftRow).reference_numbers.join(", ") || "-" : "-"}
                   </td>
+                  {canExportSupportIr && reportId ? (
+                    <td className="px-3 py-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!canExportAccountsReceivable(row) || !row.booking_id}
+                        onClick={() => row.booking_id && onExportSupportIr?.(row.booking_id)}
+                      >
+                        {exportingBookingId === row.booking_id ? (
+                          <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <ReceiptText className="mr-2 h-3.5 w-3.5" />
+                        )}
+                        {exportingBookingId === row.booking_id ? "Generating..." : "Generate AR IR"}
+                      </Button>
+                    </td>
+                  ) : null}
                 </tr>
               );
             })}
@@ -559,6 +655,7 @@ export default function AdminReportsPage() {
     date: new Date().toISOString().slice(0, 10),
     notes: "",
   });
+  const [exportingAccountsReceivableBookingId, setExportingAccountsReceivableBookingId] = useState<string | null>(null);
   const selectedShiftIdRef = useRef<string | null>(null);
   const selectedReportRef = useRef<ShiftReport | null>(null);
   const hasBootstrappedRef = useRef(false);
@@ -711,6 +808,32 @@ export default function AdminReportsPage() {
       URL.revokeObjectURL(url);
     } catch {
       toast.error("Failed to export shift report");
+    }
+  };
+
+  const handleExportAccountsReceivable = async (bookingId: string) => {
+    const report = visibleReport;
+    if (!report) return;
+
+    setExportingAccountsReceivableBookingId(bookingId);
+    try {
+      const response = await adminFetchOrRedirect(
+        router,
+        `/api/reports/shifts/${report.shift_log.id}/accounts-receivable/${bookingId}/export`,
+      );
+      if (!response.ok) throw new Error("Failed to export accounts receivable workbook");
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `accounts-receivable-${report.shift_log.date}-${bookingId}.xlsx`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Failed to export accounts receivable workbook");
+    } finally {
+      setExportingAccountsReceivableBookingId(null);
     }
   };
 
@@ -927,7 +1050,15 @@ export default function AdminReportsPage() {
                           <p className="font-semibold text-slate-900">Shift Booking Sheet</p>
                           <p className="text-sm text-slate-500">One aggregated row per booking, including carried checked-in collectibles from the previous closed shift.</p>
                         </div>
-                        <ShiftRowsTable rows={visibleReport.activity_rows} emptyLabel="No booking activity yet" variant="activity" />
+                        <ShiftRowsTable
+                          rows={visibleReport.activity_rows}
+                          emptyLabel="No booking activity yet"
+                          variant="activity"
+                          reportId={visibleReport.shift_log.id}
+                          canExportSupportIr={canExportReports}
+                          exportingBookingId={exportingAccountsReceivableBookingId}
+                          onExportSupportIr={handleExportAccountsReceivable}
+                        />
                       </div>
                     </CardContent>
                   </Card>

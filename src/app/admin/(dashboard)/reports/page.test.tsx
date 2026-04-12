@@ -150,6 +150,7 @@ describe("ReportsPage", () => {
 
     expect(screen.getByText("Payment Methods")).toBeInTheDocument();
     expect(screen.getAllByText("Lucky Webon").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Generate AR IR").length).toBeGreaterThan(0);
 
     const requestedUrls = adminFetchOrRedirectMock.mock.calls.map((call) => call[1]);
     expect(requestedUrls.filter((url) => url === "/api/reports/shifts/current")).toHaveLength(1);

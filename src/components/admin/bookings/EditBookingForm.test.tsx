@@ -131,7 +131,7 @@ function setupFetchMock() {
     throw new Error(`Unexpected fetch call: ${init?.method ?? "GET"} ${url}`);
   });
 
-  vi.stubGlobal("fetch", fetchMock as typeof fetch);
+  vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
   return fetchMock;
 }
 
