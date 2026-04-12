@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { getOrCreateActiveShiftLog } from "@/lib/shiftUtils";
 import { toMoneyNumber } from "@/lib/bookingTotals";
 import { getBookingExtraBucket } from "@/lib/bookingExtras";
+import { getGlobalTimeConfig } from "@/lib/settings";
 
 const EXPORT_TEMPLATE_VERSION = 3;
 const TEMPLATE_PATH = path.join(process.cwd(), "public", "assets", "files", "CASH-ON-HAND-REPORT.xlsx");
@@ -1576,10 +1577,11 @@ export async function finalizeShiftCashReport(shiftLogId: string, options?: { su
   };
 }
 
-function getDisplayDateTime(value: string | null | undefined) {
+function getDisplayDateTime(value: string | null | undefined, timezone = "Asia/Manila") {
   if (!value) return "";
 
   return new Intl.DateTimeFormat("en-PH", {
+    timeZone: timezone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -1588,11 +1590,61 @@ function getDisplayDateTime(value: string | null | undefined) {
   }).format(new Date(value));
 }
 
+function getDatePartInTimezone(value: string | null | undefined, timezone = "Asia/Manila") {
+  if (!value) return null;
+
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.getTime())) {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(parsed);
+    const year = parts.find((part) => part.type === "year")?.value;
+    const month = parts.find((part) => part.type === "month")?.value;
+    const day = parts.find((part) => part.type === "day")?.value;
+
+    if (year && month && day) {
+      return `${year}-${month}-${day}`;
+    }
+  }
+
+  const match = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
+  return match?.[1] ?? null;
+}
+
+function normalizeScheduleTime(value: string | null | undefined, fallback: string) {
+  const candidate = String(value || "").trim();
+  if (/^\d{2}:\d{2}$/.test(candidate)) return candidate;
+  return fallback;
+}
+
+function buildScheduleDateTime(
+  value: string | null | undefined,
+  time: string,
+  timezone: string,
+  offset: string,
+) {
+  if (!value) return "";
+
+  const datePart = getDatePartInTimezone(value, timezone);
+  if (!datePart) return getDisplayDateTime(value, timezone);
+
+  return getDisplayDateTime(`${datePart}T${time}:00${offset}`, timezone);
+}
+
 export function getReservationScheduleDisplay(
   row: Pick<
     ShiftCashReportRow,
     "check_in_at" | "scheduled_check_in_at" | "scheduled_check_out_at" | "remaining_balance_due" | "latest_activity_at"
   >,
+  config: Pick<Awaited<ReturnType<typeof getGlobalTimeConfig>>, "timezone" | "offset" | "check_in_time" | "check_out_time"> = {
+    timezone: "Asia/Manila",
+    offset: "+08:00",
+    check_in_time: "14:00",
+    check_out_time: "12:00",
+  },
 ) {
   if (row.check_in_at) return "";
   if (!row.scheduled_check_in_at || !row.scheduled_check_out_at) return "";
@@ -1606,7 +1658,12 @@ export function getReservationScheduleDisplay(
     }
   }
 
-  return `CI: ${getDisplayDateTime(row.scheduled_check_in_at)} | CO: ${getDisplayDateTime(row.scheduled_check_out_at)}`;
+  const checkInTime = normalizeScheduleTime(config.check_in_time, "14:00");
+  const checkOutTime = normalizeScheduleTime(config.check_out_time, "12:00");
+  const scheduleTimezone = config.timezone || "Asia/Manila";
+  const scheduleOffset = config.offset || "+08:00";
+
+  return `CI: ${buildScheduleDateTime(row.scheduled_check_in_at, checkInTime, scheduleTimezone, scheduleOffset)}\r\nCO: ${buildScheduleDateTime(row.scheduled_check_out_at, checkOutTime, scheduleTimezone, scheduleOffset)}`;
 }
 
 function setCurrencyStyle(cell: ExcelJS.Cell) {
@@ -1623,6 +1680,18 @@ function setCompactDateTimeStyle(cell: ExcelJS.Cell, maxSize = 9) {
     wrapText: false,
     shrinkToFit: true,
     vertical: cell.alignment?.vertical ?? "middle",
+  };
+}
+
+function setScheduleCellStyle(cell: ExcelJS.Cell) {
+  cell.font = {
+    ...(cell.font || {}),
+    size: 9,
+  };
+  cell.alignment = {
+    wrapText: true,
+    vertical: "top",
+    horizontal: "left",
   };
 }
 
@@ -1814,6 +1883,8 @@ export async function generateShiftCashReportWorkbook(
   options?: ShiftCashReportWorkbookOptions,
 ) {
   await fs.access(TEMPLATE_PATH);
+  const timeConfig = await getGlobalTimeConfig();
+  const { timezone } = timeConfig;
 
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.readFile(TEMPLATE_PATH);
@@ -1854,12 +1925,15 @@ export async function generateShiftCashReportWorkbook(
     row.getCell(1).value = offset + 1;
     row.getCell(2).value = item.room_no || "";
     row.getCell(3).value = item.guest_name;
-    row.getCell(4).value = getReservationScheduleDisplay(item);
-    row.getCell(5).value = getDisplayDateTime(item.check_in_at);
-    row.getCell(6).value = getDisplayDateTime(item.check_out_at);
-    setCompactDateTimeStyle(row.getCell(4), 8);
+    row.getCell(4).value = getReservationScheduleDisplay(item, timeConfig);
+    row.getCell(5).value = getDisplayDateTime(item.check_in_at, timezone);
+    row.getCell(6).value = getDisplayDateTime(item.check_out_at, timezone);
+    setScheduleCellStyle(row.getCell(4));
     setCompactDateTimeStyle(row.getCell(5));
     setCompactDateTimeStyle(row.getCell(6));
+    if (row.getCell(4).value) {
+      row.height = Math.max(row.height ?? 15, 30);
+    }
     row.getCell(7).value = item.room_rate || null;
     row.getCell(8).value = item.extra_bed_amount || null;
     row.getCell(9).value = item.extra_person_amount || null;

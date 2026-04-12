@@ -1,6 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import ExcelJS from "exceljs";
 import { generateShiftCashReportWorkbook, type ShiftCashReport } from "./shiftCashReports";
+
+vi.mock("@/lib/settings", () => ({
+  getGlobalTimeConfig: vi.fn(async () => ({
+    timezone: "Asia/Manila",
+    offset: "+08:00",
+    check_in_time: "14:00",
+    check_out_time: "12:00",
+  })),
+}));
 
 describe("generateShiftCashReportWorkbook", () => {
   it("renders extras and reservation schedule headers, shortens ref numbers, adds a total top border, and protects the worksheet", async () => {
@@ -130,13 +139,18 @@ describe("generateShiftCashReportWorkbook", () => {
     expect(worksheet.getCell("A24").border.bottom?.style).toBe("medium");
     expect(worksheet.getCell("U24").border.top?.style).toBe("medium");
     expect(worksheet.getCell("U24").border.bottom?.style).toBe("medium");
-    expect(worksheet.getCell("D10").font?.size).toBe(8);
-    expect(worksheet.getCell("D10").alignment?.shrinkToFit).toBe(true);
+    expect(worksheet.getCell("D10").font?.size).toBe(9);
+    expect(worksheet.getCell("D10").alignment?.wrapText).toBe(true);
+    expect(worksheet.getCell("D10").alignment?.shrinkToFit ?? false).toBe(false);
     expect(worksheet.getCell("E10").font?.size).toBe(9);
     expect(worksheet.getCell("E10").alignment?.shrinkToFit).toBe(true);
     expect(worksheet.getCell("D10").value).toBe("");
     expect(String(worksheet.getCell("D11").value)).toContain("CI:");
     expect(String(worksheet.getCell("D11").value)).toContain("CO:");
+    expect(String(worksheet.getCell("D11").value)).toContain("\n");
+    expect(String(worksheet.getCell("D11").value)).toContain("02:00 PM");
+    expect(String(worksheet.getCell("D11").value)).toContain("12:00 PM");
+    expect(worksheet.getRow(11).height).toBeGreaterThanOrEqual(30);
     expect(worksheet.getCell("C11").value).toBe("Reservation Guest");
     expect(worksheet.getCell("U10").value).toBe("123");
     expect(worksheet.getCell("U11").value).toBe("4326");
