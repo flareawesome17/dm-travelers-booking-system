@@ -6,7 +6,7 @@ import { getOrCreateActiveShiftLog } from "@/lib/shiftUtils";
 import { toMoneyNumber } from "@/lib/bookingTotals";
 import { getBookingExtraBucket } from "@/lib/bookingExtras";
 
-const EXPORT_TEMPLATE_VERSION = 2;
+const EXPORT_TEMPLATE_VERSION = 3;
 const TEMPLATE_PATH = path.join(process.cwd(), "public", "assets", "files", "CASH-ON-HAND-REPORT.xlsx");
 const ACTIVITY_START_ROW = 10;
 const TEMPLATE_ACTIVITY_SLOTS = 14;
@@ -214,6 +214,31 @@ type ShiftCashReportWorkbookOptions = {
   preparedByName?: string | null;
 };
 
+type ShiftChargeBreakdown = Pick<
+  ShiftCashReportRow,
+  | "room_rate"
+  | "extra_bed_amount"
+  | "extra_person_amount"
+  | "linens_amount"
+  | "charge_amount"
+  | "minimart_amount"
+  | "food_amount"
+  | "early_checkin_amount"
+  | "late_checkout_amount"
+>;
+
+const CHARGE_ALLOCATION_ORDER: Array<keyof ShiftChargeBreakdown> = [
+  "room_rate",
+  "extra_bed_amount",
+  "extra_person_amount",
+  "linens_amount",
+  "charge_amount",
+  "minimart_amount",
+  "food_amount",
+  "early_checkin_amount",
+  "late_checkout_amount",
+];
+
 function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
 }
@@ -388,11 +413,11 @@ export function getRestaurantChargeBreakdown(items: RestaurantOrderItemRecord[])
   };
 }
 
-export function createBaseRow(
+function getRowChargeBreakdown(
   booking: BookingRecord | null | undefined,
   bookingExtras: BookingExtraRecord[],
   restaurantCharges?: RestaurantChargeBreakdown | null,
-) {
+): ShiftChargeBreakdown {
   const extras = getBookingExtrasBreakdown(bookingExtras);
   const restaurantBreakdown = restaurantCharges?.has_snapshot_lines
     ? restaurantCharges
@@ -400,6 +425,65 @@ export function createBaseRow(
         food_amount: roundMoney(toMoneyNumber(booking?.restaurant_charges_total)),
         minimart_amount: 0,
       };
+
+  return {
+    room_rate: roundMoney(toMoneyNumber(booking?.total_amount)),
+    extra_bed_amount: extras.extra_bed_amount,
+    extra_person_amount: extras.extra_person_amount,
+    linens_amount: extras.linens_amount,
+    charge_amount: extras.charge_amount,
+    early_checkin_amount: roundMoney(toMoneyNumber(booking?.early_checkin_fee_applied)),
+    late_checkout_amount: roundMoney(toMoneyNumber(booking?.late_checkout_fee_applied)),
+    minimart_amount: roundMoney(restaurantBreakdown.minimart_amount),
+    food_amount: roundMoney(restaurantBreakdown.food_amount),
+  };
+}
+
+function getChargeBreakdownTotal(breakdown: ShiftChargeBreakdown) {
+  return roundMoney(
+    CHARGE_ALLOCATION_ORDER.reduce((total, key) => total + roundMoney(toMoneyNumber(breakdown[key])), 0),
+  );
+}
+
+function allocateChargeBreakdown(
+  breakdown: ShiftChargeBreakdown,
+  paidBefore: number,
+  amountToAllocate: number,
+): ShiftChargeBreakdown {
+  let paidBeforeRemaining = roundMoney(Math.max(0, paidBefore));
+  let amountRemaining = roundMoney(Math.max(0, amountToAllocate));
+  const allocation = {
+    room_rate: 0,
+    extra_bed_amount: 0,
+    extra_person_amount: 0,
+    linens_amount: 0,
+    charge_amount: 0,
+    early_checkin_amount: 0,
+    late_checkout_amount: 0,
+    minimart_amount: 0,
+    food_amount: 0,
+  } satisfies ShiftChargeBreakdown;
+
+  for (const key of CHARGE_ALLOCATION_ORDER) {
+    const componentTotal = roundMoney(toMoneyNumber(breakdown[key]));
+    const alreadyCovered = Math.min(componentTotal, paidBeforeRemaining);
+    paidBeforeRemaining = roundMoney(Math.max(0, paidBeforeRemaining - componentTotal));
+
+    const availableInComponent = roundMoney(Math.max(0, componentTotal - alreadyCovered));
+    const allocated = roundMoney(Math.min(amountRemaining, availableInComponent));
+    allocation[key] = allocated;
+    amountRemaining = roundMoney(Math.max(0, amountRemaining - allocated));
+  }
+
+  return allocation;
+}
+
+export function createBaseRow(
+  booking: BookingRecord | null | undefined,
+  bookingExtras: BookingExtraRecord[],
+  restaurantCharges?: RestaurantChargeBreakdown | null,
+) {
+  const chargeBreakdown = getRowChargeBreakdown(booking, bookingExtras, restaurantCharges);
 
   return {
     booking_id: booking?.id || null,
@@ -410,15 +494,7 @@ export function createBaseRow(
     remaining_balance_due: roundMoney(toMoneyNumber(booking?.balance_due)),
     check_in_at: booking?.actual_check_in_at || null,
     check_out_at: booking?.actual_check_out_at || null,
-    room_rate: roundMoney(toMoneyNumber(booking?.total_amount)),
-    extra_bed_amount: extras.extra_bed_amount,
-    extra_person_amount: extras.extra_person_amount,
-    linens_amount: extras.linens_amount,
-    charge_amount: extras.charge_amount,
-    early_checkin_amount: roundMoney(toMoneyNumber(booking?.early_checkin_fee_applied)),
-    late_checkout_amount: roundMoney(toMoneyNumber(booking?.late_checkout_fee_applied)),
-    minimart_amount: roundMoney(restaurantBreakdown.minimart_amount),
-    food_amount: roundMoney(restaurantBreakdown.food_amount),
+    ...chargeBreakdown,
     cash_amount: 0,
     gcash_amount: 0,
     card_amount: 0,
@@ -429,6 +505,52 @@ export function createBaseRow(
     reference_numbers: [] as string[],
     latest_activity_at: null as string | null,
   };
+}
+
+export function mergeIncomingTurnoversIntoActivityRows(
+  activityRows: ShiftCashReportRow[],
+  incomingTurnoverRows: ShiftCashTurnoverRow[],
+) {
+  const activityBookingIds = new Set(
+    activityRows
+      .map((row) => row.booking_id)
+      .filter((value): value is string => Boolean(value)),
+  );
+
+  const carryInRows = incomingTurnoverRows
+    .filter((row) => !row.booking_id || !activityBookingIds.has(row.booking_id))
+    .map<ShiftCashReportRow>((row) => ({
+      booking_id: row.booking_id,
+      room_no: row.room_no,
+      guest_name: row.guest_name,
+      scheduled_check_in_at: row.scheduled_check_in_at ?? null,
+      scheduled_check_out_at: row.scheduled_check_out_at ?? null,
+      remaining_balance_due: roundMoney(
+        toMoneyNumber(row.remaining_balance_due || row.collectible_amount || row.total_amount),
+      ),
+      check_in_at: row.check_in_at,
+      check_out_at: row.check_out_at,
+      room_rate: row.room_rate,
+      extra_bed_amount: row.extra_bed_amount,
+      extra_person_amount: row.extra_person_amount,
+      linens_amount: row.linens_amount,
+      charge_amount: row.charge_amount,
+      early_checkin_amount: row.early_checkin_amount,
+      late_checkout_amount: row.late_checkout_amount,
+      minimart_amount: row.minimart_amount,
+      food_amount: row.food_amount,
+      cash_amount: 0,
+      gcash_amount: 0,
+      card_amount: 0,
+      cheque_amount: 0,
+      qrph_amount: 0,
+      total_amount: 0,
+      payment_count: 0,
+      reference_numbers: [],
+      latest_activity_at: row.latest_activity_at,
+    }));
+
+  return sortRows([...activityRows, ...carryInRows]);
 }
 
 function buildSummary(rows: ShiftCashReportRow[], expenses: ExpenseRecord[]) {
@@ -985,8 +1107,17 @@ export function buildCollectibleTurnovers(params: {
         params.bookingExtrasById.get(bookingId) ?? [],
         params.restaurantChargesByBookingId?.get(bookingId) ?? null,
       );
+      const paidBeforeCollectible = roundMoney(
+        Math.max(0, getChargeBreakdownTotal(baseRow) - collectibleAmount),
+      );
+      const collectibleBreakdown = allocateChargeBreakdown(
+        baseRow,
+        paidBeforeCollectible,
+        collectibleAmount,
+      );
       return [{
         ...baseRow,
+        ...collectibleBreakdown,
         total_amount: collectibleAmount,
         collectible_amount: collectibleAmount,
         latest_activity_at: state.latest_activity_at,
@@ -1107,34 +1238,45 @@ async function buildLiveReportFromShiftLog(shiftLog: ShiftLogRecord, supabase: S
     rowsByBookingId.set(bookingId, existing);
   }
 
-  const activityRows = sortRows(Array.from(rowsByBookingId.values())).map((row) => ({
-    ...row,
-    remaining_balance_due: roundMoney(row.remaining_balance_due),
-    room_rate: roundMoney(row.room_rate),
-    extra_bed_amount: roundMoney(row.extra_bed_amount),
-    extra_person_amount: roundMoney(row.extra_person_amount),
-    linens_amount: roundMoney(row.linens_amount),
-    charge_amount: roundMoney(row.charge_amount),
-    early_checkin_amount: roundMoney(row.early_checkin_amount),
-    late_checkout_amount: roundMoney(row.late_checkout_amount),
-    minimart_amount: roundMoney(row.minimart_amount),
-    food_amount: roundMoney(row.food_amount),
-    cash_amount: roundMoney(row.cash_amount),
-    gcash_amount: roundMoney(row.gcash_amount),
-    card_amount: roundMoney(row.card_amount),
-    cheque_amount: roundMoney(row.cheque_amount),
-    qrph_amount: roundMoney(row.qrph_amount),
-    total_amount: roundMoney(row.total_amount),
-  }));
+  const paymentActivityRows = sortRows(Array.from(rowsByBookingId.values())).map((row) => {
+    const booking = row.booking_id ? bookingsById.get(row.booking_id) : null;
+    const extrasForBooking = row.booking_id ? (bookingExtrasById.get(row.booking_id) ?? []) : [];
+    const restaurantBreakdown = row.booking_id
+      ? (restaurantChargesByBookingId.get(row.booking_id) ?? null)
+      : null;
+    const fullChargeBreakdown = getRowChargeBreakdown(booking, extrasForBooking, restaurantBreakdown);
+    const currentShiftCollected = roundMoney(row.total_amount);
+    const totalCharges = getChargeBreakdownTotal(fullChargeBreakdown);
+    const remainingBalanceDue = roundMoney(toMoneyNumber(booking?.balance_due));
+    const priorPaid = roundMoney(Math.max(0, totalCharges - remainingBalanceDue - currentShiftCollected));
+    const collectedBreakdown = allocateChargeBreakdown(
+      fullChargeBreakdown,
+      priorPaid,
+      currentShiftCollected,
+    );
 
-  const summary = buildSummary(activityRows, expenses);
+    return {
+      ...row,
+      ...collectedBreakdown,
+      remaining_balance_due: remainingBalanceDue,
+      cash_amount: roundMoney(row.cash_amount),
+      gcash_amount: roundMoney(row.gcash_amount),
+      card_amount: roundMoney(row.card_amount),
+      cheque_amount: roundMoney(row.cheque_amount),
+      qrph_amount: roundMoney(row.qrph_amount),
+      total_amount: currentShiftCollected,
+    };
+  });
+
+  const summary = buildSummary(paymentActivityRows, expenses);
   summary.turnover_row_count = turnoverRows.length;
+  const sortedTurnoverRows = sortRows(turnoverRows);
 
   return {
     shift_log: shiftLog,
     summary,
-    activity_rows: activityRows,
-    turnover_rows: sortRows(turnoverRows),
+    activity_rows: mergeIncomingTurnoversIntoActivityRows(paymentActivityRows, sortedTurnoverRows),
+    turnover_rows: sortedTurnoverRows,
     expense_summary: {
       cash_paid: summary.total_cash_expenses,
       non_cash_paid: summary.total_non_cash_expenses,
@@ -1161,10 +1303,41 @@ export async function getShiftCashReportById(
   const snapshot = shiftLog.status === "CLOSED" ? await fetchSnapshotHeader(supabase, shiftLogId) : null;
 
   if (snapshot) {
+    const snapshotVersion = Number(snapshot.export_template_version || 0);
+
+    if (snapshotVersion < EXPORT_TEMPLATE_VERSION) {
+      const liveReport = await buildLiveReportFromShiftLog(shiftLog, supabase);
+
+      return {
+        shift_log: shiftLog,
+        summary: {
+          total_cash: roundMoney(toMoneyNumber(snapshot.total_cash ?? liveReport.summary.total_cash)),
+          total_gcash: roundMoney(toMoneyNumber(snapshot.total_gcash ?? liveReport.summary.total_gcash)),
+          total_card: roundMoney(toMoneyNumber(snapshot.total_card ?? liveReport.summary.total_card)),
+          total_cheque: roundMoney(toMoneyNumber(snapshot.total_cheque ?? liveReport.summary.total_cheque)),
+          total_qrph: roundMoney(toMoneyNumber(snapshot.total_qrph ?? liveReport.summary.total_qrph)),
+          total_amount: roundMoney(toMoneyNumber(snapshot.total_amount ?? liveReport.summary.total_amount)),
+          total_cash_expenses: roundMoney(toMoneyNumber(snapshot.total_cash_expenses ?? liveReport.summary.total_cash_expenses)),
+          total_non_cash_expenses: roundMoney(toMoneyNumber(snapshot.total_non_cash_expenses ?? liveReport.summary.total_non_cash_expenses)),
+          total_expenses: roundMoney(toMoneyNumber(snapshot.total_expenses ?? liveReport.summary.total_expenses)),
+          cash_on_hand: roundMoney(toMoneyNumber(snapshot.cash_on_hand ?? liveReport.summary.cash_on_hand)),
+          activity_row_count: liveReport.activity_rows.length,
+          turnover_row_count: liveReport.turnover_rows.length,
+        },
+        activity_rows: liveReport.activity_rows,
+        turnover_rows: liveReport.turnover_rows,
+        expense_summary: liveReport.expense_summary,
+        export_template_version: snapshotVersion || EXPORT_TEMPLATE_VERSION,
+        report_mode: "snapshot",
+      };
+    }
+
     const [rows, turnoverRows] = await Promise.all([
       fetchSnapshotRows(supabase, snapshot.id),
       fetchIncomingTurnovers(supabase, shiftLog.shift_id, shiftLog.date),
     ]);
+    const activityRows = rows.map(mapSnapshotRow);
+    const sortedTurnoverRows = sortRows(turnoverRows);
 
     return {
       shift_log: shiftLog,
@@ -1179,11 +1352,11 @@ export async function getShiftCashReportById(
         total_non_cash_expenses: roundMoney(toMoneyNumber(snapshot.total_non_cash_expenses)),
         total_expenses: roundMoney(toMoneyNumber(snapshot.total_expenses)),
         cash_on_hand: roundMoney(toMoneyNumber(snapshot.cash_on_hand)),
-        activity_row_count: Number(snapshot.activity_row_count || rows.length),
+        activity_row_count: Number(snapshot.activity_row_count || activityRows.length),
         turnover_row_count: Number(snapshot.turnover_row_count || turnoverRows.length),
       },
-      activity_rows: rows.map(mapSnapshotRow),
-      turnover_rows: sortRows(turnoverRows),
+      activity_rows: activityRows,
+      turnover_rows: sortedTurnoverRows,
       expense_summary: {
         cash_paid: roundMoney(toMoneyNumber(snapshot.total_cash_expenses)),
         non_cash_paid: roundMoney(toMoneyNumber(snapshot.total_non_cash_expenses)),
@@ -1751,32 +1924,6 @@ export async function generateShiftCashReportWorkbook(
   setCurrencyStyle(worksheet.getCell(`E${FOOTER_TOTAL_CASH_ROW + footerOffset}`));
   setCurrencyStyle(worksheet.getCell(`E${FOOTER_LESS_EXPENSES_ROW + footerOffset}`));
   setCurrencyStyle(worksheet.getCell(`E${FOOTER_CASH_ON_HAND_ROW + footerOffset}`));
-
-  const turnoverStartRow = SIGNATURE_ROW + footerOffset + 3;
-  if (report.turnover_rows.length > 0) {
-    worksheet.getCell(`A${turnoverStartRow}`).value = "INCOMING TURNOVER";
-    worksheet.getCell(`A${turnoverStartRow}`).font = { bold: true, size: 12 };
-    worksheet.getCell(`A${turnoverStartRow + 1}`).value = "Room";
-    worksheet.getCell(`B${turnoverStartRow + 1}`).value = "Guest";
-    worksheet.getCell(`C${turnoverStartRow + 1}`).value = "Check-In";
-    worksheet.getCell(`D${turnoverStartRow + 1}`).value = "Check-Out";
-    worksheet.getCell(`E${turnoverStartRow + 1}`).value = "Collectible";
-    worksheet.getCell(`F${turnoverStartRow + 1}`).value = "Source Shift";
-
-    for (let index = 0; index < report.turnover_rows.length; index += 1) {
-      const row = report.turnover_rows[index];
-      const rowIndex = turnoverStartRow + 2 + index;
-      worksheet.getCell(`A${rowIndex}`).value = row.room_no || "";
-      worksheet.getCell(`B${rowIndex}`).value = row.guest_name;
-      worksheet.getCell(`C${rowIndex}`).value = getDisplayDateTime(row.check_in_at);
-      worksheet.getCell(`D${rowIndex}`).value = getDisplayDateTime(row.check_out_at);
-      setCompactDateTimeStyle(worksheet.getCell(`C${rowIndex}`));
-      setCompactDateTimeStyle(worksheet.getCell(`D${rowIndex}`));
-      worksheet.getCell(`E${rowIndex}`).value = row.collectible_amount || row.total_amount || null;
-      worksheet.getCell(`F${rowIndex}`).value = row.source_shift_name || "";
-      setCurrencyStyle(worksheet.getCell(`E${rowIndex}`));
-    }
-  }
 
   await worksheet.protect("dm-shift-report-readonly", {
     selectLockedCells: true,

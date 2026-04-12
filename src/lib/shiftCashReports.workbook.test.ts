@@ -144,4 +144,111 @@ describe("generateShiftCashReportWorkbook", () => {
     expect((worksheet as any).sheetProtection).toBeTruthy();
     expect((worksheet as any).sheetProtection.sheet).toBe(true);
   });
+
+  it("does not render a separate incoming turnover block below the worksheet footer", async () => {
+    const report: ShiftCashReport = {
+      shift_log: {
+        id: "shift-log-2",
+        shift_id: "shift-1",
+        date: "2026-04-12",
+        status: "OPEN",
+        shifts: {
+          id: "shift-1",
+          name: "Morning Shift",
+          start_time: "06:00:00",
+          end_time: "14:00:00",
+          sort_order: 1,
+          is_active: true,
+        },
+      },
+      summary: {
+        total_cash: 0,
+        total_gcash: 0,
+        total_card: 0,
+        total_cheque: 0,
+        total_qrph: 0,
+        total_amount: 0,
+        total_cash_expenses: 0,
+        total_non_cash_expenses: 0,
+        total_expenses: 0,
+        cash_on_hand: 0,
+        activity_row_count: 1,
+        turnover_row_count: 1,
+      },
+      activity_rows: [
+        {
+          booking_id: "booking-1",
+          room_no: "105",
+          guest_name: "Lucky Webon",
+          scheduled_check_in_at: null,
+          scheduled_check_out_at: null,
+          remaining_balance_due: 200,
+          check_in_at: "2026-04-11T14:00:00.000Z",
+          check_out_at: null,
+          room_rate: 0,
+          extra_bed_amount: 0,
+          extra_person_amount: 0,
+          linens_amount: 0,
+          charge_amount: 200,
+          minimart_amount: 0,
+          food_amount: 0,
+          early_checkin_amount: 0,
+          late_checkout_amount: 0,
+          cash_amount: 0,
+          gcash_amount: 0,
+          card_amount: 0,
+          cheque_amount: 0,
+          qrph_amount: 0,
+          total_amount: 0,
+          payment_count: 0,
+          reference_numbers: [],
+          latest_activity_at: "2026-04-12T00:30:00.000Z",
+        },
+      ],
+      turnover_rows: [
+        {
+          booking_id: "booking-1",
+          room_no: "105",
+          guest_name: "Lucky Webon",
+          scheduled_check_in_at: null,
+          scheduled_check_out_at: null,
+          remaining_balance_due: 200,
+          check_in_at: "2026-04-11T14:00:00.000Z",
+          check_out_at: null,
+          room_rate: 0,
+          extra_bed_amount: 0,
+          extra_person_amount: 0,
+          linens_amount: 0,
+          charge_amount: 200,
+          minimart_amount: 0,
+          food_amount: 0,
+          early_checkin_amount: 0,
+          late_checkout_amount: 0,
+          total_amount: 200,
+          collectible_amount: 200,
+          latest_activity_at: "2026-04-12T00:30:00.000Z",
+          source_shift_log_id: "shift-log-1",
+          source_shift_name: "Night Shift",
+        },
+      ],
+      expense_summary: {
+        cash_paid: 0,
+        non_cash_paid: 0,
+        total: 0,
+        expense_count: 0,
+      },
+      export_template_version: 2,
+      report_mode: "live",
+    };
+
+    const buffer = await generateShiftCashReportWorkbook(report);
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer as any);
+    const worksheet = workbook.worksheets[0];
+
+    expect(worksheet.getCell("A37").value).not.toBe("INCOMING TURNOVER");
+    expect(worksheet.getCell("B10").value).toBe("105");
+    expect(worksheet.getCell("K10").value).toBe(200);
+  });
 });

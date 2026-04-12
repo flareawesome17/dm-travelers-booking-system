@@ -667,7 +667,7 @@ export default function AdminReportsPage() {
                         <ShiftMetricCard label="Cash On Hand" value={formatCurrency(visibleReport.summary.cash_on_hand)} helper="Cash receipts minus cash-paid expenses" />
                         <ShiftMetricCard label="Cash Receipts" value={formatCurrency(visibleReport.summary.total_cash)} helper="Only the cash column contributes to cash on hand" />
                         <ShiftMetricCard label="Cash Expenses" value={formatCurrency(visibleReport.summary.total_cash_expenses)} helper="Cash-paid expenses only" />
-                        <ShiftMetricCard label="Turnover Rows" value={String(visibleReport.summary.turnover_row_count)} helper="Carried from the previous closed shift" />
+                        <ShiftMetricCard label="Carry-In Rows" value={String(visibleReport.summary.turnover_row_count)} helper="Checked-in collectibles carried from the previous closed shift" />
                       </div>
 
                       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -683,25 +683,17 @@ export default function AdminReportsPage() {
                           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                           <div>
                             <p className="font-semibold">Cash-on-hand logic</p>
-                            <p className="mt-1">Non-cash collections stay visible in the shift report, but only cash receipts and cash-paid expenses affect the final cash-on-hand figure.</p>
+                            <p className="mt-1">Carried checked-in collectibles are folded into the main booking sheet for visibility, but only actual shift collections and cash-paid expenses affect the final cash-on-hand figure.</p>
                           </div>
                         </div>
                       </div>
 
                       <div className="rounded-2xl border border-slate-200">
                         <div className="border-b border-slate-200 px-4 py-3">
-                          <p className="font-semibold text-slate-900">Booking Activity This Shift</p>
-                          <p className="text-sm text-slate-500">One aggregated row per booking for payment activity recorded under this shift.</p>
+                          <p className="font-semibold text-slate-900">Shift Booking Sheet</p>
+                          <p className="text-sm text-slate-500">One aggregated row per booking, including carried checked-in collectibles from the previous closed shift.</p>
                         </div>
                         <ShiftRowsTable rows={visibleReport.activity_rows} emptyLabel="No booking activity yet" variant="activity" />
-                      </div>
-
-                      <div className="rounded-2xl border border-slate-200">
-                        <div className="border-b border-slate-200 px-4 py-3">
-                          <p className="font-semibold text-slate-900">Incoming Turnover</p>
-                          <p className="text-sm text-slate-500">Open checked-in bookings with remaining collectible balance carried in from the previous closed shift.</p>
-                        </div>
-                        <ShiftRowsTable rows={visibleReport.turnover_rows} emptyLabel="No incoming turnover" variant="turnover" />
                       </div>
                     </CardContent>
                   </Card>

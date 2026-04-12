@@ -5,6 +5,7 @@ import {
   formatReferenceNumbersForWorkbook,
   getReservationScheduleDisplay,
   getRestaurantChargeBreakdown,
+  mergeIncomingTurnoversIntoActivityRows,
   type ShiftCashReportRow,
   type ShiftCashTurnoverRow,
 } from "./shiftCashReports";
@@ -237,6 +238,48 @@ describe("buildCollectibleTurnovers", () => {
     });
   });
 
+  it("allocates collectible rows to the remaining unpaid components instead of the original booking total", () => {
+    const result = buildCollectibleTurnovers({
+      activityRows: [createActivityRow({
+        booking_id: "booking-1",
+        room_no: "105",
+        guest_name: "Lucky Webon",
+        card_amount: 200,
+        total_amount: 200,
+      })],
+      incomingTurnoverRows: [],
+      bookingsById: new Map([
+        ["booking-1", {
+          id: "booking-1",
+          room_no: "105",
+          guest_name: "Lucky Webon",
+          total_amount: 1180,
+          balance_due: 200,
+          restaurant_charges_total: 0,
+          actual_check_in_at: "2026-04-11T14:00:00.000Z",
+          actual_check_out_at: null,
+        } as any],
+      ]),
+      bookingExtrasById: new Map([
+        ["booking-1", [
+          {
+            booking_id: "booking-1",
+            extra_type: "other",
+            total_price: 200,
+          } as any,
+        ]],
+      ]),
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      booking_id: "booking-1",
+      room_rate: 0,
+      charge_amount: 200,
+      collectible_amount: 200,
+    });
+  });
+
   it("preserves current food and minimart allocations on turnover rows", () => {
     const result = buildCollectibleTurnovers({
       activityRows: [createActivityRow()],
@@ -269,6 +312,30 @@ describe("buildCollectibleTurnovers", () => {
       food_amount: 150,
       minimart_amount: 45,
       collectible_amount: 300,
+    });
+  });
+
+  it("folds incoming turnover rows into the main activity sheet when the booking has no new shift payment", () => {
+    const mergedRows = mergeIncomingTurnoversIntoActivityRows(
+      [createActivityRow({ booking_id: "booking-2", room_no: "102" })],
+      [createTurnoverRow({
+        booking_id: "booking-1",
+        room_no: "105",
+        guest_name: "Lucky Webon",
+        charge_amount: 200,
+        remaining_balance_due: 200,
+        collectible_amount: 200,
+      })],
+    );
+
+    expect(mergedRows).toHaveLength(2);
+    expect(mergedRows.find((row) => row.booking_id === "booking-1")).toMatchObject({
+      room_no: "105",
+      charge_amount: 200,
+      cash_amount: 0,
+      card_amount: 0,
+      total_amount: 0,
+      remaining_balance_due: 200,
     });
   });
 });
