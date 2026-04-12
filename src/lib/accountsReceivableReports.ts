@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import ExcelJS from "exceljs";
-import { getBookingChargeBreakdown, toMoneyNumber } from "@/lib/bookingTotals";
+import { toMoneyNumber } from "@/lib/bookingTotals";
 import { getBookingExtraDisplayName } from "@/lib/bookingExtras";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import {
@@ -30,13 +30,6 @@ type BookingExtraRecord = {
 type BookingSupportRecord = {
   id: string;
   reference_number?: string | null;
-  total_amount?: number | string | null;
-  restaurant_charges_total?: number | string | null;
-  extras_total?: number | string | null;
-  extensions_total?: number | string | null;
-  early_checkin_fee_applied?: number | string | null;
-  late_checkout_fee_applied?: number | string | null;
-  discount_amount?: number | string | null;
   balance_due?: number | string | null;
   actual_check_in_at?: string | null;
   actual_check_out_at?: string | null;
@@ -45,6 +38,20 @@ type BookingSupportRecord = {
   guests?: { full_name?: string | null } | null;
   rooms?: { room_number?: string | null } | null;
   booking_extras?: BookingExtraRecord[] | null;
+  restaurant_orders?: RestaurantOrderRecord[] | null;
+};
+
+type RestaurantOrderItemRecord = {
+  id: string;
+  name?: string | null;
+  line_total?: number | string | null;
+  is_minimart?: boolean | null;
+};
+
+type RestaurantOrderRecord = {
+  id: string;
+  status?: string | null;
+  restaurant_order_items?: RestaurantOrderItemRecord[] | null;
 };
 
 type AccountsReceivableLine = {
@@ -100,6 +107,13 @@ function getTargetOutstanding(row: ShiftAccountsReceivableRow, booking: BookingS
   }
 
   return roundMoney(Math.max(0, toMoneyNumber(row.remaining_balance_due || booking.balance_due)));
+}
+
+function getLineStatus(totalAmount: number, outstandingAmount: number) {
+  if (totalAmount <= 0) return "";
+  if (outstandingAmount <= 0) return "Paid";
+  if (outstandingAmount >= totalAmount) return "Unpaid";
+  return "Partial";
 }
 
 function buildBookingExtraLines(
@@ -158,7 +172,7 @@ function compressLines(lines: AccountsReceivableLine[], maxLines: number) {
       {
         particular: "Other Charges",
         amount: roundMoney(lines.reduce((sum, line) => sum + line.amount, 0)),
-        status: "For Endorsement",
+        status: lines[0]?.status || "",
       },
     ];
   }
@@ -170,98 +184,66 @@ function compressLines(lines: AccountsReceivableLine[], maxLines: number) {
     {
       particular: "Other Charges",
       amount: overflowAmount,
-      status: visibleLines[visibleLines.length - 1]?.status || "For Endorsement",
+      status: visibleLines[visibleLines.length - 1]?.status || "",
     },
   ];
 }
 
-function buildWorkbookLines(input: AccountsReceivableWorkbookInput) {
-  const { booking, reportRow } = input;
-  const targetOutstanding = getTargetOutstanding(reportRow, booking);
-  const lineStatus = targetOutstanding > 0 ? "For Endorsement" : "Settled";
-  const breakdown = getBookingChargeBreakdown(booking);
-  const lines: AccountsReceivableLine[] = [];
+function buildRestaurantLines(
+  booking: BookingSupportRecord,
+  reportRow: ShiftAccountsReceivableRow,
+  lineStatus: string,
+) {
+  const chargedOrders = (booking.restaurant_orders ?? []).filter(
+    (order) => String(order.status || "").trim().toLowerCase() === "charged to room",
+  );
+  const itemLines = chargedOrders
+    .flatMap((order) => order.restaurant_order_items ?? [])
+    .map((item) => ({
+      particular: String(item.name || "").trim(),
+      amount: roundMoney(toMoneyNumber(item.line_total)),
+      status: lineStatus,
+    }))
+    .filter((line) => line.particular && line.amount > 0);
 
-  if (breakdown.roomTotal > 0) {
-    lines.push({
-      particular: "Room Accommodation",
-      amount: roundMoney(breakdown.roomTotal),
+  if (itemLines.length > 0) return itemLines;
+
+  const fallbackLines: AccountsReceivableLine[] = [];
+  if (toMoneyNumber(reportRow.food_amount) > 0) {
+    fallbackLines.push({
+      particular: "Restaurant Charges",
+      amount: roundMoney(toMoneyNumber(reportRow.food_amount)),
       status: lineStatus,
     });
   }
-
-  if (breakdown.discountAmount > 0) {
-    lines.push({
-      particular: "Less Discount",
-      amount: -roundMoney(breakdown.discountAmount),
-      status: "Applied",
-    });
-  }
-
-  lines.push(...buildBookingExtraLines(booking, reportRow, lineStatus));
-
-  if (breakdown.extensionsTotal > 0) {
-    lines.push({
-      particular: "Stay Extensions",
-      amount: roundMoney(breakdown.extensionsTotal),
-      status: lineStatus,
-    });
-  }
-
-  if (breakdown.earlyCheckInFee > 0) {
-    lines.push({
-      particular: "Early Check-in Fee",
-      amount: roundMoney(breakdown.earlyCheckInFee),
-      status: lineStatus,
-    });
-  }
-
-  if (breakdown.lateCheckOutFee > 0) {
-    lines.push({
-      particular: "Late Check-out Fee",
-      amount: roundMoney(breakdown.lateCheckOutFee),
-      status: lineStatus,
-    });
-  }
-
   if (toMoneyNumber(reportRow.minimart_amount) > 0) {
-    lines.push({
-      particular: "Minimart Charges",
+    fallbackLines.push({
+      particular: "Minimart",
       amount: roundMoney(toMoneyNumber(reportRow.minimart_amount)),
       status: lineStatus,
     });
   }
 
-  const restaurantChargeAmount = roundMoney(
-    Math.max(
-      0,
-      toMoneyNumber(reportRow.food_amount) || toMoneyNumber(booking.restaurant_charges_total),
-    ),
-  );
-  if (restaurantChargeAmount > 0) {
-    lines.push({
-      particular: "Restaurant Charges",
-      amount: restaurantChargeAmount,
-      status: lineStatus,
-    });
-  }
+  return fallbackLines;
+}
 
+function buildWorkbookLines(input: AccountsReceivableWorkbookInput) {
+  const { booking, reportRow } = input;
+  const targetOutstanding = getTargetOutstanding(reportRow, booking);
+  const lines: AccountsReceivableLine[] = [];
+  lines.push(...buildBookingExtraLines(booking, reportRow, ""));
+  lines.push(...buildRestaurantLines(booking, reportRow, ""));
   const grossAmount = roundMoney(lines.reduce((sum, line) => sum + line.amount, 0));
-  const appliedPayments = roundMoney(Math.max(0, grossAmount - targetOutstanding));
-  const lineLimit = ITEM_ROW_COUNT - (appliedPayments > 0 ? 1 : 0);
-  const visibleLines = compressLines(lines, lineLimit);
-
-  if (appliedPayments > 0) {
-    visibleLines.push({
-      particular: "Less Payments Received",
-      amount: -appliedPayments,
-      status: "Collected",
-    });
-  }
+  const effectiveOutstanding = roundMoney(Math.min(targetOutstanding, grossAmount));
+  const lineStatus = getLineStatus(grossAmount, effectiveOutstanding);
+  const visibleLines = compressLines(
+    lines.map((line) => ({ ...line, status: lineStatus })),
+    ITEM_ROW_COUNT,
+  );
 
   return {
     lines: visibleLines,
-    targetOutstanding,
+    targetOutstanding: roundMoney(visibleLines.reduce((sum, line) => sum + line.amount, 0)),
   };
 }
 
@@ -361,13 +343,6 @@ async function fetchBookingSupportRecord(bookingId: string) {
     .select(`
       id,
       reference_number,
-      total_amount,
-      restaurant_charges_total,
-      extras_total,
-      extensions_total,
-      early_checkin_fee_applied,
-      late_checkout_fee_applied,
-      discount_amount,
       balance_due,
       actual_check_in_at,
       actual_check_out_at,
@@ -375,7 +350,12 @@ async function fetchBookingSupportRecord(bookingId: string) {
       reserved_checkout_datetime,
       guests(full_name),
       rooms(room_number),
-      booking_extras(id, extra_type, custom_label, quantity, unit_price, total_price)
+      booking_extras(id, extra_type, custom_label, quantity, unit_price, total_price),
+      restaurant_orders:restaurant_orders(
+        id,
+        status,
+        restaurant_order_items(id, name, line_total, is_minimart)
+      )
     `)
     .eq("id", bookingId)
     .single();

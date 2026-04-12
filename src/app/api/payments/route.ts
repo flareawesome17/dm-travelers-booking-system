@@ -22,6 +22,12 @@ export async function POST(req: NextRequest) {
     const accountingDate = await findNextOpenLedgerDate(supabase, today);
 
     const { booking_id, amount, method, type, transaction_id } = parsed.data;
+    if ((method === "GCash" || method === "Card") && !String(transaction_id || "").trim()) {
+      return NextResponse.json(
+        { error: { code: "missing_reference", message: "Reference number is required for GCash and card payments" } },
+        { status: 400 },
+      );
+    }
 
     // 1. Fetch current booking details to calculate new balance
     const { data: booking, error: fetchError } = await supabase

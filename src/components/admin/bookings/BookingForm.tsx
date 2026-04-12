@@ -81,6 +81,7 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
   const [globalDiscountName, setGlobalDiscountName] = useState<string | null>(null);
   const [depositPaid, setDepositPaid] = useState("0");
   const [depositMethod, setDepositMethod] = useState<"Cash" | "GCash" | "Card" | "Cheque">("Cash");
+  const [depositReferenceNumber, setDepositReferenceNumber] = useState("");
   const [chequeNumber, setChequeNumber] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [roomAvailability, setRoomAvailability] = useState<
@@ -330,6 +331,15 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
       return;
     }
 
+    if (
+      deposit > 0 &&
+      (depositMethod === "GCash" || depositMethod === "Card") &&
+      !depositReferenceNumber.trim()
+    ) {
+      toast.error("Reference number is required for GCash and card deposits.");
+      return;
+    }
+
     if (usePerGuestRate) {
       if (perGuestPrice == null || perGuestPrice <= 0) {
         toast.error("This room does not have a per guest rate configured.");
@@ -372,6 +382,10 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
           total_amount: totalAmount,
           deposit_paid: deposit,
           deposit_method: deposit > 0 ? depositMethod : null,
+          deposit_reference_number:
+            deposit > 0 && (depositMethod === "GCash" || depositMethod === "Card")
+              ? depositReferenceNumber.trim() || null
+              : null,
           cheque_number: (deposit > 0 && depositMethod === "Cheque") ? chequeNumber.trim() || null : null,
           special_requests: [notes.trim(), specialRequests.trim()].filter(Boolean).join(" | ") || null,
           is_lgu_booking: isLguBooking,
@@ -995,6 +1009,21 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
                   onChange={(e) => setChequeNumber(e.target.value)}
                   placeholder="Enter cheque number"
                   className="h-9 max-w-xs"
+                />
+              </div>
+            )}
+            {(depositMethod === "GCash" || depositMethod === "Card") && deposit > 0 && (
+              <div className="flex items-center gap-2">
+                <Label htmlFor="deposit_reference_number" className="text-xs whitespace-nowrap">
+                  {depositMethod === "GCash" ? "GCash Ref #" : "Card Ref #"}
+                </Label>
+                <Input
+                  id="deposit_reference_number"
+                  value={depositReferenceNumber}
+                  onChange={(e) => setDepositReferenceNumber(e.target.value)}
+                  placeholder={depositMethod === "GCash" ? "Enter GCash reference number" : "Enter card reference number"}
+                  className="h-9 max-w-xs"
+                  required
                 />
               </div>
             )}

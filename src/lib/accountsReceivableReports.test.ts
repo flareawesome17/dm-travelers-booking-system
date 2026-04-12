@@ -6,7 +6,7 @@ import {
 } from "./accountsReceivableReports";
 
 describe("generateAccountsReceivableWorkbook", () => {
-  it("renders one booking support IR that reconciles to the shift collectible balance", async () => {
+  it("renders one booking support IR with additionals-only particulars and simple payment statuses", async () => {
     const input: AccountsReceivableWorkbookInput = {
       report: {
         shift_log: {
@@ -52,13 +52,6 @@ describe("generateAccountsReceivableWorkbook", () => {
       booking: {
         id: "booking-1",
         reference_number: "REF-1001",
-        total_amount: 300,
-        restaurant_charges_total: 120,
-        extras_total: 180,
-        extensions_total: 50,
-        early_checkin_fee_applied: 0,
-        late_checkout_fee_applied: 0,
-        discount_amount: 0,
         balance_due: 350,
         actual_check_in_at: "2026-04-11T14:00:00.000Z",
         actual_check_out_at: null,
@@ -83,6 +76,26 @@ describe("generateAccountsReceivableWorkbook", () => {
             total_price: 80,
           },
         ],
+        restaurant_orders: [
+          {
+            id: "order-1",
+            status: "Charged to Room",
+            restaurant_order_items: [
+              {
+                id: "item-1",
+                name: "Hotsilog",
+                line_total: 50,
+                is_minimart: false,
+              },
+              {
+                id: "item-2",
+                name: "Bottled Water",
+                line_total: 70,
+                is_minimart: true,
+              },
+            ],
+          },
+        ],
       },
       preparedByName: "Ella Joy",
       generatedAt: new Date("2026-04-12T08:15:00.000Z"),
@@ -96,22 +109,20 @@ describe("generateAccountsReceivableWorkbook", () => {
     expect(worksheet.name).toContain("RM105");
     expect(worksheet.getCell("B2").value).toBe("105");
     expect(worksheet.getCell("E2").value).toBe("Lucky Webon");
-    expect(worksheet.getCell("A6").value).toBe("Room Accommodation");
-    expect(worksheet.getCell("C6").value).toBe(300);
-    expect(worksheet.getCell("A7").value).toBe("Extra Bed");
-    expect(worksheet.getCell("C7").value).toBe(100);
-    expect(worksheet.getCell("A8").value).toBe("Broken glass");
-    expect(worksheet.getCell("C8").value).toBe(80);
-    expect(worksheet.getCell("A9").value).toBe("Stay Extensions");
-    expect(worksheet.getCell("C9").value).toBe(50);
-    expect(worksheet.getCell("A10").value).toBe("Minimart Charges");
-    expect(worksheet.getCell("C10").value).toBe(70);
-    expect(worksheet.getCell("A11").value).toBe("Restaurant Charges");
-    expect(worksheet.getCell("C11").value).toBe(50);
-    expect(worksheet.getCell("A12").value).toBe("Less Payments Received");
-    expect(worksheet.getCell("C12").value).toBe(-300);
-    expect(worksheet.getCell("D12").value).toBe("Collected");
-    expect((worksheet.getCell("C16").value as { result?: number }).result).toBe(350);
+    expect(worksheet.getCell("A6").value).toBe("Extra Bed");
+    expect(worksheet.getCell("C6").value).toBe(100);
+    expect(worksheet.getCell("D6").value).toBe("Unpaid");
+    expect(worksheet.getCell("A7").value).toBe("Broken glass");
+    expect(worksheet.getCell("C7").value).toBe(80);
+    expect(worksheet.getCell("D7").value).toBe("Unpaid");
+    expect(worksheet.getCell("A8").value).toBe("Hotsilog");
+    expect(worksheet.getCell("C8").value).toBe(50);
+    expect(worksheet.getCell("D8").value).toBe("Unpaid");
+    expect(worksheet.getCell("A9").value).toBe("Bottled Water");
+    expect(worksheet.getCell("C9").value).toBe(70);
+    expect(worksheet.getCell("D9").value).toBe("Unpaid");
+    expect(worksheet.getCell("A10").value).toBeNull();
+    expect((worksheet.getCell("C16").value as { result?: number }).result).toBe(300);
     expect(String(worksheet.getCell("D17").value)).toContain("Ella Joy");
     expect((worksheet as any).sheetProtection).toBeTruthy();
     expect((worksheet as any).sheetProtection.sheet).toBe(true);

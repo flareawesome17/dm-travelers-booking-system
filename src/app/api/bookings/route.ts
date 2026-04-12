@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/rbac";
 import { findNextOpenLedgerDate, manilaDateString } from "@/lib/ledgerDate";
 import { parseAndValidate, dbError, internalError } from "@/lib/api-security";
 import { createBookingSchema } from "@/lib/validation-schemas";
+import { z } from "zod";
 import { syncReceivableForBooking } from "@/lib/receivables";
 import { addShiftTransaction } from "@/lib/shiftUtils";
 import { broadcastSystemMessage } from "@/lib/activity-hub";
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
   const auth = await requirePermission(req, "bookings.create");
   if ("error" in auth) return auth.error;
 
-  const parsed = await parseAndValidate(req, createBookingSchema);
+  const parsed = await parseAndValidate<z.infer<typeof createBookingSchema>>(req, createBookingSchema);
   if (parsed.success === false) return parsed.error;
 
   try {
@@ -137,7 +138,10 @@ export async function POST(req: NextRequest) {
       const method = body.deposit_method && ["Cash", "GCash", "Card", "Stripe", "PayPal", "Cheque"].includes(body.deposit_method) ? body.deposit_method : "Cash";
       const today = await manilaDateString();
       const accountingDate = await findNextOpenLedgerDate(supabase, today);
-      const transactionId = `DEP-${Date.now()}-${Math.floor(Math.random() * 1000)}-${String(data.reference_number || "REF").replace(/[^A-Z0-9_-]/gi, "")}`;
+      const transactionId =
+        (method === "GCash" || method === "Card")
+          ? String(body.deposit_reference_number || "").trim()
+          : `DEP-${Date.now()}-${Math.floor(Math.random() * 1000)}-${String(data.reference_number || "REF").replace(/[^A-Z0-9_-]/gi, "")}`;
 
       const { data: paymentData, error: pErr } = await supabase.from("payments").insert({
         booking_id: data.id,

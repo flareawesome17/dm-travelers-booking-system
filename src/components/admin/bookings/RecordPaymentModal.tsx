@@ -55,6 +55,10 @@ export function RecordPaymentModal({ booking, onSuccess, onClose }: Props) {
       toast.error("Please enter a valid amount.");
       return;
     }
+    if ((method === "GCash" || method === "Card") && !transactionId.trim()) {
+      toast.error("Reference number is required for GCash and card payments.");
+      return;
+    }
 
     setLoading(true);
     const token = typeof window !== "undefined" ? localStorage.getItem("admin_token") : "";
@@ -236,15 +240,35 @@ export function RecordPaymentModal({ booking, onSuccess, onClose }: Props) {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="pay-txn">{method === "Cheque" ? "Cheque Number" : "Transaction ID"} (Optional)</Label>
+          <Label htmlFor="pay-txn">
+            {method === "Cheque"
+              ? "Cheque Number"
+              : method === "GCash" || method === "Card"
+                ? "Reference Number"
+                : "Transaction ID"}
+            {method === "GCash" || method === "Card" ? " *" : " (Optional)"}
+          </Label>
           <Input
             id="pay-txn"
             value={transactionId}
             onChange={(e) => setTransactionId(e.target.value)}
-            placeholder={method === "Cheque" ? "Enter cheque number" : "e.g. GCASH-REF-12345"}
+            placeholder={
+              method === "Cheque"
+                ? "Enter cheque number"
+                : method === "GCash"
+                  ? "Enter GCash reference number"
+                  : method === "Card"
+                    ? "Enter card reference number"
+                    : "e.g. TXN-12345"
+            }
+            required={method === "GCash" || method === "Card"}
           />
           <p className="text-xs text-slate-500">
-            {method === "Cheque" ? "Record the cheque number for tracking purposes." : "Useful for tracking digital payments securely."}
+            {method === "Cheque"
+              ? "Record the cheque number for tracking purposes."
+              : method === "GCash" || method === "Card"
+                ? "Reference number is required for non-cash front desk payments."
+                : "Useful for tracking digital payments securely."}
           </p>
         </div>
 

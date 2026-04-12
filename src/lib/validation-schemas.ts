@@ -86,6 +86,7 @@ export const createBookingSchema = z.object({
   reference_number: z.string().max(30).optional(),
   rate_plan_kind: z.string().max(20).optional(),
   deposit_method: z.enum(["Cash", "GCash", "Card", "Stripe", "PayPal", "Cheque"]).optional().nullable(),
+  deposit_reference_number: z.string().trim().max(100).optional().nullable(),
   // Feature 2 / 3 – LGU + Special Booking
   is_lgu_booking: z.boolean().optional(),
   is_special_booking: z.boolean().optional(),
@@ -111,7 +112,19 @@ export const createBookingSchema = z.object({
       });
     }
   })).optional(),
-}).strict();
+}).strict().superRefine((data, ctx) => {
+  if (
+    Number(data.deposit_paid || 0) > 0 &&
+    (data.deposit_method === "GCash" || data.deposit_method === "Card") &&
+    !String(data.deposit_reference_number || "").trim()
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["deposit_reference_number"],
+      message: "Reference number is required for GCash and card deposits",
+    });
+  }
+});
 
 // ─── Payment Schemas ───────────────────────────────────────────────────────────
 
