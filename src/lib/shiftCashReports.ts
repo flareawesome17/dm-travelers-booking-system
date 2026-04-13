@@ -259,7 +259,12 @@ function isMissingShiftCashReportTable(error: DbErrorLike | null | undefined) {
 function isMissingTurnoverCollectibleColumn(error: DbErrorLike | null | undefined) {
   if (!error) return false;
   const message = String(error.message || "").toLowerCase();
-  return message.includes("collectible_amount");
+  return (
+    message.includes("collectible_amount") ||
+    message.includes("scheduled_check_in_at") ||
+    message.includes("scheduled_check_out_at") ||
+    message.includes("remaining_balance_due")
+  );
 }
 
 function isMissingReservationScheduleColumns(error: DbErrorLike | null | undefined) {
@@ -922,6 +927,9 @@ async function fetchIncomingTurnovers(supabase: SupabaseAdmin, shiftId: string, 
       booking_id,
       room_no,
       guest_name,
+      scheduled_check_in_at,
+      scheduled_check_out_at,
+      remaining_balance_due,
       check_in_at,
       check_out_at,
       room_rate,
@@ -942,6 +950,9 @@ async function fetchIncomingTurnovers(supabase: SupabaseAdmin, shiftId: string, 
       booking_id,
       room_no,
       guest_name,
+      scheduled_check_in_at,
+      scheduled_check_out_at,
+      remaining_balance_due,
       check_in_at,
       check_out_at,
       room_rate,
@@ -992,6 +1003,9 @@ async function fetchIncomingTurnovers(supabase: SupabaseAdmin, shiftId: string, 
     booking_id: row.booking_id || null,
     room_no: String(row.room_no || ""),
     guest_name: String(row.guest_name || "Unknown Guest"),
+    scheduled_check_in_at: row.scheduled_check_in_at || null,
+    scheduled_check_out_at: row.scheduled_check_out_at || null,
+    remaining_balance_due: roundMoney(toMoneyNumber(row.remaining_balance_due || row.collectible_amount || row.total_amount)),
     check_in_at: row.check_in_at || null,
     check_out_at: row.check_out_at || null,
     room_rate: roundMoney(toMoneyNumber(row.room_rate)),
@@ -1533,6 +1547,9 @@ export async function finalizeShiftCashReport(shiftLogId: string, options?: { su
       booking_id: row.booking_id,
       room_no: row.room_no || null,
       guest_name: row.guest_name,
+      scheduled_check_in_at: row.scheduled_check_in_at,
+      scheduled_check_out_at: row.scheduled_check_out_at,
+      remaining_balance_due: row.remaining_balance_due,
       check_in_at: row.check_in_at,
       check_out_at: row.check_out_at,
       room_rate: row.room_rate,
@@ -1554,7 +1571,11 @@ export async function finalizeShiftCashReport(shiftLogId: string, options?: { su
     if (turnoverError && isMissingTurnoverCollectibleColumn(turnoverError)) {
       const fallbackInsert = await supabase
         .from("shift_cash_report_turnovers")
-        .insert(turnoverPayload.map(({ collectible_amount, ...legacyPayload }) => legacyPayload));
+        .insert(
+          turnoverPayload.map(
+            ({ collectible_amount, scheduled_check_in_at, scheduled_check_out_at, remaining_balance_due, ...legacyPayload }) => legacyPayload
+          )
+        );
       finalTurnoverError = fallbackInsert.error;
     }
 
@@ -1648,15 +1669,6 @@ export function getReservationScheduleDisplay(
 ) {
   if (row.check_in_at) return "";
   if (!row.scheduled_check_in_at || !row.scheduled_check_out_at) return "";
-  if (roundMoney(toMoneyNumber(row.remaining_balance_due)) <= 0) return "";
-
-  if (row.latest_activity_at) {
-    const scheduledCheckInAt = new Date(row.scheduled_check_in_at).getTime();
-    const latestActivityAt = new Date(row.latest_activity_at).getTime();
-    if (!Number.isNaN(scheduledCheckInAt) && !Number.isNaN(latestActivityAt) && scheduledCheckInAt <= latestActivityAt) {
-      return "";
-    }
-  }
 
   const checkInTime = normalizeScheduleTime(config.check_in_time, "14:00");
   const checkOutTime = normalizeScheduleTime(config.check_out_time, "12:00");

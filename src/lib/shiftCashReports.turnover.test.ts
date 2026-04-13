@@ -92,7 +92,7 @@ describe("buildCollectibleTurnovers", () => {
     });
   });
 
-  it("formats reservation schedule text only for future unpaid reservations that are not checked in", () => {
+  it("formats reservation schedule text for reservations that are not yet checked in, regardless of payment status", () => {
     expect(getReservationScheduleDisplay(createActivityRow({
       scheduled_check_in_at: "2026-04-12T06:00:00.000Z",
       scheduled_check_out_at: "2026-04-13T04:00:00.000Z",
@@ -107,7 +107,7 @@ describe("buildCollectibleTurnovers", () => {
       remaining_balance_due: 0,
       check_in_at: null,
       latest_activity_at: "2026-04-11T05:00:00.000Z",
-    }))).toBe("");
+    }))).toContain("CI:");
 
     expect(getReservationScheduleDisplay(createActivityRow({
       scheduled_check_in_at: "2026-04-10T06:00:00.000Z",
@@ -115,7 +115,7 @@ describe("buildCollectibleTurnovers", () => {
       remaining_balance_due: 700,
       check_in_at: null,
       latest_activity_at: "2026-04-11T05:00:00.000Z",
-    }))).toBe("");
+    }))).toContain("CI:");
 
     expect(getReservationScheduleDisplay(createActivityRow({
       scheduled_check_in_at: "2026-04-12T06:00:00.000Z",

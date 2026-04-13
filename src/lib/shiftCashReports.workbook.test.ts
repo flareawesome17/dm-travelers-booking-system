@@ -77,7 +77,7 @@ describe("generateShiftCashReportWorkbook", () => {
           guest_name: "Reservation Guest",
           scheduled_check_in_at: "2026-04-12T06:00:00.000Z",
           scheduled_check_out_at: "2026-04-13T04:00:00.000Z",
-          remaining_balance_due: 700,
+          remaining_balance_due: 0,
           check_in_at: null,
           check_out_at: null,
           room_rate: 1930,
