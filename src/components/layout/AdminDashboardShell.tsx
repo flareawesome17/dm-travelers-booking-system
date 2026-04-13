@@ -87,6 +87,7 @@ export default function AdminDashboardShell({
       ["/admin/housekeeping", "housekeeping.read"],
       ["/admin/restaurant", "restaurant.read"],
       ["/admin/inventory", "inventory.read"],
+      ["/admin/cash", "cash.read"],
       ["/admin/treasury", "treasury.read"],
       ["/admin/reports", ["reports.shift_cash.read", "reports.analytics.read"]],
       ["/admin/shifts", "shifts.read"],

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -1041,6 +1042,7 @@ export default function AdminReportsPage() {
                           <div>
                             <p className="font-semibold">Cash-on-hand logic</p>
                             <p className="mt-1">Carried checked-in collectibles are folded into the main booking sheet for visibility, but only actual shift collections and cash-paid expenses affect the final cash-on-hand figure.</p>
+                            <p className="mt-2">Approved bank deposits now live in <Link href="/admin/cash" className="font-semibold underline underline-offset-2">Cash</Link>; historical shift cash reports remain unchanged.</p>
                           </div>
                         </div>
                       </div>

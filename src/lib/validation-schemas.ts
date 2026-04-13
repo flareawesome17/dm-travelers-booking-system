@@ -11,6 +11,7 @@ const positiveNumber = z.number().positive("Must be a positive number");
 const nonNegativeNumber = z.number().min(0, "Cannot be negative");
 const ymdDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format");
 const hhmmTime = z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Must be HH:MM format");
+const isoDateTime = z.string().datetime({ offset: true });
 const safeString = z.string().trim().min(1, "Cannot be empty").max(500, "Too long");
 const email = z.string().email("Invalid email address").transform((v) => v.toLowerCase().trim());
 
@@ -348,6 +349,62 @@ export const approveTreasuryWithdrawalSchema = z.object({
 export const completeTreasuryWithdrawalSchema = z.object({
   external_reference: z.string().trim().min(3).max(120),
   completion_note: z.string().trim().max(500).optional().nullable(),
+}).strict();
+
+export const createCashBankAccountSchema = z.object({
+  bank_name: z.string().trim().min(2).max(120),
+  label: z.string().trim().min(2).max(120).optional(),
+  account_name: z.string().trim().max(120).optional().nullable(),
+  account_number: z.string().trim().max(60).optional().nullable(),
+  branch_label: z.string().trim().max(120).optional().nullable(),
+}).strict();
+
+export const updateCashBankAccountSchema = z.object({
+  label: z.string().trim().min(2).max(120).optional(),
+  bank_name: z.string().trim().min(2).max(120).optional(),
+  account_name: z.string().trim().max(120).optional().nullable(),
+  account_number: z.string().trim().max(60).optional().nullable(),
+  branch_label: z.string().trim().max(120).optional().nullable(),
+  is_active: z.boolean().optional(),
+}).strict().refine((data) => Object.keys(data).length > 0, "At least one bank account field is required");
+
+export const createCashProofPayloadSchema = z.object({
+  bucket: z.literal("cash-deposit-proofs"),
+  path: z.string().trim().min(3).max(500),
+  filename: z.string().trim().min(1).max(255),
+  content_type: z.string().trim().min(3).max(120),
+  size: z.number().int().positive().max(8 * 1024 * 1024),
+}).strict();
+
+export const createCashDepositRequestSchema = z.object({
+  amount: positiveNumber,
+  bank_account_id: z.string().uuid("Invalid bank account ID"),
+  deposit_reference: z.string().trim().min(3).max(120),
+  deposited_at: isoDateTime,
+  proof: createCashProofPayloadSchema,
+  note: z.string().trim().max(500).optional().nullable(),
+}).strict();
+
+export const approveCashDepositSchema = z.object({
+  approval_note: z.string().trim().max(500).optional().nullable(),
+}).strict();
+
+export const rejectCashDepositSchema = z.object({
+  rejection_note: z.string().trim().min(3).max(500),
+}).strict();
+
+export const cancelCashDepositSchema = z.object({
+  cancellation_note: z.string().trim().max(500).optional().nullable(),
+}).strict();
+
+export const reverseCashDepositSchema = z.object({
+  reversal_reason: z.string().trim().min(3).max(500),
+}).strict();
+
+export const createCashOpeningAdjustmentSchema = z.object({
+  amount: z.number().refine((value) => Number.isFinite(value) && value !== 0, "Amount must be a non-zero number"),
+  note: z.string().trim().max(500).optional().nullable(),
+  effective_at: isoDateTime.optional(),
 }).strict();
 
 // ─── Discount Schemas (Global Module) ──────────────────────────────────────────
