@@ -828,6 +828,28 @@ async function fetchBookingExtras(supabase: SupabaseAdmin, bookingIds: string[])
   return (data ?? []) as BookingExtraRecord[];
 }
 
+/**
+ * Fetch IDs of all bookings currently checked in with outstanding balances.
+ * These bookings must appear in the shift booking sheet regardless of whether
+ * any payment was recorded during the current shift, and they must become
+ * candidates for cash-on-hand turnover when the shift closes.
+ */
+async function fetchActiveCheckedInBookingIds(supabase: SupabaseAdmin): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("id")
+    .eq("status", "Checked-In")
+    .not("actual_check_in_at", "is", null)
+    .is("actual_check_out_at", null)
+    .gt("balance_due", 0);
+
+  if (error) {
+    console.error("[fetchActiveCheckedInBookingIds]", error);
+    return [];
+  }
+  return (data ?? []).map((row: any) => row.id as string);
+}
+
 async function fetchRestaurantChargeBreakdowns(supabase: SupabaseAdmin, bookingIds: string[]) {
   const breakdowns = new Map<string, RestaurantChargeBreakdown>();
   if (bookingIds.length === 0) return breakdowns;
@@ -1283,14 +1305,53 @@ async function buildLiveReportFromShiftLog(shiftLog: ShiftLogRecord, supabase: S
     };
   });
 
-  const summary = buildSummary(paymentActivityRows, expenses);
+  // ── Carry checked-in bookings with outstanding balances ─────────────
+  // Ensures bookings that are checked in (even without payments during
+  // this shift) appear in the shift booking sheet and become candidates
+  // for turnover when the shift closes.
+  const coveredBookingIds = new Set([
+    ...paymentActivityRows.map((r) => r.booking_id),
+    ...turnoverRows.map((r) => r.booking_id),
+  ].filter((v): v is string => Boolean(v)));
+
+  const allCheckedInIds = await fetchActiveCheckedInBookingIds(supabase);
+  const uncoveredIds = allCheckedInIds.filter((id) => !coveredBookingIds.has(id));
+  const uncoveredCheckedInRows: ShiftCashReportRow[] = [];
+
+  if (uncoveredIds.length > 0) {
+    const [ucBookings, ucExtras, ucRestaurantCharges] = await Promise.all([
+      fetchBookings(supabase, uncoveredIds),
+      fetchBookingExtras(supabase, uncoveredIds),
+      fetchRestaurantChargeBreakdowns(supabase, uncoveredIds),
+    ]);
+
+    const ucExtrasById = new Map<string, BookingExtraRecord[]>();
+    for (const extra of ucExtras) {
+      const arr = ucExtrasById.get(extra.booking_id) ?? [];
+      arr.push(extra);
+      ucExtrasById.set(extra.booking_id, arr);
+    }
+
+    for (const booking of ucBookings) {
+      const row = createBaseRow(
+        booking,
+        ucExtrasById.get(booking.id) ?? [],
+        ucRestaurantCharges.get(booking.id) ?? null,
+      );
+      row.latest_activity_at = booking.actual_check_in_at || null;
+      uncoveredCheckedInRows.push(row);
+    }
+  }
+
+  const allActivityRows = sortRows([...paymentActivityRows, ...uncoveredCheckedInRows]);
+  const summary = buildSummary(allActivityRows, expenses);
   summary.turnover_row_count = turnoverRows.length;
   const sortedTurnoverRows = sortRows(turnoverRows);
 
   return {
     shift_log: shiftLog,
     summary,
-    activity_rows: mergeIncomingTurnoversIntoActivityRows(paymentActivityRows, sortedTurnoverRows),
+    activity_rows: mergeIncomingTurnoversIntoActivityRows(allActivityRows, sortedTurnoverRows),
     turnover_rows: sortedTurnoverRows,
     expense_summary: {
       cash_paid: summary.total_cash_expenses,

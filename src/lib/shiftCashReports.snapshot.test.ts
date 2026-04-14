@@ -121,6 +121,12 @@ function createSupabaseMock(options: {
             return makeFilterChain(table);
           }
 
+          if (table === "bookings") {
+            return {
+              eq: () => ({ not: () => ({ is: () => ({ gt: () => Promise.resolve({ data: [], error: null }) }) }) }),
+            };
+          }
+
           throw new Error(`Unexpected table ${table}`);
         },
       };
