@@ -41,6 +41,7 @@ const AdminModal = React.forwardRef<
 >(({ className, children, size = "lg", stickyFooter = false, scrollMode = "content", ...props }, ref) => (
   <AdminModalContext.Provider value={{ stickyFooter }}>
     <DialogContent
+      aria-describedby={undefined}
       ref={ref}
       data-size={size}
       data-scroll-mode={scrollMode}

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
-  CalendarCheck, Plus, Pencil, Trash2, LogIn, LogOut, XCircle, Search, ChevronLeft, ChevronRight, Banknote, MoreHorizontal, CalendarPlus, Package
+  CalendarCheck, Plus, Pencil, Trash2, LogIn, LogOut, XCircle, Search, ChevronLeft, ChevronRight, Banknote, MoreHorizontal, CalendarPlus, Package, RefreshCw
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -370,19 +370,25 @@ export default function AdminBookingsPage() {
             </AdminPanelCardTitle>
             <span className="hidden sm:inline-block ml-1 text-xs font-medium rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{filtered.length} filtered / {list.length} total</span>
           </div>
-          {canCreate && (
-            <Dialog open={open} onOpenChange={setOpen}>
-              <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={() => setOpen(true)}>
-                <Plus className="h-4 w-4 mr-1" /> New booking
-              </Button>
-              <AdminModal size="xl">
-                <AdminModalHeader><AdminModalTitle>Add new booking</AdminModalTitle></AdminModalHeader>
-                <AdminModalBody>
-                <BookingForm apiUrl="" token={typeof window !== "undefined" ? localStorage.getItem("admin_token") || "" : ""} onSuccess={() => { refreshData(); }} onClose={() => setOpen(false)} />
-                </AdminModalBody>
-              </AdminModal>
-            </Dialog>
-          )}
+          <div className="flex items-center gap-2">
+            <Button type="button" size="sm" variant="outline" className="rounded-full px-4 text-slate-600 border-slate-200" onClick={refreshData} disabled={loading || summaryLoading}>
+              <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", (loading || summaryLoading) && "animate-spin")} />
+              Refresh
+            </Button>
+            {canCreate && (
+              <Dialog open={open} onOpenChange={setOpen}>
+                <Button type="button" size="sm" className="bg-[#07008A] hover:bg-[#05006a] text-white rounded-full px-4" onClick={() => setOpen(true)}>
+                  <Plus className="h-4 w-4 mr-1" /> New booking
+                </Button>
+                <AdminModal size="xl">
+                  <AdminModalHeader><AdminModalTitle>Add new booking</AdminModalTitle></AdminModalHeader>
+                  <AdminModalBody>
+                  <BookingForm apiUrl="" token={typeof window !== "undefined" ? localStorage.getItem("admin_token") || "" : ""} onSuccess={() => { refreshData(); }} onClose={() => setOpen(false)} />
+                  </AdminModalBody>
+                </AdminModal>
+              </Dialog>
+            )}
+          </div>
         </AdminPanelCardHeader>
         <AdminPanelCardContent className="px-0 py-0">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 py-4 border-b bg-slate-50/60 gap-4">

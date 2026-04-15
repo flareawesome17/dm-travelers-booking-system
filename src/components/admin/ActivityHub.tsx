@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseClient } from "@/lib/supabase";
 import {
   MessageSquare,
   Bell,
@@ -312,13 +312,7 @@ export default function ActivityHub({
     });
   }, []);
 
-  const supabase = useMemo(() => {
-    return createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { auth: { persistSession: false } }
-    );
-  }, []);
+  const supabase = useMemo(() => getSupabaseClient(), []);
 
   /* ================================================================ */
   /*  Data Fetching                                                    */
