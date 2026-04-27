@@ -47,6 +47,16 @@ export function getBookingExtraBucket(extraType: string | null | undefined) {
   return "charge";
 }
 
+/**
+ * Extras that are charged per night (qty × price × days).
+ * All other extras are one-time charges (days = 1).
+ */
+export const PER_DAY_EXTRA_TYPES = new Set<string>(["Extra Bed"]);
+
+export function isPerDayExtra(extraType: string | null | undefined) {
+  return PER_DAY_EXTRA_TYPES.has(String(extraType || "").trim());
+}
+
 export function getBookingExtraDisplayName(extra: BookingExtraLike) {
   if (isCustomBookingExtraType(extra.extra_type)) {
     const customLabel = String(extra.custom_label || "").trim();

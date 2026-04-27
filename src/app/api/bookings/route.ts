@@ -127,7 +127,8 @@ export async function POST(req: NextRequest) {
         custom_label: extra.extra_type === "Custom Charge" ? extra.custom_label?.trim() || null : null,
         quantity: extra.quantity,
         unit_price: extra.unit_price,
-        total_price: extra.quantity * extra.unit_price,
+        days: extra.days ?? 1,
+        total_price: extra.quantity * extra.unit_price * (extra.days ?? 1),
       }));
       
       const { error: extrasError } = await supabase.from("booking_extras").insert(extrasToInsert);

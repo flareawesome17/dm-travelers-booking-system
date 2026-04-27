@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
 import { getErrorMessage } from "@/lib/utils";
-import { Plus, Trash2, Package } from "lucide-react";
+import { Plus, Trash2, Package, Pencil } from "lucide-react";
 import {
   CUSTOM_BOOKING_EXTRA_TYPE,
   getBookingExtraDisplayName,
+  isPerDayExtra,
   PREDEFINED_BOOKING_EXTRA_TYPES,
   type BookingExtraType,
   type PredefinedBookingExtraType,
@@ -21,6 +22,7 @@ type ExtraRow = {
   custom_label?: string | null;
   quantity: number;
   unit_price: number;
+  days: number;
   total_price: number;
 };
 
@@ -29,6 +31,7 @@ type PendingExtraRow = {
   custom_label?: string;
   quantity: number;
   unit_price: number;
+  days: number;
 };
 
 type BookingExtrasSectionProps = {
@@ -36,6 +39,8 @@ type BookingExtrasSectionProps = {
   token: string;
   onTotalChange?: (total: number) => void;
   onSuccess?: () => void;
+  /** Number of nights for this booking — used to auto-fill days for per-day extras */
+  bookingNights?: number;
 };
 
 const EMPTY_DEFAULT_PRICES: Record<PredefinedBookingExtraType, number> = {
@@ -62,15 +67,21 @@ function createCustomChargeRow(): PendingExtraRow {
     custom_label: "",
     quantity: 1,
     unit_price: 0,
+    days: 1,
   };
 }
 
-export function BookingExtrasSection({ bookingId, token, onTotalChange, onSuccess }: BookingExtrasSectionProps) {
+function computeExtraLineTotal(extra: { quantity: number; unit_price: number; days: number }) {
+  return extra.quantity * extra.unit_price * extra.days;
+}
+
+export function BookingExtrasSection({ bookingId, token, onTotalChange, onSuccess, bookingNights }: BookingExtrasSectionProps) {
   const [extras, setExtras] = useState<ExtraRow[]>([]);
   const [defaultPrices, setDefaultPrices] = useState<Record<PredefinedBookingExtraType, number>>(EMPTY_DEFAULT_PRICES);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pendingExtras, setPendingExtras] = useState<PendingExtraRow[]>([]);
+  const [patchingId, setPatchingId] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -108,13 +119,18 @@ export function BookingExtrasSection({ bookingId, token, onTotalChange, onSucces
   }, [bookingId, token]);
 
   const extrasTotal = extras.reduce((sum, extra) => sum + Number(extra.total_price || 0), 0);
-  const pendingTotal = pendingExtras.reduce((sum, extra) => sum + extra.quantity * extra.unit_price, 0);
+  const pendingTotal = pendingExtras.reduce((sum, extra) => sum + computeExtraLineTotal(extra), 0);
 
   const notifyTotal = useCallback((saved: ExtraRow[], pending: PendingExtraRow[]) => {
     const total = saved.reduce((sum, extra) => sum + Number(extra.total_price || 0), 0)
-      + pending.reduce((sum, extra) => sum + extra.quantity * extra.unit_price, 0);
+      + pending.reduce((sum, extra) => sum + computeExtraLineTotal(extra), 0);
     onTotalChange?.(total);
   }, [onTotalChange]);
+
+  const defaultDaysForType = (type: BookingExtraType) => {
+    if (isPerDayExtra(type) && bookingNights && bookingNights > 0) return bookingNights;
+    return 1;
+  };
 
   const addPending = () => {
     const usedTypes = new Set(
@@ -127,7 +143,7 @@ export function BookingExtrasSection({ bookingId, token, onTotalChange, onSucces
     const available = PREDEFINED_BOOKING_EXTRA_TYPES.find((type) => !usedTypes.has(type)) || PREDEFINED_BOOKING_EXTRA_TYPES[0];
     const next = [
       ...pendingExtras,
-      { extra_type: available, quantity: 1, unit_price: defaultPrices[available] || 0 },
+      { extra_type: available, quantity: 1, unit_price: defaultPrices[available] || 0, days: defaultDaysForType(available) },
     ];
 
     setPendingExtras(next);
@@ -157,12 +173,14 @@ export function BookingExtrasSection({ bookingId, token, onTotalChange, onSucces
             ...current,
             extra_type: type,
             custom_label: current.custom_label || "",
+            days: 1,
           }
         : {
             extra_type: type,
             quantity: current.quantity,
             unit_price: defaultPrices[type as PredefinedBookingExtraType] || current.unit_price,
             custom_label: "",
+            days: defaultDaysForType(type),
           };
     } else if (field === "custom_label") {
       next[idx] = { ...current, custom_label: String(value) };
@@ -170,6 +188,8 @@ export function BookingExtrasSection({ bookingId, token, onTotalChange, onSucces
       next[idx] = { ...current, quantity: Math.max(1, Number(value) || 1) };
     } else if (field === "unit_price") {
       next[idx] = { ...current, unit_price: Math.max(0, Number(value) || 0) };
+    } else if (field === "days") {
+      next[idx] = { ...current, days: Math.max(1, Number(value) || 1) };
     }
 
     setPendingExtras(next);
@@ -197,6 +217,7 @@ export function BookingExtrasSection({ bookingId, token, onTotalChange, onSucces
             custom_label: extra.extra_type === CUSTOM_BOOKING_EXTRA_TYPE ? extra.custom_label?.trim() || null : null,
             quantity: extra.quantity,
             unit_price: extra.unit_price,
+            days: extra.days,
           })),
         }),
       });
@@ -218,6 +239,35 @@ export function BookingExtrasSection({ bookingId, token, onTotalChange, onSucces
       toast.error("Something went wrong.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const patchExtra = async (extra: ExtraRow, updates: { days?: number; quantity?: number }) => {
+    if (!extra.id) return;
+
+    setPatchingId(extra.id);
+    try {
+      const res = await fetch(`/api/bookings/${bookingId}/extras/${extra.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(updates),
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(getErrorMessage(data) || "Failed to update extra.");
+        return;
+      }
+
+      const next = extras.map((item) => (item.id === extra.id ? { ...item, ...data } : item));
+      setExtras(next);
+      notifyTotal(next, pendingExtras);
+      onSuccess?.();
+      toast.success("Extra updated.");
+    } catch {
+      toast.error("Something went wrong.");
+    } finally {
+      setPatchingId(null);
     }
   };
 
@@ -274,104 +324,157 @@ export function BookingExtrasSection({ bookingId, token, onTotalChange, onSucces
                 <th className="px-3 py-2 text-left font-medium text-slate-500">Type</th>
                 <th className="px-3 py-2 text-center font-medium text-slate-500">Qty</th>
                 <th className="px-3 py-2 text-right font-medium text-slate-500">Price</th>
+                <th className="px-2 py-2 text-center font-medium text-slate-500">Days</th>
                 <th className="px-3 py-2 text-right font-medium text-slate-500">Total</th>
-                <th className="w-8" />
+                <th className="w-14" />
               </tr>
             </thead>
             <tbody>
-              {extras.map((extra, index) => (
-                <tr key={extra.id || index} className="border-t border-slate-100">
-                  <td className="px-3 py-2">
-                    <div className="font-medium text-slate-700">{getBookingExtraDisplayName(extra)}</div>
-                    {extra.extra_type === CUSTOM_BOOKING_EXTRA_TYPE ? (
-                      <div className="text-[10px] uppercase tracking-wide text-slate-400">Custom Charge</div>
-                    ) : null}
-                  </td>
-                  <td className="px-3 py-2 text-center text-slate-600">{extra.quantity}</td>
-                  <td className="px-3 py-2 text-right text-slate-600">₱{Number(extra.unit_price).toFixed(2)}</td>
-                  <td className="px-3 py-2 text-right font-semibold text-[#07008A]">₱{Number(extra.total_price).toFixed(2)}</td>
-                  <td className="px-1 py-2">
-                    <button
-                      type="button"
-                      onClick={() => deleteExtra(extra)}
-                      className="rounded p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {extras.map((extra, index) => {
+                const perDay = isPerDayExtra(extra.extra_type);
+                return (
+                  <tr key={extra.id || index} className="border-t border-slate-100">
+                    <td className="px-3 py-2">
+                      <div className="font-medium text-slate-700">{getBookingExtraDisplayName(extra)}</div>
+                      {extra.extra_type === CUSTOM_BOOKING_EXTRA_TYPE ? (
+                        <div className="text-[10px] uppercase tracking-wide text-slate-400">Custom Charge</div>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2 text-center text-slate-600">{extra.quantity}</td>
+                    <td className="px-3 py-2 text-right text-slate-600">₱{Number(extra.unit_price).toFixed(2)}</td>
+                    <td className="px-2 py-2 text-center">
+                      {perDay ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <Input
+                            type="number"
+                            min={1}
+                            max={365}
+                            className="h-6 w-12 text-center text-xs px-1"
+                            value={extra.days ?? 1}
+                            disabled={patchingId === extra.id}
+                            onChange={(e) => {
+                              const newDays = Math.max(1, Number(e.target.value) || 1);
+                              // Optimistic update
+                              const updated = extras.map((item) =>
+                                item.id === extra.id
+                                  ? { ...item, days: newDays, total_price: item.quantity * Number(item.unit_price) * newDays }
+                                  : item
+                              );
+                              setExtras(updated);
+                              notifyTotal(updated, pendingExtras);
+                            }}
+                            onBlur={(e) => {
+                              const newDays = Math.max(1, Number(e.target.value) || 1);
+                              if (newDays !== (extra.days ?? 1)) {
+                                patchExtra(extra, { days: newDays });
+                              }
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-[#07008A]">₱{Number(extra.total_price).toFixed(2)}</td>
+                    <td className="px-1 py-2">
+                      <button
+                        type="button"
+                        onClick={() => deleteExtra(extra)}
+                        className="rounded p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
 
-      {pendingExtras.map((extra, idx) => (
-        <div
-          key={`${extra.extra_type}-${idx}`}
-          className="grid grid-cols-12 items-end gap-2 rounded-lg border border-dashed border-amber-300 bg-amber-50/30 p-2"
-        >
-          <div className={extra.extra_type === CUSTOM_BOOKING_EXTRA_TYPE ? "col-span-3" : "col-span-4"}>
-            <Label className="text-[10px]">Type</Label>
-            <select
-              value={extra.extra_type}
-              onChange={(event) => updatePending(idx, "extra_type", event.target.value)}
-              className="flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-xs"
-            >
-              {PREDEFINED_BOOKING_EXTRA_TYPES.map((type) => (
-                <option key={type} value={type}>{type}</option>
-              ))}
-              <option value={CUSTOM_BOOKING_EXTRA_TYPE}>{CUSTOM_BOOKING_EXTRA_TYPE}</option>
-            </select>
-          </div>
+      {pendingExtras.map((extra, idx) => {
+        const perDay = isPerDayExtra(extra.extra_type);
+        return (
+          <div
+            key={`${extra.extra_type}-${idx}`}
+            className="grid grid-cols-12 items-end gap-2 rounded-lg border border-dashed border-amber-300 bg-amber-50/30 p-2"
+          >
+            <div className={extra.extra_type === CUSTOM_BOOKING_EXTRA_TYPE ? "col-span-3" : perDay ? "col-span-3" : "col-span-4"}>
+              <Label className="text-[10px]">Type</Label>
+              <select
+                value={extra.extra_type}
+                onChange={(event) => updatePending(idx, "extra_type", event.target.value)}
+                className="flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-xs"
+              >
+                {PREDEFINED_BOOKING_EXTRA_TYPES.map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+                <option value={CUSTOM_BOOKING_EXTRA_TYPE}>{CUSTOM_BOOKING_EXTRA_TYPE}</option>
+              </select>
+            </div>
 
-          {extra.extra_type === CUSTOM_BOOKING_EXTRA_TYPE ? (
-            <div className="col-span-3">
-              <Label className="text-[10px]">Label</Label>
+            {extra.extra_type === CUSTOM_BOOKING_EXTRA_TYPE ? (
+              <div className="col-span-3">
+                <Label className="text-[10px]">Label</Label>
+                <Input
+                  value={extra.custom_label || ""}
+                  onChange={(event) => updatePending(idx, "custom_label", event.target.value)}
+                  placeholder="e.g. Broken glass"
+                  className="h-8 text-xs"
+                />
+              </div>
+            ) : null}
+
+            <div className="col-span-2">
+              <Label className="text-[10px]">Qty</Label>
               <Input
-                value={extra.custom_label || ""}
-                onChange={(event) => updatePending(idx, "custom_label", event.target.value)}
-                placeholder="e.g. Broken glass"
+                type="number"
+                min={1}
+                max={20}
+                value={extra.quantity}
+                onChange={(event) => updatePending(idx, "quantity", event.target.value)}
                 className="h-8 text-xs"
               />
             </div>
-          ) : null}
-
-          <div className="col-span-2">
-            <Label className="text-[10px]">Qty</Label>
-            <Input
-              type="number"
-              min={1}
-              max={20}
-              value={extra.quantity}
-              onChange={(event) => updatePending(idx, "quantity", event.target.value)}
-              className="h-8 text-xs"
-            />
+            <div className={perDay ? "col-span-2" : "col-span-3"}>
+              <Label className="text-[10px]">Price (₱)</Label>
+              <Input
+                type="number"
+                min={0}
+                value={extra.unit_price}
+                onChange={(event) => updatePending(idx, "unit_price", event.target.value)}
+                className="h-8 text-xs"
+              />
+            </div>
+            {perDay && (
+              <div className="col-span-2">
+                <Label className="text-[10px]">Nights</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={extra.days}
+                  onChange={(event) => updatePending(idx, "days", event.target.value)}
+                  className="h-8 text-xs"
+                />
+              </div>
+            )}
+            <div className="col-span-1 pb-1 text-right text-xs font-semibold text-[#07008A]">
+              ₱{computeExtraLineTotal(extra).toFixed(2)}
+            </div>
+            <div className="col-span-12 flex justify-end sm:col-span-1 sm:block sm:pb-1">
+              <button
+                type="button"
+                onClick={() => removePending(idx)}
+                className="rounded p-1 text-red-400 hover:bg-red-50 hover:text-red-600"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </div>
           </div>
-          <div className="col-span-3">
-            <Label className="text-[10px]">Price (₱)</Label>
-            <Input
-              type="number"
-              min={0}
-              value={extra.unit_price}
-              onChange={(event) => updatePending(idx, "unit_price", event.target.value)}
-              className="h-8 text-xs"
-            />
-          </div>
-          <div className="col-span-1 pb-1 text-right text-xs font-semibold text-[#07008A]">
-            ₱{(extra.quantity * extra.unit_price).toFixed(2)}
-          </div>
-          <div className="col-span-12 flex justify-end sm:col-span-1 sm:block sm:pb-1">
-            <button
-              type="button"
-              onClick={() => removePending(idx)}
-              className="rounded p-1 text-red-400 hover:bg-red-50 hover:text-red-600"
-            >
-              <Trash2 className="h-3 w-3" />
-            </button>
-          </div>
-        </div>
-      ))}
+        );
+      })}
 
       {(extras.length > 0 || pendingExtras.length > 0) && (
         <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">

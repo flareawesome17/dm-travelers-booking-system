@@ -12,11 +12,21 @@ type ManageExtrasModalProps = {
   booking: {
     id: string;
     reference_number?: string;
+    check_in_date?: string;
+    check_out_date?: string;
   };
   token: string;
 };
 
 export function ManageExtrasModal({ open, onClose, onSuccess, booking, token }: ManageExtrasModalProps) {
+  const bookingNights = (() => {
+    if (!booking.check_in_date || !booking.check_out_date) return undefined;
+    const start = new Date(booking.check_in_date);
+    const end = new Date(booking.check_out_date);
+    const diff = Math.ceil((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+    return diff > 0 ? diff : 1;
+  })();
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-[500px]">
@@ -30,7 +40,7 @@ export function ManageExtrasModal({ open, onClose, onSuccess, booking, token }: 
         </DialogHeader>
         
         <div className="py-2">
-          <BookingExtrasSection bookingId={booking.id} token={token} onSuccess={onSuccess} />
+          <BookingExtrasSection bookingId={booking.id} token={token} onSuccess={onSuccess} bookingNights={bookingNights} />
         </div>
 
         <DialogFooter>

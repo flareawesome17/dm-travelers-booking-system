@@ -103,6 +103,7 @@ export const createBookingSchema = z.object({
     extra_type: z.enum(BOOKING_EXTRA_TYPES),
     quantity: z.number().int().min(1).max(20),
     unit_price: nonNegativeNumber,
+    days: z.number().int().min(1).max(365).optional().default(1),
     custom_label: z.string().trim().min(1).max(150).optional().nullable(),
   }).superRefine((data, ctx) => {
     if (data.extra_type === "Custom Charge" && !String(data.custom_label || "").trim()) {
@@ -280,6 +281,7 @@ const bookingExtraInputSchema = z.object({
   }),
   quantity: z.number().int().min(1).max(20),
   unit_price: nonNegativeNumber,
+  days: z.number().int().min(1).max(365).optional().default(1),
   custom_label: z.string().trim().min(1).max(150).optional().nullable(),
 }).superRefine((data, ctx) => {
   if (data.extra_type === "Custom Charge" && !String(data.custom_label || "").trim()) {

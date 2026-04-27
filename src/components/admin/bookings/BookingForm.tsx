@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/sonner";
 import { cn, getErrorMessage } from "@/lib/utils";
+import { isPerDayExtra } from "@/lib/bookingExtras";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
@@ -279,7 +280,8 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
     const active = selectedExtras[type];
     if (!active.checked) return sum;
     const price = defaultPrices[type] || 0;
-    return sum + (price * active.quantity);
+    const days = isPerDayExtra(type) ? Math.max(1, nights) : 1;
+    return sum + (price * active.quantity * days);
   }, 0);
 
   const baseAmount = selectedRate ? selectedRate.price * blocks : 0;
@@ -400,7 +402,8 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
           extras: EXTRA_TYPES.filter(t => selectedExtras[t].checked).map(t => ({
             extra_type: t,
             quantity: selectedExtras[t].quantity,
-            unit_price: defaultPrices[t] || 0
+            unit_price: defaultPrices[t] || 0,
+            days: isPerDayExtra(t) ? Math.max(1, nights) : 1,
           })),
         }),
       });
@@ -855,7 +858,12 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
                     />
                     <div className="space-y-0.5">
                       <div className="text-sm font-medium text-slate-700 leading-none">{type}</div>
-                      <div className="text-[10px] text-slate-400">₱{price.toFixed(2)}</div>
+                      <div className="text-[10px] text-slate-400">
+                        ₱{price.toFixed(2)}
+                        {isPerDayExtra(type) && nights > 0 && (
+                          <span className="ml-1 text-[#07008A]/70">× {Math.max(1, nights)} night{Math.max(1, nights) !== 1 ? "s" : ""}</span>
+                        )}
+                      </div>
                     </div>
                   </label>
                   {isChecked && (

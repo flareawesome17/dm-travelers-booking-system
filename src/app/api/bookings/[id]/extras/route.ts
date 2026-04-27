@@ -53,7 +53,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       custom_label: e.extra_type === "Custom Charge" ? e.custom_label?.trim() || null : null,
       quantity: e.quantity,
       unit_price: e.unit_price,
-      total_price: e.quantity * e.unit_price,
+      days: e.days ?? 1,
+      total_price: e.quantity * e.unit_price * (e.days ?? 1),
     }));
 
     const { data: inserted, error: insErr } = await supabase
