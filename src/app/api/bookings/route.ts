@@ -67,10 +67,13 @@ export async function POST(req: NextRequest) {
       body.rate_plan_kind
     );
 
+    const bookingSource = body.booking_source || "Walk-in";
+    const refPrefix = bookingSource === "Booking.com" ? "BDC" : "REF";
+
     const bookingData = {
       guest_id: guestId,
       room_id: body.room_id,
-      reference_number: body.reference_number || `REF-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+      reference_number: body.reference_number || `${refPrefix}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
       total_amount: totalAmount,
       deposit_paid: depositPaid,
       balance_due: computedBalance,
@@ -94,6 +97,9 @@ export async function POST(req: NextRequest) {
       discount_amount: body.discount_amount || 0,
       discount_id: body.discount_id || null,
       cheque_number: body.cheque_number || null,
+      // Booking source (OTA tagging)
+      booking_source: bookingSource,
+      external_reference: body.external_reference?.trim() || null,
     };
 
     const { data, error } = await supabase

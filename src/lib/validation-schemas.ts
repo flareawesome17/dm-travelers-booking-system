@@ -98,6 +98,9 @@ export const createBookingSchema = z.object({
   discount_type: z.enum(["fixed", "percent"]).optional().default("fixed"),
   discount_amount: nonNegativeNumber.optional().default(0),
   discount_id: z.string().uuid().optional().nullable(),
+  // Booking source (OTA tagging)
+  booking_source: z.enum(["Walk-in", "Booking.com", "Online", "Phone", "Other"]).optional().default("Walk-in"),
+  external_reference: z.string().trim().max(200).optional().nullable(),
   // Booking Extras from initial creation
   extras: z.array(z.object({
     extra_type: z.enum(BOOKING_EXTRA_TYPES),

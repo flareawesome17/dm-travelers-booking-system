@@ -18,7 +18,8 @@ import {
   Sparkles,
   Tag,
   DollarSign,
-  Percent
+  Percent,
+  Globe
 } from "lucide-react";
 
 const EXTRA_TYPES = ["Extra Bed", "Extra Pillow", "Extra Blanket", "Extra Towel - Bath", "Extra Towel - Hand", "Extra Person"] as const;
@@ -92,6 +93,8 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
   const [isSpecialBooking, setIsSpecialBooking] = useState(false);
   const [specialBookingLabel, setSpecialBookingLabel] = useState("");
   const [usePerGuestRate, setUsePerGuestRate] = useState(false);
+  const [bookingSource, setBookingSource] = useState<"Walk-in" | "Booking.com" | "Online" | "Phone" | "Other">("Walk-in");
+  const [externalReference, setExternalReference] = useState("");
   const [defaultPrices, setDefaultPrices] = useState<Record<string, number>>({});
   const [selectedExtras, setSelectedExtras] = useState<Record<ExtraType, { checked: boolean; quantity: number }>>({
     "Extra Bed": { checked: false, quantity: 1 },
@@ -395,6 +398,8 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
           is_lgu_booking: isLguBooking,
           is_special_booking: isSpecialBooking,
           special_booking_label: isSpecialBooking ? specialBookingLabel.trim() || null : null,
+          booking_source: bookingSource,
+          external_reference: bookingSource === "Booking.com" ? externalReference.trim() || null : null,
           discount_value: discountValue,
           discount_type: discountType,
           discount_amount: calculatedDiscount,
@@ -834,6 +839,42 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
               </div>
             )}
           </div>
+        </div>
+
+        {/* ── Booking Source ──────────────────────────── */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Globe className="h-4 w-4 text-blue-600" />
+            <Label className="text-sm font-medium text-slate-700">Booking Source</Label>
+          </div>
+          <select
+            value={bookingSource}
+            onChange={(e) => setBookingSource(e.target.value as typeof bookingSource)}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="Walk-in">Walk-in</option>
+            <option value="Booking.com">Booking.com</option>
+            <option value="Online">Online (Website)</option>
+            <option value="Phone">Phone</option>
+            <option value="Other">Other</option>
+          </select>
+          {bookingSource === "Booking.com" && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-blue-600 bg-blue-50 border border-blue-100 rounded-md px-2.5 py-1.5">
+                📌 This booking will be tagged as a <strong>Booking.com</strong> reservation. A system reference number will be auto-generated with a <strong>BDC-</strong> prefix.
+              </p>
+              <div className="space-y-1">
+                <Label htmlFor="external_reference" className="text-xs font-medium text-slate-600">Booking.com Confirmation #</Label>
+                <Input
+                  id="external_reference"
+                  value={externalReference}
+                  onChange={(e) => setExternalReference(e.target.value)}
+                  placeholder="e.g. 4291837265"
+                  className="h-9 text-sm"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="space-y-3">

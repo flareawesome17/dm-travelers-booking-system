@@ -9,6 +9,8 @@ export type BookingAnalyticsRow = {
   actual_check_in_at?: string | null;
   actual_check_out_at?: string | null;
   rate_plan_kind?: string | null;
+  booking_source?: string | null;
+  external_reference?: string | null;
   guests?: {
     full_name?: string | null;
     email?: string | null;
@@ -180,6 +182,7 @@ export function filterAdminBookings(params: {
     if (params.typeFilter === "lgu") matchesType = !!booking.is_lgu_booking;
     else if (params.typeFilter === "special") matchesType = !!booking.is_special_booking;
     else if (params.typeFilter === "normal") matchesType = !booking.is_lgu_booking && !booking.is_special_booking;
+    else if (params.typeFilter === "booking.com") matchesType = String(booking.booking_source || "").toLowerCase() === "booking.com";
 
     const matchesSearch = !term
       ? true
@@ -193,6 +196,8 @@ export function filterAdminBookings(params: {
           booking.is_lgu_booking ? "lgu booking" : "",
           booking.is_special_booking ? "special booking" : "",
           booking.special_booking_label,
+          booking.booking_source,
+          booking.external_reference,
         ]
           .filter(Boolean)
           .join(" ")

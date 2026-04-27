@@ -82,6 +82,8 @@ type BookingRow = {
   rate_plan_kind?: string; special_requests?: string | null;
   early_checkin_fee_applied?: number; late_checkout_fee_applied?: number;
   is_lgu_booking?: boolean; is_special_booking?: boolean; special_booking_label?: string | null;
+  booking_source?: string;
+  external_reference?: string | null;
   guests?: { full_name?: string; email?: string; phone_number?: string };
   rooms?: {
     room_number?: string; room_type?: string; status?: string;
@@ -416,6 +418,7 @@ export default function AdminBookingsPage() {
                 <option value="normal">Normal Booking</option>
                 <option value="lgu">LGU Booking</option>
                 <option value="special">Special Booking</option>
+                <option value="booking.com">Booking.com</option>
               </select>
               <select 
                 className="h-9 w-full sm:w-[160px] rounded-md border border-input bg-white px-3 text-xs text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-[#07008A]/60 transition-all cursor-pointer" 
@@ -483,6 +486,11 @@ export default function AdminBookingsPage() {
                           {b.is_special_booking && (
                             <span className="mt-1.5 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-medium text-amber-700 w-fit border border-amber-100">
                               {b.special_booking_label?.trim() || "Special Booking"}
+                            </span>
+                          )}
+                          {b.booking_source && b.booking_source !== "Walk-in" && (
+                            <span className="mt-1.5 inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-medium text-blue-700 w-fit border border-blue-100">
+                              {b.booking_source}{b.external_reference ? ` · ${b.external_reference}` : ""}
                             </span>
                           )}
                         </div>

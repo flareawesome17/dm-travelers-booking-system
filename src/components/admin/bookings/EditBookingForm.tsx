@@ -9,7 +9,7 @@ import { cn, getErrorMessage } from "@/lib/utils";
 import { calculateBookingRoomSubtotal, getBookingChargeBreakdown } from "@/lib/bookingTotals";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarDays, Users, Tag, DollarSign, Percent, User, BedDouble, Sparkles, ReceiptText } from "lucide-react";
+import { CalendarDays, Users, Tag, DollarSign, Percent, User, BedDouble, Sparkles, ReceiptText, Globe } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 
@@ -56,6 +56,8 @@ type BookingRow = {
   is_lgu_booking?: boolean;
   is_special_booking?: boolean;
   special_booking_label?: string | null;
+  booking_source?: string | null;
+  external_reference?: string | null;
   num_adults?: number;
   num_children?: number;
   discount_value?: number;
@@ -100,6 +102,8 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
   const [isSpecialBooking, setIsSpecialBooking] = useState(booking.is_special_booking ?? false);
   const [specialBookingLabel, setSpecialBookingLabel] = useState(booking.special_booking_label ?? "");
   const [chequeNumber, setChequeNumber] = useState(booking.cheque_number ?? "");
+  const [bookingSource, setBookingSource] = useState<"Walk-in" | "Booking.com" | "Online" | "Phone" | "Other">((booking.booking_source as any) ?? "Walk-in");
+  const [externalReference, setExternalReference] = useState(booking.external_reference ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [rooms, setRooms] = useState<RoomData[]>([]);
   const [loadingRooms, setLoadingRooms] = useState(true);
@@ -339,6 +343,8 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
                 is_lgu_booking: isLguBooking,
                 is_special_booking: isSpecialBooking,
                 special_booking_label: isSpecialBooking ? specialBookingLabel.trim() : null,
+                booking_source: bookingSource,
+                external_reference: bookingSource === "Booking.com" ? externalReference.trim() || null : null,
                 num_adults: numAdults,
                 num_children: numChildren,
                 discount_value: discountValue,
@@ -807,6 +813,42 @@ export function EditBookingForm({ apiUrl, token, booking, onSuccess, onClose }: 
           </div>
         </div>
       </div>
+
+        {/* ── Booking Source ──────────────────────────── */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Globe className="h-4 w-4 text-blue-600" />
+            <Label className="text-sm font-medium text-slate-700">Booking Source</Label>
+          </div>
+          <select
+            value={bookingSource}
+            onChange={(e) => setBookingSource(e.target.value as typeof bookingSource)}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="Walk-in">Walk-in</option>
+            <option value="Booking.com">Booking.com</option>
+            <option value="Online">Online (Website)</option>
+            <option value="Phone">Phone</option>
+            <option value="Other">Other</option>
+          </select>
+          {bookingSource === "Booking.com" && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-blue-600 bg-blue-50 border border-blue-100 rounded-md px-2.5 py-1.5">
+                📌 Tagged as a <strong>Booking.com</strong> reservation.
+              </p>
+              <div className="space-y-1">
+                <Label htmlFor="edit_external_reference" className="text-xs font-medium text-slate-600">Booking.com Confirmation #</Label>
+                <Input
+                  id="edit_external_reference"
+                  value={externalReference}
+                  onChange={(e) => setExternalReference(e.target.value)}
+                  placeholder="e.g. 4291837265"
+                  className="h-9 text-sm"
+                />
+              </div>
+            </div>
+          )}
+        </div>
 
       <hr className="border-slate-200" />
 
