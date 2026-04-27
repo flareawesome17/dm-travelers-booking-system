@@ -172,7 +172,9 @@ export function BookingForm({ apiUrl, token, onSuccess, onClose }: BookingFormPr
     if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return false;
     const start = s <= e ? s : e;
     const end = s <= e ? e : s;
-    return reservedRanges.some((r) => r.start <= end && r.end >= start);
+    // check-out is exclusive: guest leaves at 12 PM, new guest arrives at 2 PM.
+    // So newCheckOut == existingCheckIn is NOT an overlap (same-day turnover).
+    return reservedRanges.some((r) => r.start < end && r.end >= start);
   };
 
   useEffect(() => {
