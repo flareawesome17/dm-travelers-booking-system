@@ -66,26 +66,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (pErr || !payment) return dbError(pErr, "Failed to record payment");
 
-    // Shift Transaction Sync
-    try {
-      await addShiftTransaction({
-        source: "booking",
-        referenceId: payment.id,
-        description: `Receivable Collection (${body.method}): ${refIdentifier}`,
-        amount: Number(body.amount),
-        type: "INCOME",
-        performedBy: typeof auth.payload?.sub === "string" ? auth.payload.sub : null,
-        onFailure: "throw",
-      });
-    } catch (shiftError) {
-      console.error("[RECEIVABLE_SHIFT_SYNC_ERROR]", shiftError);
-      
-      const { error: rollbackError } = await supabase.from("receivable_payments").delete().eq("id", payment.id);
-      if (rollbackError) {
-        console.error("[RECEIVABLE_SHIFT_SYNC_ROLLBACK_ERROR]", rollbackError);
-      }
-      return internalError();
-    }
+    // Shift Transaction Sync (non-blocking – shift issues should not block receivable collections)
+    await addShiftTransaction({
+      source: "booking",
+      referenceId: payment.id,
+      description: `Receivable Collection (${body.method}): ${refIdentifier}`,
+      amount: Number(body.amount),
+      type: "INCOME",
+      performedBy: typeof auth.payload?.sub === "string" ? auth.payload.sub : null,
+      onFailure: "silent",
+    });
 
     // Update receivable totals
     const newAmountPaid = toMoneyNumber(rec.amount_paid) + body.amount;
