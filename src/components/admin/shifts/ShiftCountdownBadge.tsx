@@ -9,6 +9,7 @@ export function ShiftCountdownBadge() {
   
   useEffect(() => {
     const fetchShift = async () => {
+      if (document.visibilityState === "hidden") return;
       const token = localStorage.getItem("admin_token");
       if (!token) return;
       try {
@@ -24,7 +25,7 @@ export function ShiftCountdownBadge() {
     };
 
     fetchShift();
-    const intv = setInterval(fetchShift, 60000); // Check every minute
+    const intv = setInterval(fetchShift, 120_000); // Check every 2 minutes
     return () => clearInterval(intv);
   }, []);
 

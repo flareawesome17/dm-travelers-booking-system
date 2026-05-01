@@ -3,7 +3,54 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { verifyAdminToken } from "@/lib/auth";
 import { apiError, dbError } from "@/lib/api-security";
 
-async function loadPermissions(args: { roleId: number; adminId: string }) {
+/* ── In-memory TTL cache for admin is_active check ───────────────────
+ *
+ * Without this, EVERY API call triggers: SELECT is_active FROM admin_users WHERE id = ?
+ * With 3 admin tabs open, that's ~40+ redundant identical queries per minute.
+ *
+ * Cache entries expire after 5 minutes. If an admin account is disabled,
+ * the worst case is they retain access for up to 5 more minutes — acceptable
+ * for a hotel admin panel where deactivation is a rare, manual action.
+ * ─────────────────────────────────────────────────────────────────── */
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+interface CacheEntry<T> {
+  value: T;
+  expiresAt: number;
+}
+
+const activeCache = new Map<string, CacheEntry<boolean | null>>();
+const permissionsCache = new Map<string, CacheEntry<Set<string>>>();
+
+/** Check if an admin is active, with 5-minute in-memory caching. */
+async function checkAdminActive(adminId: string): Promise<boolean | null> {
+  const now = Date.now();
+  const cached = activeCache.get(adminId);
+  if (cached && cached.expiresAt > now) return cached.value;
+
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("admin_users")
+    .select("is_active")
+    .eq("id", adminId)
+    .single();
+
+  if (error || !data) {
+    activeCache.set(adminId, { value: null, expiresAt: now + CACHE_TTL_MS });
+    return null;
+  }
+
+  activeCache.set(adminId, { value: data.is_active, expiresAt: now + CACHE_TTL_MS });
+  return data.is_active;
+}
+
+/** Load permissions for a given role + user, with 5-minute caching. */
+async function loadPermissions(args: { roleId: number; adminId: string }): Promise<Set<string>> {
+  const cacheKey = `${args.adminId}:${args.roleId}`;
+  const now = Date.now();
+  const cached = permissionsCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) return cached.value;
+
   const supabase = getSupabaseAdmin();
 
   const { data: rolePerms, error: rpErr } = await supabase
@@ -28,7 +75,18 @@ async function loadPermissions(args: { roleId: number; adminId: string }) {
     if (typeof n === "string") names.push(n);
   }
 
-  return new Set(names);
+  const result = new Set(names);
+  permissionsCache.set(cacheKey, { value: result, expiresAt: now + CACHE_TTL_MS });
+  return result;
+}
+
+/** Force-clear the cache for a specific admin (call after role/permission changes). */
+export function invalidateAdminCache(adminId: string) {
+  activeCache.delete(adminId);
+  // Clear all permission entries for this admin
+  for (const key of permissionsCache.keys()) {
+    if (key.startsWith(`${adminId}:`)) permissionsCache.delete(key);
+  }
 }
 
 export async function requirePermission(req: NextRequest, permission: string) {
@@ -41,19 +99,12 @@ export async function requirePermission(req: NextRequest, permission: string) {
     return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) } as const;
   }
 
-  // Check if admin is still active
-  const supabase = getSupabaseAdmin();
-  const { data: admin, error: adminErr } = await supabase
-    .from("admin_users")
-    .select("is_active")
-    .eq("id", adminId)
-    .single();
-
-  if (adminErr || !admin) {
+  // Check if admin is still active (cached — avoids a DB hit on every API call)
+  const isActive = await checkAdminActive(adminId);
+  if (isActive === null) {
     return { error: apiError("unauthorized", "Authentication required", 401) } as const;
   }
-
-  if (!admin.is_active) {
+  if (!isActive) {
     return { 
       error: apiError("forbidden", "Sorry, your account is disabled, please contact your administrator.", 403) 
     } as const;
@@ -82,19 +133,12 @@ export async function requireAnyPermission(req: NextRequest, permissions: string
     return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) } as const;
   }
 
-  // Check if admin is still active
-  const supabase = getSupabaseAdmin();
-  const { data: admin, error: adminErr } = await supabase
-    .from("admin_users")
-    .select("is_active")
-    .eq("id", adminId)
-    .single();
-
-  if (adminErr || !admin) {
+  // Check if admin is still active (cached)
+  const isActive = await checkAdminActive(adminId);
+  if (isActive === null) {
     return { error: apiError("unauthorized", "Authentication required", 401) } as const;
   }
-
-  if (!admin.is_active) {
+  if (!isActive) {
     return { 
       error: apiError("forbidden", "Sorry, your account is disabled, please contact your administrator.", 403) 
     } as const;
@@ -124,19 +168,12 @@ export async function getCurrentAdminPermissions(req: NextRequest) {
     return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) } as const;
   }
 
-  // Check if admin is still active
-  const supabase = getSupabaseAdmin();
-  const { data: admin, error: adminErr } = await supabase
-    .from("admin_users")
-    .select("is_active")
-    .eq("id", adminId)
-    .single();
-
-  if (adminErr || !admin) {
+  // Check if admin is still active (cached)
+  const isActive = await checkAdminActive(adminId);
+  if (isActive === null) {
     return { error: apiError("unauthorized", "Authentication required", 401) } as const;
   }
-
-  if (!admin.is_active) {
+  if (!isActive) {
     return { 
       error: apiError("forbidden", "Sorry, your account is disabled, please contact your administrator.", 403) 
     } as const;

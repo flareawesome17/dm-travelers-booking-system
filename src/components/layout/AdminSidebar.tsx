@@ -224,6 +224,7 @@ export default function AdminSidebar({
 
   const fetchNewBookingCount = useCallback(async () => {
     try {
+      if (document.visibilityState === "hidden") return;
       const since = localStorage.getItem(LAST_SEEN_KEY) || new Date(0).toISOString();
       const res = await fetch(`/api/bookings/new-count?since=${encodeURIComponent(since)}`);
       if (res.ok) {
@@ -237,7 +238,7 @@ export default function AdminSidebar({
 
   useEffect(() => {
     fetchNewBookingCount();
-    bookingPollRef.current = setInterval(fetchNewBookingCount, 30_000);
+    bookingPollRef.current = setInterval(fetchNewBookingCount, 120_000);
     return () => {
       if (bookingPollRef.current) clearInterval(bookingPollRef.current);
     };
@@ -245,6 +246,7 @@ export default function AdminSidebar({
 
   const fetchExpiringBookings = useCallback(async () => {
     try {
+      if (document.visibilityState === "hidden") return;
       const tokenStr = localStorage.getItem("admin_token");
       if (!tokenStr) return;
 
@@ -278,10 +280,10 @@ export default function AdminSidebar({
     }
   }, []);
 
-  // Poll for expiring bookings every 60 seconds
+  // Poll for expiring bookings every 5 minutes
   useEffect(() => {
     fetchExpiringBookings();
-    expiringPollRef.current = setInterval(fetchExpiringBookings, 60_000);
+    expiringPollRef.current = setInterval(fetchExpiringBookings, 300_000);
     return () => {
       if (expiringPollRef.current) clearInterval(expiringPollRef.current);
     };
@@ -289,6 +291,7 @@ export default function AdminSidebar({
 
   const fetchOnlineUsersCount = useCallback(async () => {
     try {
+      if (document.visibilityState === "hidden") return;
       const tokenStr = localStorage.getItem("admin_token");
       if (!tokenStr) return;
 
@@ -304,10 +307,10 @@ export default function AdminSidebar({
     }
   }, []);
 
-  // Poll for online users every 60 seconds
+  // Poll for online users every 5 minutes
   useEffect(() => {
     fetchOnlineUsersCount();
-    onlineUsersPollRef.current = setInterval(fetchOnlineUsersCount, 60_000);
+    onlineUsersPollRef.current = setInterval(fetchOnlineUsersCount, 300_000);
     return () => {
       if (onlineUsersPollRef.current) clearInterval(onlineUsersPollRef.current);
     };

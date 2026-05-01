@@ -337,6 +337,7 @@ export default function ActivityHub({
   // ── Team members ──
   const fetchTeam = useCallback(async () => {
     try {
+      if (document.visibilityState === "hidden") return;
       const res = await fetch("/api/admin/team", { headers: authHeaders() });
       if (res.ok) {
         const data = await res.json();
@@ -348,7 +349,7 @@ export default function ActivityHub({
 
   useEffect(() => {
     fetchTeam();
-    const interval = setInterval(fetchTeam, 30_000);
+    const interval = setInterval(fetchTeam, 120_000);
     return () => clearInterval(interval);
   }, [fetchTeam]);
 

@@ -68,11 +68,13 @@ type RestaurantOrder = {
 
 export default function AdminDashboardPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [rooms, setRooms] = useState<Room[]>([]);
   const [orders, setOrders] = useState<RestaurantOrder[]>([]);
+  const [totalBookings, setTotalBookings] = useState(0);
+  const [roomStats, setRoomStats] = useState({ total: 0, available: 0, occupied: 0, dirty: 0 });
   const [revenue, setRevenue] = useState(0);
   const [lowStockObjects, setLowStockObjects] = useState<any[]>([]);
   const [activeShift, setActiveShift] = useState<any>(null);
+  const [arrivalsToday, setArrivalsToday] = useState<Booking[]>([]);
   const [expiringBookings, setExpiringBookings] = useState<ExpiringBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [welcome, setWelcome] = useState<{ name: string | null; roleLabel: string | null } | null>(null);
@@ -91,41 +93,43 @@ export default function AdminDashboardPage() {
 
     let active = true;
     const fetchData = async () => {
+      if (document.visibilityState === "hidden") return;
+
       try {
         const headers = { Authorization: `Bearer ${token}` };
-        const [bRes, rRes, oRes, revRes, invRes, shiftRes, expRes] = await Promise.all([
-          fetch("/api/bookings", { headers }),
-          fetch("/api/rooms", { headers }),
-          fetch("/api/restaurant/orders", { headers }),
-          fetch("/api/reports/revenue?startDate=" + new Date().toISOString().split("T")[0], { headers }),
-          fetch("/api/inventory", { headers }),
+        const [dashboardRes, shiftRes] = await Promise.all([
+          fetch("/api/admin/dashboard", { headers }),
           fetch("/api/shifts/current", { headers }),
-          fetch("/api/bookings/expiring", { headers }),
         ]);
 
-        const [bData, rData, oData, revData, invData, shiftData, expData] = await Promise.all([
-          bRes.json(), rRes.json(), oRes.json(), revRes.json(),
-          invRes.ok ? invRes.json() : Promise.resolve([]),
+        const [dashboardData, shiftData] = await Promise.all([
+          dashboardRes.ok ? dashboardRes.json() : Promise.resolve(null),
           shiftRes.ok ? shiftRes.json() : Promise.resolve(null),
-          expRes.ok ? expRes.json() : Promise.resolve({ bookings: [] }),
         ]);
 
         if (!active) return;
 
-        setBookings(Array.isArray(bData) ? bData : []);
-        setRooms(Array.isArray(rData) ? rData : []);
-        setOrders(Array.isArray(oData) ? oData : []);
-        setRevenue(revData?.total_revenue || 0);
-
-        if (Array.isArray(invData)) {
-          setLowStockObjects(invData.filter((i: any) => Number(i.current_stock) <= Number(i.min_stock_alert)));
+        if (dashboardData) {
+          setBookings(Array.isArray(dashboardData.recentBookings) ? dashboardData.recentBookings : []);
+          setTotalBookings(Number(dashboardData.totalBookings || 0));
+          setRoomStats({
+            total: Number(dashboardData.roomStats?.total || 0),
+            available: Number(dashboardData.roomStats?.available || 0),
+            occupied: Number(dashboardData.roomStats?.occupied || 0),
+            dirty: Number(dashboardData.roomStats?.dirty || 0),
+          });
+          setOrders(Array.isArray(dashboardData.recentOrders) ? dashboardData.recentOrders : []);
+          setRevenue(Number(dashboardData.revenueToday || 0));
+          setLowStockObjects(Array.isArray(dashboardData.lowStock) ? dashboardData.lowStock : []);
+          setArrivalsToday(Array.isArray(dashboardData.arrivalsToday) ? dashboardData.arrivalsToday : []);
+          setExpiringBookings(Array.isArray(dashboardData.expiringBookings) ? dashboardData.expiringBookings : []);
         }
+
         if (shiftData && shiftData.shift && shiftData.shift_log?.status !== "CLOSED") {
           setActiveShift(shiftData);
         } else {
           setActiveShift(null);
         }
-        setExpiringBookings(expData?.bookings || []);
       } catch (error) {
         console.error("Dashboard fetch error:", error);
       } finally {
@@ -134,7 +138,7 @@ export default function AdminDashboardPage() {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 60000);
+    const interval = setInterval(fetchData, 120000);
     const handleFocus = () => { void fetchData(); };
     window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleFocus);
@@ -179,25 +183,6 @@ export default function AdminDashboardPage() {
     });
   }, []);
 
-  const arrivalsToday = bookings.filter(b => {
-    const isToday = b.check_in_date?.startsWith(nowData.today);
-    const s = (b.status || "").toLowerCase().replace("-", " ");
-    const isArriving = !["checked in", "checked out", "cancelled", "completed"].includes(s);
-    return isToday && isArriving;
-  });
-
-  const departuresToday = bookings.filter(b => {
-    const isToday = b.check_out_date?.startsWith(nowData.today);
-    const s = (b.status || "").toLowerCase().replace("-", " ");
-    return isToday && (s === "checked in");
-  });
-  
-  const roomStats = {
-    available: rooms.filter(r => r.status === "Available").length,
-    occupied: rooms.filter(r => r.status === "Occupied").length,
-    dirty: rooms.filter(r => r.status === "Dirty").length,
-  };
-
   const statusVariant: Record<string, string> = {
     "pending payment": "bg-slate-100 text-slate-700 border-slate-200",
     "confirmed": "bg-blue-50 text-blue-700 border-blue-200",
@@ -219,7 +204,7 @@ export default function AdminDashboardPage() {
   })();
 
   // Total rooms and occupancy
-  const totalRooms = rooms.length;
+  const totalRooms = roomStats.total;
   const occupancyPct = totalRooms > 0 ? Math.round((roomStats.occupied / totalRooms) * 100) : 0;
 
   return (
@@ -296,7 +281,7 @@ export default function AdminDashboardPage() {
           },
           {
             icon: CalendarDays,
-            value: bookings.length,
+            value: totalBookings,
             label: "Total Bookings",
             color: "text-[#07008A]",
             bgColor: "bg-[#07008A]/[0.06]",

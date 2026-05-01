@@ -117,6 +117,7 @@ export default function AdminDashboardShell({
 
     const sendHeartbeat = async () => {
       try {
+        if (document.visibilityState === "hidden") return;
         await fetch("/api/admin/heartbeat", { 
           method: "POST",
           headers: { Authorization: `Bearer ${token}` }
@@ -129,8 +130,8 @@ export default function AdminDashboardShell({
     // Send immediately on mount
     sendHeartbeat();
 
-    // Then every 60 seconds
-    const interval = setInterval(sendHeartbeat, 60000);
+    // Then every 2 minutes. Online status uses a 5-minute window.
+    const interval = setInterval(sendHeartbeat, 120000);
     return () => clearInterval(interval);
   }, [pathname]); // Re-run or stay alive across navigation
 

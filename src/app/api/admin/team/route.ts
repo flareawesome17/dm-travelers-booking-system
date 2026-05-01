@@ -8,9 +8,18 @@ import { dbError, internalError } from "@/lib/api-security";
  * Used by the Activity Hub to show who's available for chat.
  * Requires `activity_hub.read` permission.
  */
+
+// Cache team response for 60 seconds — all admins see the same list
+let cachedTeam: { members: any[]; expiresAt: number } | null = null;
+
 export async function GET(req: NextRequest) {
   const auth = await requirePermission(req, "activity_hub.read");
   if ("error" in auth) return auth.error;
+
+  const now = Date.now();
+  if (cachedTeam && cachedTeam.expiresAt > now) {
+    return NextResponse.json({ members: cachedTeam.members });
+  }
 
   try {
     const supabase = getSupabaseAdmin();
@@ -38,8 +47,11 @@ export async function GET(req: NextRequest) {
       return a.name.localeCompare(b.name);
     });
 
+    cachedTeam = { members, expiresAt: Date.now() + 60_000 };
+
     return NextResponse.json({ members });
   } catch {
     return internalError();
   }
 }
+

@@ -3,63 +3,38 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { requirePermission } from "@/lib/rbac";
 import { dbError, internalError } from "@/lib/api-security";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const auth = await requirePermission(req, "bookings.read");
   if ("error" in auth) return auth.error;
 
   try {
     const supabase = getSupabaseAdmin();
-    // We only care about bookings that are currently Checked-In
-    const { data: bookings, error } = await supabase
-      .from("bookings")
-      .select("*, guests(full_name), rooms(room_number)")
-      .eq("status", "Checked-In");
-
-    if (error) return dbError(error, "Failed to load checked-in bookings");
-
     const now = new Date();
     const alertThreshold = new Date(now.getTime() + 30 * 60 * 1000); // 30 minutes from now
 
-    const { getGlobalTimeConfig } = await import("@/lib/settings");
-    const { offset } = await getGlobalTimeConfig(supabase);
-    const tzOffset = offset || "+08:00";
+    const { data: bookings, error } = await supabase
+      .from("bookings")
+      .select("id, reference_number, reserved_checkout_datetime, guests(full_name), rooms(room_number)")
+      .eq("status", "Checked-In")
+      .not("reserved_checkout_datetime", "is", null)
+      .lte("reserved_checkout_datetime", alertThreshold.toISOString())
+      .order("reserved_checkout_datetime", { ascending: true })
+      .limit(20);
 
-    const expiring = (bookings || []).map((b) => {
-      let checkoutTime: Date | null = null;
-      const rateKind = b.rate_plan_kind || "24h";
+    if (error) return dbError(error, "Failed to load checked-in bookings");
 
-      if (rateKind === "24h") {
-        if (b.check_out_date) {
-            // Standard check-out is 12:00 PM based on timezone 
-            checkoutTime = new Date(`${b.check_out_date}T12:00:00${tzOffset}`);
-        }
-      } else {
-        // Hourly: actual_check_in_at + N hours
-        const hoursToAdd = parseInt(rateKind.replace(/\D/g, ""), 10) || 0;
-        if (b.actual_check_in_at) {
-          checkoutTime = new Date(b.actual_check_in_at);
-          checkoutTime.setHours(checkoutTime.getHours() + hoursToAdd);
-        }
-      }
-
-      if (!checkoutTime) return null;
-
-      // Filter: Expiring within 30 mins OR already past due (overdue)
-      if (checkoutTime <= alertThreshold) {
-        return {
-          id: b.id,
-          reference_number: b.reference_number,
-          guest_name: b.guests?.full_name,
-          room_number: b.rooms?.room_number,
-          checkout_datetime: checkoutTime.toISOString(),
-          is_overdue: checkoutTime < now
-        };
-      }
-      return null;
-    }).filter((item): item is NonNullable<typeof item> => item !== null);
-
-    // Sort by checkout time (earliest first)
-    expiring.sort((a, b) => new Date(a.checkout_datetime).getTime() - new Date(b.checkout_datetime).getTime());
+    const expiring = (bookings || []).map((b) => ({
+      id: b.id,
+      reference_number: b.reference_number,
+      guest_name: (b.guests as any)?.full_name,
+      room_number: (b.rooms as any)?.room_number,
+      checkout_datetime: b.reserved_checkout_datetime,
+      is_overdue: b.reserved_checkout_datetime
+        ? new Date(b.reserved_checkout_datetime).getTime() < now.getTime()
+        : false,
+    }));
 
     return NextResponse.json({
       count: expiring.length,
