@@ -23,7 +23,10 @@ function createSupabaseMock() {
         return {
           select: vi.fn(() => ({
             order: vi.fn(async () => ({
-              data: [{ id: 1, name: "Manager", description: "Ops" }],
+              data: [
+                { id: 2, name: "Manager", description: "Ops" },
+                { id: 3, name: "Staff", description: "Front desk" },
+              ],
               error: null,
             })),
           })),
@@ -34,7 +37,12 @@ function createSupabaseMock() {
         return {
           select: vi.fn(() => ({
             order: vi.fn(async () => ({
-              data: [{ id: 10, name: "roles.manage" }],
+              data: [
+                { id: 10, name: "roles.manage" },
+                { id: 50, name: "gcash.read" },
+                { id: 51, name: "gcash.transact" },
+                { id: 52, name: "gcash.adjust" },
+              ],
               error: null,
             })),
           })),
@@ -44,7 +52,13 @@ function createSupabaseMock() {
       if (table === "role_permissions") {
         return {
           select: vi.fn(async () => ({
-            data: [{ role_id: 1, permission_id: 10 }],
+            data: [
+              { role_id: 2, permission_id: 50 },
+              { role_id: 2, permission_id: 51 },
+              { role_id: 2, permission_id: 52 },
+              { role_id: 3, permission_id: 50 },
+              { role_id: 3, permission_id: 51 },
+            ],
             error: null,
           })),
         };
@@ -86,9 +100,23 @@ describe("GET /api/rbac/roles", () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({
-      roles: [{ id: 1, name: "Manager", description: "Ops" }],
-      permissions: [{ id: 10, name: "roles.manage" }],
-      role_permissions: [{ role_id: 1, permission_id: 10 }],
+      roles: [
+        { id: 2, name: "Manager", description: "Ops" },
+        { id: 3, name: "Staff", description: "Front desk" },
+      ],
+      permissions: [
+        { id: 10, name: "roles.manage" },
+        { id: 50, name: "gcash.read" },
+        { id: 51, name: "gcash.transact" },
+        { id: 52, name: "gcash.adjust" },
+      ],
+      role_permissions: [
+        { role_id: 2, permission_id: 50 },
+        { role_id: 2, permission_id: 51 },
+        { role_id: 2, permission_id: 52 },
+        { role_id: 3, permission_id: 50 },
+        { role_id: 3, permission_id: 51 },
+      ],
     });
   });
 });

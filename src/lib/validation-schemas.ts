@@ -412,6 +412,22 @@ export const createCashOpeningAdjustmentSchema = z.object({
   effective_at: isoDateTime.optional(),
 }).strict();
 
+export const createGcashTransactionSchema = z.object({
+  transaction_type: z.enum(["cash_in", "load"]),
+  amount: positiveNumber,
+  transaction_reference: z.string().trim().max(120).optional().nullable(),
+  customer_name: z.string().trim().max(120).optional().nullable(),
+  recipient_number: z.string().trim().max(30).optional().nullable(),
+  note: z.string().trim().max(500).optional().nullable(),
+  effective_at: isoDateTime.optional(),
+}).strict();
+
+export const createGcashOpeningAdjustmentSchema = z.object({
+  amount: z.number().refine((value) => Number.isFinite(value) && value !== 0, "Amount must be a non-zero number"),
+  note: z.string().trim().max(500).optional().nullable(),
+  effective_at: isoDateTime.optional(),
+}).strict();
+
 // ─── Discount Schemas (Global Module) ──────────────────────────────────────────
 
 const discountBaseSchema = z.object({

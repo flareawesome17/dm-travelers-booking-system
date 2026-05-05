@@ -26,6 +26,7 @@ import {
   Clock,
   Landmark,
   Wallet,
+  WalletCards,
   FileText,
   ShieldCheck,
   Percent,
@@ -69,6 +70,7 @@ const financeItems: SidebarItem[] = [
   { label: "Receivables", path: "/admin/receivables", icon: Building2, permission: "receivables.read" },
   { label: "Inventory", path: "/admin/inventory", icon: PackageSearch, permission: "inventory.read" },
   { label: "Cash", path: "/admin/cash", icon: Wallet, permission: "cash.read" },
+  { label: "GCash", path: "/admin/gcash", icon: WalletCards, permission: "gcash.read" },
   { label: "Treasury", path: "/admin/treasury", icon: Landmark, permission: "treasury.read" },
   { label: "LGU Monitoring", path: "/admin/lgu-monitoring", icon: ShieldCheck, permission: "lgu-monitoring.read" },
 ];
