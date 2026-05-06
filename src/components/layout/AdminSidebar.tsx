@@ -31,6 +31,7 @@ import {
   ShieldCheck,
   Percent,
   Star,
+  ConciergeBell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -71,6 +72,7 @@ const financeItems: SidebarItem[] = [
   { label: "Inventory", path: "/admin/inventory", icon: PackageSearch, permission: "inventory.read" },
   { label: "Cash", path: "/admin/cash", icon: Wallet, permission: "cash.read" },
   { label: "GCash", path: "/admin/gcash", icon: WalletCards, permission: "gcash.read" },
+  { label: "Other Services", path: "/admin/other-services", icon: ConciergeBell, permission: "other_services.read" },
   { label: "Treasury", path: "/admin/treasury", icon: Landmark, permission: "treasury.read" },
   { label: "LGU Monitoring", path: "/admin/lgu-monitoring", icon: ShieldCheck, permission: "lgu-monitoring.read" },
 ];

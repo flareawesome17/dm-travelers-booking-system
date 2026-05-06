@@ -29,6 +29,7 @@ describe("CashPage", () => {
           json: async () => ({
             cash_receipts_total: 1000,
             restaurant_cash_total: 200,
+            other_services_cash_total: 70,
             cash_expenses_total: 50,
             approved_deposits_total: 300,
             opening_adjustments_total: 100,

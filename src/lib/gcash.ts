@@ -24,6 +24,7 @@ export type GcashSummary = {
   booking_gcash_total: number;
   restaurant_gcash_total: number;
   receivable_gcash_total: number;
+  other_services_gcash_total: number;
   gcash_expenses_total: number;
   manual_cash_in_total: number;
   manual_load_total: number;
@@ -55,6 +56,7 @@ export function buildGcashSummary(args: {
   paymentRows: AmountRow[];
   restaurantRows: RestaurantGcashRow[];
   receivableRows: AmountRow[];
+  otherServiceRows?: RestaurantGcashRow[];
   expenseRows: AmountRow[];
   ledgerRows: GcashLedgerRow[];
 }): GcashSummary {
@@ -65,6 +67,7 @@ export function buildGcashSummary(args: {
       .filter((row) => !String(row.notes || "").startsWith("Synced from booking payment"))
       .reduce((sum, row) => sum + toMoney(row.amount), 0),
   );
+  const otherServicesGcashTotal = roundMoney((args.otherServiceRows ?? []).reduce((sum, row) => sum + toMoney(row.total_amount), 0));
   const gcashExpensesTotal = roundMoney(args.expenseRows.reduce((sum, row) => sum + toMoney(row.amount), 0));
 
   let manualCashInTotal = 0;
@@ -93,6 +96,7 @@ export function buildGcashSummary(args: {
     booking_gcash_total: bookingGcashTotal,
     restaurant_gcash_total: restaurantGcashTotal,
     receivable_gcash_total: receivableGcashTotal,
+    other_services_gcash_total: otherServicesGcashTotal,
     gcash_expenses_total: gcashExpensesTotal,
     manual_cash_in_total: roundMoney(manualCashInTotal),
     manual_load_total: roundMoney(manualLoadTotal),
@@ -103,6 +107,7 @@ export function buildGcashSummary(args: {
       restaurantGcashTotal +
       receivableGcashTotal -
       gcashExpensesTotal +
+      otherServicesGcashTotal +
       ledgerNetEffect,
     ),
   };
@@ -113,6 +118,7 @@ export async function getGcashSummary(supabase: SupabaseAdminClient) {
     { data: paymentRows, error: paymentError },
     { data: restaurantRows, error: restaurantError },
     { data: receivableRows, error: receivableError },
+    { data: otherServiceRows, error: otherServiceError },
     { data: expenseRows, error: expenseError },
     { data: ledgerRows, error: ledgerError },
   ] = await Promise.all([
@@ -131,6 +137,10 @@ export async function getGcashSummary(supabase: SupabaseAdminClient) {
       .select("amount, notes")
       .eq("method", "GCash"),
     supabase
+      .from("other_service_records")
+      .select("total_amount")
+      .eq("payment_method", "GCash"),
+    supabase
       .from("expenses")
       .select("amount")
       .eq("payment_method", "GCash"),
@@ -142,6 +152,7 @@ export async function getGcashSummary(supabase: SupabaseAdminClient) {
   if (paymentError) throw paymentError;
   if (restaurantError) throw restaurantError;
   if (receivableError) throw receivableError;
+  if (otherServiceError) throw otherServiceError;
   if (expenseError) throw expenseError;
   if (ledgerError) throw ledgerError;
 
@@ -149,6 +160,7 @@ export async function getGcashSummary(supabase: SupabaseAdminClient) {
     paymentRows: paymentRows ?? [],
     restaurantRows: restaurantRows ?? [],
     receivableRows: receivableRows ?? [],
+    otherServiceRows: otherServiceRows ?? [],
     expenseRows: expenseRows ?? [],
     ledgerRows: ledgerRows ?? [],
   });

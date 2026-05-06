@@ -51,12 +51,21 @@ export async function GET(req: NextRequest) {
     const { data: receivablePayments, error: rcErr } = await rcQuery;
     if (rcErr) throw rcErr;
 
+    // 5. Fetch Other Services
+    let osQuery = supabase.from("other_service_records")
+      .select("id, total_amount, payment_method, accounting_date, service_name");
+    if (startDay) osQuery = osQuery.gte("accounting_date", startDay);
+    if (endDay) osQuery = osQuery.lte("accounting_date", endDay);
+    const { data: otherServices, error: osErr } = await osQuery;
+    if (osErr) throw osErr;
+
     // --- Calculations (Actual Paid Revenue) ---
     const roomRevenue = (payments ?? []).reduce((s, p) => s + Number(p.amount || 0), 0);
     const restaurantRevenue = (rOrders ?? []).reduce((s, r) => s + Number(r.total_amount || 0), 0);
     const receivableRevenue = (receivablePayments ?? []).reduce((s, rp) => s + Number(rp.amount || 0), 0);
+    const otherServicesRevenue = (otherServices ?? []).reduce((s, service) => s + Number(service.total_amount || 0), 0);
 
-    let totalRevenue = roomRevenue + restaurantRevenue + receivableRevenue;
+    let totalRevenue = roomRevenue + restaurantRevenue + receivableRevenue + otherServicesRevenue;
     let totalExpenses = (expenses ?? []).reduce((s, e) => s + Number(e.amount || 0), 0);
     let netProfit = totalRevenue - totalExpenses;
 
@@ -76,6 +85,11 @@ export async function GET(req: NextRequest) {
       const amt = Number(rp.amount || 0);
       if (amt > 0) byMethod[m] = (byMethod[m] || 0) + amt;
     });
+    (otherServices ?? []).forEach((service) => {
+      const m = service.payment_method || "Unknown";
+      const amt = Number(service.total_amount || 0);
+      if (amt > 0) byMethod[m] = (byMethod[m] || 0) + amt;
+    });
 
     const bySource: Record<string, number> = {
       Rooms: roomRevenue,
@@ -84,6 +98,9 @@ export async function GET(req: NextRequest) {
     if (receivableRevenue > 0) {
       bySource["Receivables"] = receivableRevenue;
     }
+    if (otherServicesRevenue > 0) {
+      bySource["Other Services"] = otherServicesRevenue;
+    }
 
     if (format === "csv") {
       const header = "Category,Amount\n";
@@ -91,6 +108,7 @@ export async function GET(req: NextRequest) {
         `Room Revenue,${roomRevenue.toFixed(2)}`,
         `Restaurant Revenue,${restaurantRevenue.toFixed(2)}`,
         `Receivable Collections,${receivableRevenue.toFixed(2)}`,
+        `Other Services Revenue,${otherServicesRevenue.toFixed(2)}`,
         `Total Revenue,${totalRevenue.toFixed(2)}`,
         `Total Expenses,${totalExpenses.toFixed(2)}`,
         `Net Profit,${netProfit.toFixed(2)}`
@@ -101,6 +119,7 @@ export async function GET(req: NextRequest) {
     const bookingCount = Array.from(new Set((payments ?? []).map((p) => p.booking_id).filter(Boolean))).length;
     const orderCount = (rOrders ?? []).length;
     const receivableCollectionCount = (receivablePayments ?? []).length;
+    const otherServicesCount = (otherServices ?? []).length;
 
     // --- Shift Ledger Single Source of Truth for All Periods ---
     if (format !== "csv") {
@@ -156,6 +175,7 @@ export async function GET(req: NextRequest) {
       room_revenue: roomRevenue,
       restaurant_revenue: restaurantRevenue,
       receivable_revenue: receivableRevenue,
+      other_services_revenue: otherServicesRevenue,
       total_expenses: totalExpenses,
       net_profit: netProfit,
       by_method: byMethod,
@@ -163,6 +183,7 @@ export async function GET(req: NextRequest) {
       booking_count: bookingCount,
       order_count: orderCount,
       receivable_collection_count: receivableCollectionCount,
+      other_services_count: otherServicesCount,
       expenses_list: expenses || []
     });
   } catch (error: any) {

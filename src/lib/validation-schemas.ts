@@ -428,6 +428,33 @@ export const createGcashOpeningAdjustmentSchema = z.object({
   effective_at: isoDateTime.optional(),
 }).strict();
 
+export const createOtherServiceRecordSchema = z.object({
+  service_type_id: z.string().uuid("Invalid service type ID"),
+  quantity: positiveNumber,
+  payment_method: z.enum(["Cash", "GCash", "Card", "QRPh", "Cheque"]),
+  payment_reference: z.string().trim().max(120).optional().nullable(),
+  customer_name: z.string().trim().max(120).optional().nullable(),
+  room_number: z.string().trim().max(30).optional().nullable(),
+  note: z.string().trim().max(500).optional().nullable(),
+  accounting_date: ymdDate.optional(),
+}).strict().superRefine((data, ctx) => {
+  if (data.payment_method !== "Cash" && !String(data.payment_reference || "").trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["payment_reference"],
+      message: "Reference number is required for non-cash service payments",
+    });
+  }
+});
+
+export const updateOtherServiceTypeSchema = z.object({
+  name: z.string().trim().min(2).max(120).optional(),
+  rate_amount: nonNegativeNumber.optional(),
+  unit_label: z.string().trim().min(1).max(40).optional(),
+  unit_description: z.string().trim().max(200).optional().nullable(),
+  is_active: z.boolean().optional(),
+}).strict().refine((data) => Object.keys(data).length > 0, "At least one service field is required");
+
 // ─── Discount Schemas (Global Module) ──────────────────────────────────────────
 
 const discountBaseSchema = z.object({

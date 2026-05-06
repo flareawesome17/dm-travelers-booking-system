@@ -285,7 +285,7 @@ export async function getOrCreateActiveShiftLog(adminId?: string) {
  * Non-blocking — if no shift is found, silently skips.
  */
 type AddShiftTransactionParams = {
-  source: "booking" | "restaurant" | "expense" | "manual";
+  source: "booking" | "restaurant" | "expense" | "manual" | "other_service";
   referenceId?: string;
   description: string;
   amount: number;

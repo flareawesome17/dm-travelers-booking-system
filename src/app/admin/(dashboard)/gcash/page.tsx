@@ -19,6 +19,7 @@ type GcashSummary = {
   booking_gcash_total: number;
   restaurant_gcash_total: number;
   receivable_gcash_total: number;
+  other_services_gcash_total: number;
   gcash_expenses_total: number;
   manual_cash_in_total: number;
   manual_load_total: number;
@@ -235,7 +236,7 @@ export default function AdminGcashPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <SummaryCard label="Available GCash" value={money(summary?.available_gcash || 0)} helper="Live wallet balance after tagged inflows and posted outflows." emphasized />
-        <SummaryCard label="Tagged Payments" value={money((summary?.booking_gcash_total || 0) + (summary?.restaurant_gcash_total || 0) + (summary?.receivable_gcash_total || 0))} helper={`Bookings ${money(summary?.booking_gcash_total || 0)} + restaurant ${money(summary?.restaurant_gcash_total || 0)} + AR ${money(summary?.receivable_gcash_total || 0)}.`} />
+        <SummaryCard label="Tagged Payments" value={money((summary?.booking_gcash_total || 0) + (summary?.restaurant_gcash_total || 0) + (summary?.receivable_gcash_total || 0) + (summary?.other_services_gcash_total || 0))} helper={`Bookings ${money(summary?.booking_gcash_total || 0)} + restaurant ${money(summary?.restaurant_gcash_total || 0)} + AR ${money(summary?.receivable_gcash_total || 0)} + services ${money(summary?.other_services_gcash_total || 0)}.`} />
         <SummaryCard label="Cash-In Outflow" value={money(summary?.manual_cash_in_total || 0)} helper="Customer cash-in principal deducted from GCash." />
         <SummaryCard label="Load Outflow" value={money(summary?.manual_load_total || 0)} helper="Customer load principal deducted from GCash." />
         <SummaryCard label="Service Fees" value={money(summary?.service_charges_total || 0)} helper={`PHP 20 per 1-1000 tier. GCash expenses ${money(summary?.gcash_expenses_total || 0)}.`} />

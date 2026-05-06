@@ -19,6 +19,7 @@ describe("buildGcashSummary", () => {
         { amount: 400, notes: "Direct AR payment" },
         { amount: 999, notes: "Synced from booking payment TXN-1" },
       ],
+      otherServiceRows: [{ total_amount: 150 }],
       expenseRows: [{ amount: 100 }],
       ledgerRows: [
         { direction: "credit", entry_type: "opening_adjustment", amount: 500 },
@@ -31,12 +32,13 @@ describe("buildGcashSummary", () => {
       booking_gcash_total: 1300,
       restaurant_gcash_total: 250,
       receivable_gcash_total: 400,
+      other_services_gcash_total: 150,
       gcash_expenses_total: 100,
       manual_cash_in_total: 700,
       manual_load_total: 1200,
       service_charges_total: 60,
       opening_adjustments_total: 500,
-      available_gcash: 450,
+      available_gcash: 600,
     });
   });
 });

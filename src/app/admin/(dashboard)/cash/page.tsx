@@ -32,6 +32,7 @@ import {
 type CashSummary = {
   cash_receipts_total: number;
   restaurant_cash_total: number;
+  other_services_cash_total: number;
   cash_expenses_total: number;
   approved_deposits_total: number;
   opening_adjustments_total: number;
@@ -384,7 +385,7 @@ export default function AdminCashPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <SummaryCard label="Available Cash" value={money(summary?.available_cash || 0)} helper="Official live physical cash after recorded bank deposits." emphasized />
-        <SummaryCard label="Cash Receipts" value={money((summary?.cash_receipts_total || 0) + (summary?.restaurant_cash_total || 0))} helper={`Booking cash ${money(summary?.cash_receipts_total || 0)} + restaurant cash ${money(summary?.restaurant_cash_total || 0)}.`} />
+        <SummaryCard label="Cash Receipts" value={money((summary?.cash_receipts_total || 0) + (summary?.restaurant_cash_total || 0) + (summary?.other_services_cash_total || 0))} helper={`Booking ${money(summary?.cash_receipts_total || 0)} + restaurant ${money(summary?.restaurant_cash_total || 0)} + services ${money(summary?.other_services_cash_total || 0)}.`} />
         <SummaryCard label="Cash Expenses" value={money(summary?.cash_expenses_total || 0)} helper="Only expenses marked as cash reduce the balance." />
         <SummaryCard label="Bank Deposited" value={money(summary?.approved_deposits_total || 0)} helper={`Recorded deposits already removed from cash on hand. Reversals added back ${money(summary?.reversals_total || 0)}.`} />
         <SummaryCard label="Opening Adjustment" value={money(summary?.opening_adjustments_total || 0)} helper="Use this once to align the module with actual counted cash." />

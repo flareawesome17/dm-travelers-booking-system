@@ -6,6 +6,7 @@ describe("buildCashSummary", () => {
     const summary = buildCashSummary({
       paymentRows: [{ amount: 1000 }, { amount: 250.5 }],
       restaurantRows: [{ total_amount: 300 }],
+      otherServiceRows: [{ total_amount: 70 }],
       expenseRows: [{ amount: 125.25 }],
       ledgerRows: [
         { direction: "credit", entry_type: "opening_adjustment", amount: 200 },
@@ -18,11 +19,12 @@ describe("buildCashSummary", () => {
     expect(summary).toEqual({
       cash_receipts_total: 1250.5,
       restaurant_cash_total: 300,
+      other_services_cash_total: 70,
       cash_expenses_total: 125.25,
       approved_deposits_total: 600,
       opening_adjustments_total: 200,
       reversals_total: 100,
-      available_cash: 1125.25,
+      available_cash: 1195.25,
       pending_request_total: 100,
       pending_request_count: 2,
     });
@@ -32,6 +34,7 @@ describe("buildCashSummary", () => {
     const summary = buildCashSummary({
       paymentRows: [],
       restaurantRows: [],
+      otherServiceRows: [],
       expenseRows: [],
       ledgerRows: [{ direction: "debit", entry_type: "opening_adjustment", amount: 50 }],
       pendingRows: [],

@@ -22,6 +22,7 @@ describe("GcashPage", () => {
             booking_gcash_total: 1000,
             restaurant_gcash_total: 250,
             receivable_gcash_total: 300,
+            other_services_gcash_total: 150,
             gcash_expenses_total: 50,
             manual_cash_in_total: 500,
             manual_load_total: 200,

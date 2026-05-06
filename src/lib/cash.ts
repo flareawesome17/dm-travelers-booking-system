@@ -6,6 +6,7 @@ type SupabaseAdminClient = ReturnType<typeof getSupabaseAdmin>;
 
 type CashAmountRow = { amount?: number | string | null };
 type CashRestaurantRow = { total_amount?: number | string | null };
+type CashOtherServiceRow = { total_amount?: number | string | null };
 type CashLedgerRow = {
   id?: string;
   direction?: "credit" | "debit" | string | null;
@@ -61,6 +62,7 @@ type CashDepositRequestRecord = {
 export type CashSummary = {
   cash_receipts_total: number;
   restaurant_cash_total: number;
+  other_services_cash_total: number;
   cash_expenses_total: number;
   approved_deposits_total: number;
   opening_adjustments_total: number;
@@ -220,12 +222,14 @@ export function validateCashProofUpload(file: CashProofFile) {
 export function buildCashSummary(args: {
   paymentRows: CashAmountRow[];
   restaurantRows: CashRestaurantRow[];
+  otherServiceRows?: CashOtherServiceRow[];
   expenseRows: CashAmountRow[];
   ledgerRows: CashLedgerRow[];
   pendingRows: CashPendingRow[];
 }): CashSummary {
   const cashReceiptsTotal = roundMoney(args.paymentRows.reduce((sum, row) => sum + toMoney(row.amount), 0));
   const restaurantCashTotal = roundMoney(args.restaurantRows.reduce((sum, row) => sum + toMoney(row.total_amount), 0));
+  const otherServicesCashTotal = roundMoney((args.otherServiceRows ?? []).reduce((sum, row) => sum + toMoney(row.total_amount), 0));
   const cashExpensesTotal = roundMoney(args.expenseRows.reduce((sum, row) => sum + toMoney(row.amount), 0));
 
   let approvedDepositsTotal = 0;
@@ -250,14 +254,16 @@ export function buildCashSummary(args: {
   const pendingRequestTotal = roundMoney(args.pendingRows.reduce((sum, row) => sum + toMoney(row.amount), 0));
   const availableCash = roundMoney(
     cashReceiptsTotal +
-    restaurantCashTotal -
-    cashExpensesTotal +
-    ledgerNetEffect,
+    restaurantCashTotal +
+    otherServicesCashTotal +
+    ledgerNetEffect -
+    cashExpensesTotal,
   );
 
   return {
     cash_receipts_total: cashReceiptsTotal,
     restaurant_cash_total: restaurantCashTotal,
+    other_services_cash_total: otherServicesCashTotal,
     cash_expenses_total: cashExpensesTotal,
     approved_deposits_total: roundMoney(approvedDepositsTotal),
     opening_adjustments_total: roundMoney(openingAdjustmentsTotal),
@@ -272,6 +278,7 @@ export async function getCashSummary(supabase: SupabaseAdminClient) {
   const [
     { data: paymentRows, error: paymentError },
     { data: restaurantRows, error: restaurantError },
+    { data: otherServiceRows, error: otherServiceError },
     { data: expenseRows, error: expenseError },
     { data: ledgerRows, error: ledgerError },
     { data: pendingRows, error: pendingError },
@@ -285,6 +292,10 @@ export async function getCashSummary(supabase: SupabaseAdminClient) {
       .from("restaurant_orders")
       .select("total_amount")
       .eq("status", "Paid")
+      .eq("payment_method", "Cash"),
+    supabase
+      .from("other_service_records")
+      .select("total_amount")
       .eq("payment_method", "Cash"),
     supabase
       .from("expenses")
@@ -301,6 +312,7 @@ export async function getCashSummary(supabase: SupabaseAdminClient) {
 
   if (paymentError) throw paymentError;
   if (restaurantError) throw restaurantError;
+  if (otherServiceError) throw otherServiceError;
   if (expenseError) throw expenseError;
   if (ledgerError) throw ledgerError;
   if (pendingError) throw pendingError;
@@ -308,6 +320,7 @@ export async function getCashSummary(supabase: SupabaseAdminClient) {
   return buildCashSummary({
     paymentRows: paymentRows ?? [],
     restaurantRows: restaurantRows ?? [],
+    otherServiceRows: otherServiceRows ?? [],
     expenseRows: expenseRows ?? [],
     ledgerRows: ledgerRows ?? [],
     pendingRows: pendingRows ?? [],
