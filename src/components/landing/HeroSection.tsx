@@ -4,15 +4,14 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { CalendarDays, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-const heroImage = "/images/hero-hotel.jpg";
+import { publicAssets } from "@/lib/public-assets";
 
 const HeroSection = () => {
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0">
-        <img src={heroImage} alt="D&M Travellers Inn - Luxury boutique hotel in Plaridel" className="w-full h-full object-cover" />
+        <img src={publicAssets.heroHotel.src} alt="D&M Travellers Inn - Luxury boutique hotel in Plaridel" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-hero" />
       </div>
 

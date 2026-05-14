@@ -9,6 +9,7 @@ import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "framer-
 import { ArrowRight, Menu, PhoneCall, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { publicAssets } from "@/lib/public-assets";
 
 const navLinks = [
   { label: "Home", href: "/" },
@@ -100,7 +101,10 @@ export default function Navbar() {
                 <img
                   alt={`${hotelName} logo`}
                   className="object-contain w-full h-full"
-                  src={settings.hotel_logo || "/logo.png"}
+                  src={settings.hotel_logo || publicAssets.logo.src}
+                  onError={(event) => {
+                    event.currentTarget.src = publicAssets.logo.src;
+                  }}
                 />
               </div>
 

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRef } from "react";
 import { ArrowRight, Coffee, Soup, UtensilsCrossed, Wine } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { publicAssets } from "@/lib/public-assets";
 import {
   PublicGlassPanel,
   PublicGrid,
@@ -76,7 +77,7 @@ export default function RestaurantPreview() {
                   className="object-cover"
                   fill
                   sizes="(max-width: 1024px) 100vw, 50vw"
-                  src="/images/restaurant.jpg"
+                  src={publicAssets.restaurant}
                 />
                 <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,14,29,0.1)_0%,rgba(4,14,29,0.78)_100%)]" />
 

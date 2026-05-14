@@ -1,17 +1,18 @@
 "use client";
 
 import { motion, useInView } from "framer-motion";
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, BedDouble, Hotel, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PublicAssetImage } from "@/components/public/PublicAssetImage";
 import {
   PublicGlassPanel,
   PublicGrid,
   PublicSection,
   PublicSectionIntro,
 } from "@/components/public/PublicPrimitives";
+import { publicAssets } from "@/lib/public-assets";
 
 type RoomType = {
   room_id: string;
@@ -98,9 +99,10 @@ export default function FeaturedRoomsSection() {
                     <PublicGlassPanel className="group h-full overflow-hidden p-0">
                       <div className="relative aspect-[4/4.7] overflow-hidden">
                         {room.sample_image_url ? (
-                          <Image
+                          <PublicAssetImage
                             alt={room.room_type}
                             className="object-cover transition-transform duration-700 group-hover:scale-105"
+                            fallbackSrc={publicAssets.roomStandard}
                             fill
                             sizes="(max-width: 1024px) 100vw, 33vw"
                             src={room.sample_image_url}

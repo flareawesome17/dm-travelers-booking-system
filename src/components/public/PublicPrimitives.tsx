@@ -1,4 +1,5 @@
 import Image from "next/image";
+import type { StaticImageData } from "next/image";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +26,7 @@ type PublicPageHeroProps = {
   eyebrow: string;
   title: string;
   description: string;
-  imageSrc?: string;
+  imageSrc?: string | StaticImageData;
   imageAlt?: string;
   align?: "left" | "center";
   children?: ReactNode;

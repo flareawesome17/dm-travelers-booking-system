@@ -10,6 +10,7 @@ import {
   PublicPageHero,
   PublicSection,
 } from "@/components/public/PublicPrimitives";
+import { publicAssets } from "@/lib/public-assets";
 
 const DEFAULTS = {
   address: "Looc Proper, Dipolog - Oroquieta National Rd, Plaridel, 7209 Misamis Occidental, Philippines",
@@ -95,7 +96,7 @@ export default function ContactPage() {
         description="Make it easy for guests to ask a question, check availability, or reach the front desk without friction on mobile, tablet, or desktop."
         eyebrow="Contact"
         imageAlt="D&M Travellers Inn contact and arrival experience"
-        imageSrc="/images/hero-hotel.jpg"
+        imageSrc={publicAssets.heroHotel}
         stats={[
           { label: "Support", value: "Front desk ready" },
           { label: "Response path", value: "Direct inquiry" },

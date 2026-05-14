@@ -32,6 +32,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/sonner";
+import { PublicAssetImage } from "@/components/public/PublicAssetImage";
 import {
   PublicGlassPanel,
   PublicGrid,
@@ -39,6 +40,7 @@ import {
   PublicSection,
 } from "@/components/public/PublicPrimitives";
 import { cn } from "@/lib/utils";
+import { publicAssets } from "@/lib/public-assets";
 
 type RoomTypeOption = {
   room_id: string;
@@ -793,7 +795,7 @@ function BookingPageContent() {
         description="Reserve in a few clear steps with brighter contrast, cleaner spacing, and a more reassuring booking flow that works better on every screen."
         eyebrow="Book Your Stay"
         imageAlt="Booking at D&M Travellers Inn"
-        imageSrc="/images/room-deluxe.jpg"
+        imageSrc={publicAssets.roomDeluxe}
         stats={[
           { label: "Step flow", value: "5 stage" },
           { label: "Verification", value: "Email code" },
@@ -847,9 +849,10 @@ function BookingPageContent() {
                 <PublicGlassPanel className="overflow-hidden p-0">
                   <div className="relative aspect-[4/2.4] overflow-hidden">
                     {selectedRoomData.sample_image_url ? (
-                      <Image
+                      <PublicAssetImage
                         alt={selectedRoomData.room_type}
                         className="object-cover"
+                        fallbackSrc={publicAssets.roomStandard}
                         fill
                         sizes="(max-width: 1024px) 100vw, 34vw"
                         src={selectedRoomData.sample_image_url}
@@ -935,9 +938,10 @@ function BookingPageContent() {
                           >
                             <div className="relative h-24 overflow-hidden rounded-[1rem]">
                               {room.sample_image_url ? (
-                                <Image
+                                <PublicAssetImage
                                   alt={room.room_type}
                                   className="object-cover"
+                                  fallbackSrc={publicAssets.roomStandard}
                                   fill
                                   sizes="112px"
                                   src={room.sample_image_url}

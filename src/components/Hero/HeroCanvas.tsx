@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useReducedMotion, type MotionValue } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { publicAssets } from "@/lib/public-assets";
 
 export type HeroSequenceConfig = {
   frameDirectory: string;
@@ -236,7 +237,7 @@ export default function HeroCanvas({
 
     const fallbackImage = new window.Image();
     fallbackImage.decoding = "async";
-    fallbackImage.src = config.fallbackImagePath;
+    fallbackImage.src = publicAssets.heroHotel.src;
     fallbackImage.onload = () => {
       fallbackImageRef.current = fallbackImage;
 
@@ -373,7 +374,7 @@ export default function HeroCanvas({
       <Image
         priority
         fetchPriority="high"
-        src={config.fallbackImagePath}
+        src={publicAssets.heroHotel}
         alt={`${hotelName} - Boutique hotel arrival`}
         fill
         sizes="100vw"

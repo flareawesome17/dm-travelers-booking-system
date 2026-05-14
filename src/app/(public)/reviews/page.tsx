@@ -17,6 +17,7 @@ import {
   PublicSection,
 } from "@/components/public/PublicPrimitives";
 import { cn } from "@/lib/utils";
+import { publicAssets } from "@/lib/public-assets";
 
 interface Review {
   id: string;
@@ -87,7 +88,7 @@ export default function ReviewsPage() {
         description="Read what our guests have to say about their stay at D&M Travellers Inn. We take pride in providing a comfortable and memorable experience for every traveler."
         eyebrow="Guest Experience"
         imageAlt="Guest review experience at D&M Travellers Inn"
-        imageSrc="/images/hero-hotel.jpg"
+        imageSrc={publicAssets.heroHotel}
         stats={[
           { label: "Rating", value: "4.8/5" },
           { label: "Service", value: "Exemplary" },

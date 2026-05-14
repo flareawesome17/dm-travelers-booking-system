@@ -1,16 +1,17 @@
 "use client";
 
 import { motion, useInView } from "framer-motion";
-import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChefHat, Soup, Sparkles, UtensilsCrossed } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
+import { PublicAssetImage } from "@/components/public/PublicAssetImage";
 import {
   PublicGlassPanel,
   PublicGrid,
   PublicPageHero,
   PublicSection,
 } from "@/components/public/PublicPrimitives";
+import { publicAssets } from "@/lib/public-assets";
 
 type MenuItem = {
   id: string;
@@ -91,7 +92,7 @@ export default function RestaurantPage() {
         description="Browse our selection of thoughtfully prepared meals, crafted to suit guests looking for warm, satisfying dining options during their stay."
         eyebrow="Restaurant"
         imageAlt="Dining at D&M Travellers Inn"
-        imageSrc="/images/restaurant.jpg"
+        imageSrc={publicAssets.restaurant}
         stats={[
           { label: "Dining style", value: "Warm and familiar" },
           { label: "Menu flow", value: "Category-led" },
@@ -171,12 +172,13 @@ export default function RestaurantPage() {
                     >
                       <PublicGlassPanel className="group h-full overflow-hidden p-0">
                         <div className="relative aspect-[4/2.6]">
-                          <Image
+                          <PublicAssetImage
                             alt={item.name || "Menu item"}
                             className="object-cover transition-transform duration-700 group-hover:scale-105"
+                            fallbackSrc={publicAssets.restaurant}
                             fill
                             sizes="(max-width: 1280px) 100vw, 33vw"
-                            src={item.image_url || "/images/restaurant.jpg"}
+                            src={item.image_url}
                           />
                           <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_18%,rgba(5,14,27,0.86)_100%)]" />
                           <div className="absolute left-5 top-5 rounded-full border border-white/14 bg-secondary/68 px-3 py-1 text-[0.68rem] uppercase tracking-[0.24em] text-gold-light/84 backdrop-blur-md">

@@ -1,18 +1,19 @@
 "use client";
 
 import { motion, useInView } from "framer-motion";
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, BedDouble, Hotel, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
+import { PublicAssetImage } from "@/components/public/PublicAssetImage";
 import {
   PublicGlassPanel,
   PublicGrid,
   PublicPageHero,
   PublicSection,
 } from "@/components/public/PublicPrimitives";
+import { publicAssets } from "@/lib/public-assets";
 
 type RoomTypeOption = {
   room_id: string;
@@ -89,7 +90,7 @@ export default function RoomsPage() {
         description="Browse room categories that feel clear, trustworthy, and easy to compare on any device before starting a direct booking."
         eyebrow="Rooms And Suites"
         imageAlt="D&M Travellers Inn room interior"
-        imageSrc="/images/room-suite.jpg"
+        imageSrc={publicAssets.roomSuite}
         stats={[
           { label: "Room types", value: loading ? "Loading" : String(roomTypes.length || 0) },
           { label: "Stay style", value: "Comfort-first" },
@@ -146,9 +147,10 @@ export default function RoomsPage() {
                       <div className="flex flex-col h-full">
                         <div className="relative h-64 sm:h-72 shrink-0 w-full overflow-hidden">
                           {room.sample_image_url ? (
-                            <Image
+                            <PublicAssetImage
                               alt={room.room_type}
                               className="object-cover"
+                              fallbackSrc={publicAssets.roomStandard}
                               fill
                               sizes="(max-width: 1280px) 100vw, 44vw"
                               src={room.sample_image_url}
