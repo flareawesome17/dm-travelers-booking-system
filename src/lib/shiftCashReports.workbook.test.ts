@@ -152,6 +152,7 @@ describe("generateShiftCashReportWorkbook", () => {
     expect(String(worksheet.getCell("D11").value)).toContain("12:00 PM");
     expect(worksheet.getRow(11).height).toBeGreaterThanOrEqual(30);
     expect(worksheet.getCell("C11").value).toBe("Reservation Guest");
+    expect(worksheet.getCell("G11").value).toBe(1930);
     expect(worksheet.getCell("U10").value).toBe("123");
     expect(worksheet.getCell("U11").value).toBe("4326");
     expect(worksheet.getCell("C34").value).toBe("ERNIE SAAVEDRA JR.");
@@ -263,6 +264,7 @@ describe("generateShiftCashReportWorkbook", () => {
 
     expect(worksheet.getCell("A37").value).not.toBe("INCOMING TURNOVER");
     expect(worksheet.getCell("B10").value).toBe("105");
+    expect(worksheet.getCell("G10").value).toBeNull();
     expect(worksheet.getCell("K10").value).toBe(200);
   });
 });

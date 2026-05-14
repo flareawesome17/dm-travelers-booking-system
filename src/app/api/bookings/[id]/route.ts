@@ -83,6 +83,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
+    if (body.status === "Checked-Out") {
+      const { data: existingCheckout } = await supabase
+        .from("bookings")
+        .select("actual_check_out_at")
+        .eq("id", id)
+        .single();
+
+      if (!existingCheckout?.actual_check_out_at) {
+        updateData.actual_check_out_at = new Date().toISOString();
+      }
+    }
+
     if (shouldRecalculatePricing) {
       const { data: existingBooking, error: existingBookingError } = await supabase
         .from("bookings")

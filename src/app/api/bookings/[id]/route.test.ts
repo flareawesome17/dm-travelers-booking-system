@@ -206,4 +206,85 @@ describe("PATCH /api/bookings/[id]", () => {
     });
     expect(updateCalled).toBe(false);
   });
+
+  it("sets actual checkout time when status is manually changed to Checked-Out", async () => {
+    let updatedPayload: Record<string, unknown> | null = null;
+
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === "bookings") {
+          return {
+            select: vi.fn((columns?: string) => ({
+              eq: vi.fn(() => ({
+                single: vi.fn(async () => {
+                  if (columns === "actual_check_out_at") {
+                    return { data: { actual_check_out_at: null }, error: null };
+                  }
+
+                  return {
+                    data: {
+                      id: "booking-1",
+                      guest_id: "guest-1",
+                      status: "Checked-Out",
+                      actual_check_out_at: updatedPayload?.actual_check_out_at,
+                      balance_due: 0,
+                      is_lgu_booking: false,
+                      is_special_booking: false,
+                      special_booking_label: null,
+                      guests: null,
+                      rooms: null,
+                      restaurant_orders: [],
+                    },
+                    error: null,
+                  };
+                }),
+              })),
+            })),
+            update: vi.fn((payload: Record<string, unknown>) => {
+              updatedPayload = payload;
+              return {
+                eq: vi.fn(() => ({
+                  select: vi.fn(() => ({
+                    single: vi.fn(async () => ({
+                      data: {
+                        id: "booking-1",
+                        guest_id: "guest-1",
+                        status: payload.status,
+                        actual_check_out_at: payload.actual_check_out_at,
+                        balance_due: 0,
+                        is_lgu_booking: false,
+                        is_special_booking: false,
+                        special_booking_label: null,
+                        guests: null,
+                        rooms: null,
+                        restaurant_orders: [],
+                      },
+                      error: null,
+                    })),
+                  })),
+                })),
+              };
+            }),
+          };
+        }
+
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    };
+
+    getSupabaseAdminMock.mockReturnValue(supabase);
+
+    const response = await PATCH(
+      {
+        json: async () => ({ status: "Checked-Out" }),
+      } as any,
+      { params: Promise.resolve({ id: "booking-1" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(updatedPayload).toMatchObject({ status: "Checked-Out" });
+    expect(typeof updatedPayload?.actual_check_out_at).toBe("string");
+    expect(body.actual_check_out_at).toBe(updatedPayload?.actual_check_out_at);
+  });
 });

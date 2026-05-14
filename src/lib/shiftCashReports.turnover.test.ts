@@ -331,6 +331,7 @@ describe("buildCollectibleTurnovers", () => {
     expect(mergedRows).toHaveLength(2);
     expect(mergedRows.find((row) => row.booking_id === "booking-1")).toMatchObject({
       room_no: "105",
+      room_rate: 0,
       charge_amount: 200,
       cash_amount: 0,
       card_amount: 0,

@@ -536,7 +536,7 @@ export function mergeIncomingTurnoversIntoActivityRows(
       ),
       check_in_at: row.check_in_at,
       check_out_at: row.check_out_at,
-      room_rate: row.room_rate,
+      room_rate: 0,
       extra_bed_amount: row.extra_bed_amount,
       extra_person_amount: row.extra_person_amount,
       linens_amount: row.linens_amount,
@@ -1339,6 +1339,7 @@ async function buildLiveReportFromShiftLog(shiftLog: ShiftLogRecord, supabase: S
         ucRestaurantCharges.get(booking.id) ?? null,
       );
       row.latest_activity_at = booking.actual_check_in_at || null;
+      row.room_rate = 0;
       uncoveredCheckedInRows.push(row);
     }
   }
@@ -2007,7 +2008,7 @@ export async function generateShiftCashReportWorkbook(
     if (row.getCell(4).value) {
       row.height = Math.max(row.height ?? 15, 30);
     }
-    row.getCell(7).value = item.room_rate || null;
+    row.getCell(7).value = item.payment_count > 0 || item.total_amount > 0 ? item.room_rate || null : null;
     row.getCell(8).value = item.extra_bed_amount || null;
     row.getCell(9).value = item.extra_person_amount || null;
     row.getCell(10).value = item.linens_amount || null;
