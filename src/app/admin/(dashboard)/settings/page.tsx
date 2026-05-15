@@ -20,6 +20,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { usePermissions } from "@/context/PermissionsContext";
 import { getErrorMessage } from "@/lib/utils";
+import { publicAssets } from "@/lib/public-assets";
 
 type ShiftConfig = {
   id: string;
@@ -153,6 +154,10 @@ export default function AdminSettingsPage() {
   const canSeeFinancial = hasPermission("settings.financial") || hasPermission("settings.write") || hasPermission("settings.manage");
   const canSeeSocial = hasPermission("settings.social") || hasPermission("settings.write") || hasPermission("settings.manage");
   const canSeeExtras = hasPermission("settings.extras") || hasPermission("settings.write") || hasPermission("settings.manage");
+  const hotelLogo =
+    settings.hotel_logo && settings.hotel_logo !== "/logo.png"
+      ? settings.hotel_logo
+      : publicAssets.logo.src;
 
   const defaultTab = canSeeGeneral ? "general" 
     : canSeeOperations ? "operations" 
@@ -372,7 +377,7 @@ export default function AdminSettingsPage() {
                         }
                       }}
                     />
-                    <img src={settings.hotel_logo || "/logo.png"} alt="Hotel Logo" className="h-20 w-auto object-contain mb-4" />
+                    <img src={hotelLogo} alt="Hotel Logo" className="h-20 w-auto object-contain mb-4" />
                     <p className="text-[10px] text-white/60 text-center uppercase tracking-widest font-bold group-hover:text-white transition-colors">
                       {canSeeGeneral ? "Click to Upload Logo" : "Logo Preview"}
                     </p>

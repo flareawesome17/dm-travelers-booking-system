@@ -214,7 +214,7 @@ export default function AdminSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
-  const [logoUrl, setLogoUrl] = useState<string>("/logo.png");
+  const [logoUrl, setLogoUrl] = useState<string>(logoImage.src);
   const [newBookingCount, setNewBookingCount] = useState(0);
   const [expiringCount, setExpiringCount] = useState(0);
   const [onlineUsersCount, setOnlineUsersCount] = useState(0);
@@ -223,6 +223,7 @@ export default function AdminSidebar({
   const onlineUsersPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastExpiringIdsRef = useRef<Set<string>>(new Set());
   const [touchStart, setTouchStart] = useState<number | null>(null);
+  const canViewOnlineUsers = permissions.includes("users.manage");
 
   const LAST_SEEN_KEY = "admin_bookings_last_seen";
 
@@ -295,6 +296,7 @@ export default function AdminSidebar({
 
   const fetchOnlineUsersCount = useCallback(async () => {
     try {
+      if (!canViewOnlineUsers) return;
       if (document.visibilityState === "hidden") return;
       const tokenStr = localStorage.getItem("admin_token");
       if (!tokenStr) return;
@@ -309,16 +311,21 @@ export default function AdminSidebar({
     } catch {
       // silent
     }
-  }, []);
+  }, [canViewOnlineUsers]);
 
   // Poll for online users every 5 minutes
   useEffect(() => {
+    if (!canViewOnlineUsers) {
+      setOnlineUsersCount(0);
+      return undefined;
+    }
+
     fetchOnlineUsersCount();
     onlineUsersPollRef.current = setInterval(fetchOnlineUsersCount, 300_000);
     return () => {
       if (onlineUsersPollRef.current) clearInterval(onlineUsersPollRef.current);
     };
-  }, [fetchOnlineUsersCount]);
+  }, [canViewOnlineUsers, fetchOnlineUsersCount]);
 
   // When the admin navigates to the bookings page, mark as seen
   useEffect(() => {
@@ -337,7 +344,7 @@ export default function AdminSidebar({
           if (logo && !logo.startsWith("/") && !logo.startsWith("http") && !logo.startsWith("data:")) {
             logo = "/" + logo;
           }
-          setLogoUrl(logo);
+          setLogoUrl(logo === "/logo.png" ? logoImage.src : logo);
         }
       })
       .catch(() => {});

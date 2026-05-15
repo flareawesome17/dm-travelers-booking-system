@@ -2,6 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Printer, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { publicAssets } from "@/lib/public-assets";
 
 type OrderItem = {
   id: string;
@@ -37,7 +38,7 @@ export function RestaurantReceiptModal({ order: initialOrder, onClose }: Receipt
     hotel_name: "D&M Travellers Inn",
     hotel_address: "Looc Proper, Plaridel, Misamis Occidental",
     hotel_phone: "+63 951 868 3018",
-    hotel_logo: "/logo.png",
+    hotel_logo: publicAssets.logo.src,
   });
 
   useEffect(() => {
@@ -79,6 +80,11 @@ export function RestaurantReceiptModal({ order: initialOrder, onClose }: Receipt
 
   if (!initialOrder) return null;
 
+  const hotelLogo =
+    settings.hotel_logo && settings.hotel_logo !== "/logo.png"
+      ? settings.hotel_logo
+      : publicAssets.logo.src;
+
   return (
     <Dialog open={!!initialOrder} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto print:max-h-none print:overflow-visible print:max-w-none print:shadow-none print:border-none print:top-0 print:translate-y-0 print:p-0">
@@ -98,7 +104,7 @@ export function RestaurantReceiptModal({ order: initialOrder, onClose }: Receipt
           <div className="p-6 bg-white text-slate-900 mx-auto w-full border border-slate-100 rounded-lg print:border-none print:p-0">
             {/* Header */}
             <div className="text-center border-b border-dashed border-slate-300 pb-4 mb-4">
-              <img src={settings.hotel_logo} alt={settings.hotel_name} className="h-12 mx-auto mb-2 object-contain" />
+              <img src={hotelLogo} alt={settings.hotel_name} className="h-12 mx-auto mb-2 object-contain" />
               <h1 className="text-lg font-bold uppercase tracking-tight">{settings.hotel_name}</h1>
               <p className="text-[10px] text-slate-500">{settings.hotel_address}</p>
               <p className="text-[10px] text-slate-500">{settings.hotel_phone}</p>

@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useReducedMotion, type MotionValue } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { publicAssets } from "@/lib/public-assets";
+import { heroFrameSources } from "./hero-frame-assets";
 
 export type HeroSequenceConfig = {
   frameDirectory: string;
@@ -15,19 +16,21 @@ export type HeroSequenceConfig = {
   padLength: number;
   fallbackImagePath: string;
   ariaLabel: string;
+  frameSources?: readonly string[];
 };
 
 // PLACEHOLDERS: adjust these values if your exported frame sequence changes.
 const HERO_SEQUENCE_CONFIG: HeroSequenceConfig = {
-  frameDirectory: "/assets/frames",
+  frameDirectory: "",
   framePrefix: "frame_",
   frameCount: 120,
   startIndex: 1,
   extension: "webp",
   padLength: 4,
-  fallbackImagePath: "/images/hero-hotel.jpg",
+  fallbackImagePath: publicAssets.heroHotel.src,
   ariaLabel:
     "Scroll-driven hero sequence revealing the arrival and hospitality experience.",
+  frameSources: heroFrameSources,
 };
 
 
@@ -41,6 +44,12 @@ const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 
 const getFramePath = (config: HeroSequenceConfig, frameNumber: number) => {
+  const sourceIndex = frameNumber - config.startIndex;
+  const bundledSource = config.frameSources?.[sourceIndex];
+  if (bundledSource) {
+    return bundledSource;
+  }
+
   const paddedFrame = String(frameNumber).padStart(config.padLength, "0");
   return `${config.frameDirectory}/${config.framePrefix}${paddedFrame}.${config.extension}`;
 };

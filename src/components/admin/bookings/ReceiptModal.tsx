@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Printer } from "lucide-react";
 import { getBookingChargeBreakdown } from "@/lib/bookingTotals";
 import { getBookingExtraDisplayName } from "@/lib/bookingExtras";
+import { publicAssets } from "@/lib/public-assets";
 
 type BookingRow = {
   id?: string;
@@ -52,7 +53,7 @@ export function ReceiptModal({ booking, onClose }: ReceiptModalProps) {
     hotel_name: "D&M Travellers Inn",
     hotel_address: "Looc Proper, Plaridel, Misamis Occidental",
     hotel_phone: "+63 951 868 3018",
-    hotel_logo: "/logo.png",
+    hotel_logo: publicAssets.logo.src,
   });
 
   useEffect(() => {
@@ -67,6 +68,11 @@ export function ReceiptModal({ booking, onClose }: ReceiptModalProps) {
   }, []);
 
   if (!booking) return null;
+
+  const hotelLogo =
+    settings.hotel_logo && settings.hotel_logo !== "/logo.png"
+      ? settings.hotel_logo
+      : publicAssets.logo.src;
 
   const deposit = Number(booking.deposit_paid ?? 0);
   const restaurantTotal =
@@ -106,7 +112,7 @@ export function ReceiptModal({ booking, onClose }: ReceiptModalProps) {
         <div className="p-8 bg-white text-slate-900 mx-auto w-full max-w-[800px] border border-slate-200 rounded-lg print:border-none print:m-0 print:p-4">
           <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-slate-300 pb-6 mb-6">
             <div className="flex items-center gap-4">
-              <img src={settings.hotel_logo} alt={settings.hotel_name} className="h-16 w-auto object-contain print:h-12" />
+              <img src={hotelLogo} alt={settings.hotel_name} className="h-16 w-auto object-contain print:h-12" />
               <div>
                 <h1 className="text-2xl font-bold text-[#07008A] tracking-tight print:text-black">{settings.hotel_name}</h1>
                 <p className="text-sm text-slate-500 mt-1">{settings.hotel_address}</p>
