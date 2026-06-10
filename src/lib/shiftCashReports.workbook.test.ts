@@ -12,7 +12,7 @@ vi.mock("@/lib/settings", () => ({
 }));
 
 describe("generateShiftCashReportWorkbook", () => {
-  it("renders extras and reservation schedule headers, shortens ref numbers, adds a total top border, and protects the worksheet", async () => {
+  it("renders the compact print layout with consolidated charges and non-cash payment indicators", async () => {
     const report: ShiftCashReport = {
       shift_log: {
         id: "shift-log-1",
@@ -56,11 +56,11 @@ describe("generateShiftCashReportWorkbook", () => {
           extra_bed_amount: 0,
           extra_person_amount: 0,
           linens_amount: 0,
-          charge_amount: 0,
+          charge_amount: 25,
           minimart_amount: 0,
           food_amount: 0,
-          early_checkin_amount: 0,
-          late_checkout_amount: 0,
+          early_checkin_amount: 40,
+          late_checkout_amount: 60,
           cash_amount: 500,
           gcash_amount: 250,
           card_amount: 100,
@@ -119,42 +119,51 @@ describe("generateShiftCashReportWorkbook", () => {
     await workbook.xlsx.load(buffer as any);
     const worksheet = workbook.worksheets[0];
 
-    expect(worksheet.getCell("H8").value).toBe("EXTRAS");
-    expect(worksheet.getCell("D8").value).toBe("SCHEDULE");
-    expect(worksheet.getCell("S10").border.left?.style).toBe("thin");
-    expect(worksheet.getCell("S10").border.right?.style).toBe("thin");
-    expect(worksheet.getCell("T10").border.left?.style).toBe("thin");
-    expect(worksheet.getCell("T10").border.right?.style).toBe("thin");
+    expect(worksheet.getCell("G8").value).toBe("EXTRAS");
+    expect(worksheet.getCell("M8").value).toBe("PAYMENT METHODS");
+    expect(worksheet.getCell("D8").value).toBe("CHECK-IN");
+    expect(worksheet.getCell("E8").value).toBe("CHECK-OUT");
+    expect(worksheet.getCell("J9").value).toBe("CHARGE:");
+    expect(worksheet.getCell("N9").value).toBe("NON-CASH");
+    expect(worksheet.getCell("O9").value).toBe("METHOD");
+    expect(worksheet.getCell("P9").value).toBe("REF NO.");
+    expect(worksheet.getCell("M10").border.left?.style).toBe("medium");
+    expect(worksheet.getCell("N10").border.left?.style).toBe("thin");
+    expect(worksheet.getCell("O10").border.left?.style).toBe("thin");
+    expect(worksheet.getCell("P10").border.right?.style).toBe("medium");
+    expect(worksheet.getCell("M7").border.top?.style).toBe("medium");
     expect(worksheet.getCell("P7").border.top?.style).toBe("medium");
-    expect(worksheet.getCell("U7").border.top?.style).toBe("medium");
+    expect(worksheet.getCell("M8").border.top?.style).toBe("medium");
     expect(worksheet.getCell("P8").border.top?.style).toBe("medium");
-    expect(worksheet.getCell("U8").border.top?.style).toBe("medium");
-    expect(worksheet.getCell("U10").border.right?.style).toBe("medium");
-    expect(worksheet.getCell("U24").border.right?.style).toBe("medium");
-    expect(worksheet.getCell("G24").border.right?.style).toBe("thin");
-    expect(worksheet.getCell("O24").border.right?.style).toBe("medium");
-    expect(worksheet.getCell("G24").border.bottom?.style).toBe("medium");
-    expect(worksheet.getCell("O24").border.bottom?.style).toBe("medium");
+    expect(worksheet.getCell("P24").border.right?.style).toBe("medium");
+    expect(worksheet.getCell("F24").border.right?.style).toBe("thin");
+    expect(worksheet.getCell("L24").border.right?.style).toBe("medium");
+    expect(worksheet.getCell("F24").border.bottom?.style).toBe("medium");
+    expect(worksheet.getCell("N24").border.bottom?.style).toBe("medium");
     expect(worksheet.getCell("A24").border.top?.style).toBe("medium");
     expect(worksheet.getCell("A24").border.bottom?.style).toBe("medium");
-    expect(worksheet.getCell("U24").border.top?.style).toBe("medium");
-    expect(worksheet.getCell("U24").border.bottom?.style).toBe("medium");
+    expect(worksheet.getCell("P24").border.top?.style).toBe("medium");
+    expect(worksheet.getCell("P24").border.bottom?.style).toBe("medium");
     expect(worksheet.getCell("D10").font?.size).toBe(9);
-    expect(worksheet.getCell("D10").alignment?.wrapText).toBe(true);
-    expect(worksheet.getCell("D10").alignment?.shrinkToFit ?? false).toBe(false);
+    expect(worksheet.getCell("D10").alignment?.shrinkToFit).toBe(true);
     expect(worksheet.getCell("E10").font?.size).toBe(9);
     expect(worksheet.getCell("E10").alignment?.shrinkToFit).toBe(true);
-    expect(worksheet.getCell("D10").value).toBe("");
-    expect(String(worksheet.getCell("D11").value)).toContain("CI:");
-    expect(String(worksheet.getCell("D11").value)).toContain("CO:");
-    expect(String(worksheet.getCell("D11").value)).toContain("\n");
-    expect(String(worksheet.getCell("D11").value)).toContain("02:00 PM");
-    expect(String(worksheet.getCell("D11").value)).toContain("12:00 PM");
-    expect(worksheet.getRow(11).height).toBeGreaterThanOrEqual(30);
     expect(worksheet.getCell("C11").value).toBe("Reservation Guest");
-    expect(worksheet.getCell("G11").value).toBe(1930);
-    expect(worksheet.getCell("U10").value).toBe("123");
-    expect(worksheet.getCell("U11").value).toBe("4326");
+    expect(worksheet.getCell("F11").value).toBe(1930);
+    expect(worksheet.getCell("J10").value).toBe(125);
+    expect(worksheet.getCell("M10").value).toBe(500);
+    expect(worksheet.getCell("N10").value).toBe(475);
+    expect(worksheet.getCell("O10").value).toBe("GCASH / CARD / CHEQUE / QRPH");
+    expect(worksheet.getCell("P10").alignment?.wrapText).toBe(true);
+    expect(worksheet.getRow(10).height).toBeGreaterThanOrEqual(28);
+    expect(worksheet.getCell("N11").value).toBe(700);
+    expect(worksheet.getCell("O11").value).toBe("GCASH");
+    expect(worksheet.getCell("P10").value).toBe("123");
+    expect(worksheet.getCell("P11").value).toBe("4326");
+    expect(worksheet.getColumn(17).hidden).toBe(true);
+    expect(worksheet.pageSetup.printArea).toBe("A1:P35");
+    expect(worksheet.pageSetup.fitToWidth).toBe(1);
+    expect(worksheet.pageSetup.fitToHeight).toBe(1);
     expect(worksheet.getCell("C34").value).toBe("ERNIE SAAVEDRA JR.");
     expect((worksheet as any).sheetProtection).toBeTruthy();
     expect((worksheet as any).sheetProtection.sheet).toBe(true);
@@ -264,7 +273,7 @@ describe("generateShiftCashReportWorkbook", () => {
 
     expect(worksheet.getCell("A37").value).not.toBe("INCOMING TURNOVER");
     expect(worksheet.getCell("B10").value).toBe("105");
-    expect(worksheet.getCell("G10").value).toBeNull();
-    expect(worksheet.getCell("K10").value).toBe(200);
+    expect(worksheet.getCell("F10").value).toBeNull();
+    expect(worksheet.getCell("J10").value).toBe(200);
   });
 });

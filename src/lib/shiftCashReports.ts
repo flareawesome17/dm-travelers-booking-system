@@ -7,7 +7,7 @@ import { toMoneyNumber } from "@/lib/bookingTotals";
 import { getBookingExtraBucket } from "@/lib/bookingExtras";
 import { getGlobalTimeConfig } from "@/lib/settings";
 
-const EXPORT_TEMPLATE_VERSION = 3;
+const EXPORT_TEMPLATE_VERSION = 4;
 const TEMPLATE_PATH = path.join(process.cwd(), "public", "assets", "files", "CASH-ON-HAND-REPORT.xlsx");
 const ACTIVITY_START_ROW = 10;
 const TEMPLATE_ACTIVITY_SLOTS = 14;
@@ -15,9 +15,9 @@ const FOOTER_TOTAL_CASH_ROW = 26;
 const FOOTER_LESS_EXPENSES_ROW = 27;
 const FOOTER_CASH_ON_HAND_ROW = 28;
 const SIGNATURE_ROW = 31;
-const WORKBOOK_TOTAL_COLUMNS = 21;
-const PAYMENT_START_COLUMN = 16;
-const PAYMENT_END_COLUMN = 21;
+const WORKBOOK_TOTAL_COLUMNS = 16;
+const PAYMENT_START_COLUMN = 13;
+const PAYMENT_END_COLUMN = 16;
 
 type SupabaseAdmin = ReturnType<typeof getSupabaseAdmin>;
 type DbErrorLike = { code?: string | null; message?: string | null };
@@ -1757,16 +1757,35 @@ function setCompactDateTimeStyle(cell: ExcelJS.Cell, maxSize = 9) {
   };
 }
 
-function setScheduleCellStyle(cell: ExcelJS.Cell) {
+function setPaymentMethodStyle(cell: ExcelJS.Cell) {
   cell.font = {
     ...(cell.font || {}),
     size: 9,
   };
   cell.alignment = {
     wrapText: true,
-    vertical: "top",
-    horizontal: "left",
+    shrinkToFit: true,
+    vertical: "middle",
+    horizontal: "center",
   };
+}
+
+function getNonCashAmount(row: ShiftCashReportRow) {
+  return roundMoney(
+    row.gcash_amount +
+      row.card_amount +
+      row.cheque_amount +
+      row.qrph_amount,
+  );
+}
+
+function getNonCashMethodIndicator(row: ShiftCashReportRow) {
+  const methods: string[] = [];
+  if (row.gcash_amount > 0) methods.push("GCASH");
+  if (row.card_amount > 0) methods.push("CARD");
+  if (row.cheque_amount > 0) methods.push("CHEQUE");
+  if (row.qrph_amount > 0) methods.push("QRPH");
+  return methods.join(" / ");
 }
 
 function getPaymentColumnBorder(
@@ -1811,32 +1830,29 @@ function resetWorksheetLayout(worksheet: ExcelJS.Worksheet) {
 
   const widths = [
     2.6,
-    6.9,
-    24,
-    24,
-    17,
-    17,
-    10,
-    8,
-    8,
-    8,
+    6.5,
+    22,
+    15,
+    15,
     9,
-    10,
+    7,
+    7,
+    7,
     9,
+    9,
+    8,
     10,
-    10,
     11,
-    11,
-    11,
-    11,
-    11,
-    11,
-    16,
+    13,
+    12,
   ];
 
   widths.forEach((width, index) => {
     worksheet.getColumn(index + 1).width = width;
   });
+  for (let column = WORKBOOK_TOTAL_COLUMNS + 1; column <= 22; column += 1) {
+    worksheet.getColumn(column).hidden = true;
+  }
 
   const headerBandStyle = cloneStyle(worksheet.getCell("A7").style);
   const totalBandStyle = cloneStyle(worksheet.getCell("M7").style);
@@ -1849,50 +1865,44 @@ function resetWorksheetLayout(worksheet: ExcelJS.Worksheet) {
     (_, index) => cloneStyle(worksheet.getCell(10, Math.min(index + 1, 20)).style),
   );
 
-  worksheet.mergeCells("A7:O7");
-  worksheet.mergeCells("P7:U7");
-  worksheet.mergeCells("H8:O8");
-  worksheet.mergeCells("P8:U8");
+  worksheet.mergeCells("A7:L7");
+  worksheet.mergeCells("M7:P7");
+  worksheet.mergeCells("G8:L8");
+  worksheet.mergeCells("M8:P8");
 
   worksheet.getCell("A7").style = cloneStyle(headerBandStyle);
-  worksheet.getCell("P7").style = cloneStyle(totalBandStyle);
-  worksheet.getCell("H8").style = cloneStyle(extraBandStyle);
-  worksheet.getCell("P8").style = cloneStyle(paymentBandStyle);
+  worksheet.getCell("M7").style = cloneStyle(totalBandStyle);
+  worksheet.getCell("G8").style = cloneStyle(extraBandStyle);
+  worksheet.getCell("M8").style = cloneStyle(paymentBandStyle);
 
   worksheet.getCell("A7").value = "ROOM ACCOMMODATION";
-  worksheet.getCell("P7").value = "TOTAL";
-  worksheet.getCell("H8").value = "EXTRAS";
-  worksheet.getCell("P8").value = "PAYMENT METHODS";
+  worksheet.getCell("M7").value = "TOTAL";
+  worksheet.getCell("G8").value = "EXTRAS";
+  worksheet.getCell("M8").value = "PAYMENT METHODS";
 
   const row8Values = [
-    "",
+    null,
     "ROOM",
     "GUEST NAME:",
-    "SCHEDULE",
     "CHECK-IN",
     "CHECK-OUT",
     "ROOM",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
   ];
 
   const row9Values = [
-    "",
+    null,
     "No.",
-    "",
-    "",
+    null,
     "DATE/TIME:",
     "DATE/TIME:",
     "RATE:",
@@ -1902,25 +1912,21 @@ function resetWorksheetLayout(worksheet: ExcelJS.Worksheet) {
     "CHARGE:",
     "MINIMART:",
     "FOOD:",
-    "EARLY C/I:",
-    "LATE C/O:",
     "CASH",
-    "GCASH",
-    "CARD",
-    "CHEQUE",
-    "QRPH",
+    "NON-CASH",
+    "METHOD",
     "REF NO.",
   ];
 
   row8Values.forEach((value, index) => {
     const cell = worksheet.getCell(8, index + 1);
-    if (!["H8", "P8"].includes(cell.address)) {
+    if (!["G8", "M8"].includes(cell.address)) {
       cell.style = cloneStyle(headerCellStyle);
     }
     cell.value = value;
   });
-  worksheet.getCell("H8").value = "EXTRAS";
-  worksheet.getCell("P8").value = "PAYMENT METHODS";
+  worksheet.getCell("G8").value = "EXTRAS";
+  worksheet.getCell("M8").value = "PAYMENT METHODS";
 
   row9Values.forEach((value, index) => {
     const cell = worksheet.getCell(9, index + 1);
@@ -1950,6 +1956,22 @@ function resetWorksheetLayout(worksheet: ExcelJS.Worksheet) {
       top: { style: "medium" },
     };
   }
+
+  worksheet.pageSetup = {
+    ...worksheet.pageSetup,
+    orientation: "landscape",
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 1,
+    margins: {
+      left: 0.2,
+      right: 0.2,
+      top: 0.35,
+      bottom: 0.35,
+      header: 0.2,
+      footer: 0.2,
+    },
+  };
 }
 
 export async function generateShiftCashReportWorkbook(
@@ -1997,34 +2019,33 @@ export async function generateShiftCashReportWorkbook(
     if (!item) continue;
 
     row.getCell(1).value = offset + 1;
-    row.getCell(2).value = item.room_no || "";
+    row.getCell(2).value = item.room_no || null;
     row.getCell(3).value = item.guest_name;
-    row.getCell(4).value = getReservationScheduleDisplay(item, timeConfig);
-    row.getCell(5).value = getDisplayDateTime(item.check_in_at, timezone);
-    row.getCell(6).value = getDisplayDateTime(item.check_out_at, timezone);
-    setScheduleCellStyle(row.getCell(4));
+    row.getCell(4).value = getDisplayDateTime(item.check_in_at, timezone) || null;
+    row.getCell(5).value = getDisplayDateTime(item.check_out_at, timezone) || null;
+    setCompactDateTimeStyle(row.getCell(4));
     setCompactDateTimeStyle(row.getCell(5));
-    setCompactDateTimeStyle(row.getCell(6));
-    if (row.getCell(4).value) {
-      row.height = Math.max(row.height ?? 15, 30);
+    row.getCell(6).value = item.payment_count > 0 || item.total_amount > 0 ? item.room_rate || null : null;
+    row.getCell(7).value = item.extra_bed_amount || null;
+    row.getCell(8).value = item.extra_person_amount || null;
+    row.getCell(9).value = item.linens_amount || null;
+    row.getCell(10).value =
+      roundMoney(item.charge_amount + item.early_checkin_amount + item.late_checkout_amount) || null;
+    row.getCell(11).value = item.minimart_amount || null;
+    row.getCell(12).value = item.food_amount || null;
+    row.getCell(13).value = item.cash_amount || null;
+    row.getCell(14).value = getNonCashAmount(item) || null;
+    const paymentMethodIndicator = getNonCashMethodIndicator(item);
+    const referenceNumbers = formatReferenceNumbersForWorkbook(item.reference_numbers);
+    row.getCell(15).value = paymentMethodIndicator || null;
+    row.getCell(16).value = referenceNumbers || null;
+    setPaymentMethodStyle(row.getCell(15));
+    setPaymentMethodStyle(row.getCell(16));
+    if (paymentMethodIndicator.includes(" / ") || referenceNumbers.includes(",")) {
+      row.height = Math.max(row.height ?? 15, 28);
     }
-    row.getCell(7).value = item.payment_count > 0 || item.total_amount > 0 ? item.room_rate || null : null;
-    row.getCell(8).value = item.extra_bed_amount || null;
-    row.getCell(9).value = item.extra_person_amount || null;
-    row.getCell(10).value = item.linens_amount || null;
-    row.getCell(11).value = item.charge_amount || null;
-    row.getCell(12).value = item.minimart_amount || null;
-    row.getCell(13).value = item.food_amount || null;
-    row.getCell(14).value = item.early_checkin_amount || null;
-    row.getCell(15).value = item.late_checkout_amount || null;
-    row.getCell(16).value = item.cash_amount || null;
-    row.getCell(17).value = item.gcash_amount || null;
-    row.getCell(18).value = item.card_amount || null;
-    row.getCell(19).value = item.cheque_amount || null;
-    row.getCell(20).value = item.qrph_amount || null;
-    row.getCell(21).value = formatReferenceNumbersForWorkbook(item.reference_numbers);
 
-    for (let column = 7; column <= 20; column += 1) {
+    for (let column = 6; column <= 14; column += 1) {
       setCurrencyStyle(row.getCell(column));
     }
   }
@@ -2038,7 +2059,7 @@ export async function generateShiftCashReportWorkbook(
   }
 
   const maxDataRow = ACTIVITY_START_ROW + visibleRows - 1;
-  ["G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T"].forEach((columnLetter) => {
+  ["F", "G", "H", "I", "J", "K", "L", "M", "N"].forEach((columnLetter) => {
     worksheet.getCell(`${columnLetter}${totalRowIndex}`).value = {
       formula: `SUM(${columnLetter}${ACTIVITY_START_ROW}:${columnLetter}${maxDataRow})`,
     };
@@ -2063,6 +2084,7 @@ export async function generateShiftCashReportWorkbook(
   }
 
   const footerOffset = extraRows;
+  worksheet.pageSetup.printArea = `A1:P${35 + footerOffset}`;
   worksheet.getCell(`E${FOOTER_TOTAL_CASH_ROW + footerOffset}`).value = report.summary.total_cash;
   worksheet.getCell(`E${FOOTER_LESS_EXPENSES_ROW + footerOffset}`).value = report.summary.total_cash_expenses;
   worksheet.getCell(`E${FOOTER_CASH_ON_HAND_ROW + footerOffset}`).value = report.summary.cash_on_hand;
