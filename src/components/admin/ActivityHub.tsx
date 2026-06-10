@@ -8,7 +8,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { getSupabaseClient } from "@/lib/supabase";
 import {
   MessageSquare,
   Bell,
@@ -235,6 +234,9 @@ export default function ActivityHub({
   const soundEnabledRef = useRef(soundEnabled);
   const activeDmPartnerRef = useRef(activeDmPartner);
   const tabRef = useRef(tab);
+  const broadcastInitializedRef = useRef(false);
+  const conversationsInitializedRef = useRef(false);
+  const conversationLatestRef = useRef<Message[]>([]);
 
   useEffect(() => { openRef.current = open; }, [open]);
   useEffect(() => { soundEnabledRef.current = soundEnabled; }, [soundEnabled]);
@@ -312,13 +314,32 @@ export default function ActivityHub({
     });
   }, []);
 
-  const supabase = useMemo(() => getSupabaseClient(), []);
-
   /* ================================================================ */
   /*  Data Fetching                                                    */
   /* ================================================================ */
 
   // ── Broadcast messages (All tab) ──
+  const notifyIncomingMessages = useCallback((previous: Message[], next: Message[]) => {
+    const previousIds = new Set(previous.map((message) => message.id));
+    const incoming = next.filter(
+      (message) =>
+        !previousIds.has(message.id) &&
+        message.sender_id !== currentAdminId &&
+        (!message.recipient_id || message.recipient_id === currentAdminId),
+    );
+
+    if (incoming.length === 0) return;
+    if (!openRef.current) {
+      setUnreadCount((count) => count + incoming.length);
+    }
+    if (soundEnabledRef.current) {
+      playNotificationSound();
+      for (const message of incoming) {
+        showNotification(message);
+      }
+    }
+  }, [currentAdminId, showNotification]);
+
   const fetchBroadcast = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/messages?mode=broadcast&limit=100", {
@@ -326,13 +347,22 @@ export default function ActivityHub({
       });
       if (res.ok) {
         const data = await res.json();
-        setBroadcastMsgs(data.messages ?? []);
+        const nextMessages: Message[] = data.messages ?? [];
+        setBroadcastMsgs((previous) => {
+          if (broadcastInitializedRef.current) {
+            notifyIncomingMessages(previous, nextMessages);
+          }
+          broadcastInitializedRef.current = true;
+          return nextMessages;
+        });
         setBroadcastLoaded(true);
       }
     } catch { /* silent */ }
-  }, []);
+  }, [notifyIncomingMessages]);
 
-  useEffect(() => { fetchBroadcast(); }, [fetchBroadcast]);
+  useEffect(() => {
+    if (canRead) fetchBroadcast();
+  }, [canRead, fetchBroadcast]);
 
   // ── Team members ──
   const fetchTeam = useCallback(async () => {
@@ -361,7 +391,14 @@ export default function ActivityHub({
       });
       if (res.ok) {
         const data = await res.json();
-        const convos: ConversationPreview[] = (data.conversations ?? []).map((msg: Message) => {
+        const latestMessages: Message[] = data.conversations ?? [];
+        if (conversationsInitializedRef.current) {
+          notifyIncomingMessages(conversationLatestRef.current, latestMessages);
+        }
+        conversationsInitializedRef.current = true;
+        conversationLatestRef.current = latestMessages;
+
+        const convos: ConversationPreview[] = latestMessages.map((msg: Message) => {
           const partnerId =
             msg.sender_id === currentAdminId ? msg.recipient_id : msg.sender_id;
           const partnerName =
@@ -380,7 +417,7 @@ export default function ActivityHub({
         setConvoLoaded(true);
       }
     } catch { /* silent */ }
-  }, [currentAdminId]);
+  }, [currentAdminId, notifyIncomingMessages]);
 
   // Refresh conversations when Chat tab is active
   useEffect(() => {
@@ -390,8 +427,8 @@ export default function ActivityHub({
   }, [tab, activeDmPartner, fetchConversations]);
 
   // ── DM thread with a specific partner ──
-  const fetchDmThread = useCallback(async (partnerId: string) => {
-    setDmLoaded(false);
+  const fetchDmThread = useCallback(async (partnerId: string, background = false) => {
+    if (!background) setDmLoaded(false);
     try {
       const res = await fetch(
         `/api/admin/messages?mode=dm&partner_id=${partnerId}&limit=100`,
@@ -534,28 +571,25 @@ export default function ActivityHub({
       setDmMessages((prev) => prev.filter((m) => m.id !== id));
     };
 
-    const channel = supabase
-      .channel("admin_messages_realtime")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "admin_messages" },
-        handlePayload
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "admin_messages" },
-        handleUpdate
-      )
-      .on(
-        "postgres_changes",
-        { event: "DELETE", schema: "public", table: "admin_messages" },
-        handleDelete
-      )
-      .subscribe();
+    if (!canRead) return undefined;
 
-    return () => { supabase.removeChannel(channel); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase, currentAdminId, fetchConversations]);
+    const pollMessages = () => {
+      if (document.visibilityState === "hidden") return;
+      fetchBroadcast();
+      fetchConversations();
+      const activePartner = activeDmPartnerRef.current;
+      if (activePartner) {
+        fetchDmThread(activePartner.id, true);
+      }
+    };
+
+    const interval = window.setInterval(pollMessages, 10_000);
+    document.addEventListener("visibilitychange", pollMessages);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", pollMessages);
+    };
+  }, [canRead, currentAdminId, fetchBroadcast, fetchConversations, fetchDmThread, showNotification]);
 
   /* ================================================================ */
   /*  UI Helpers                                                       */
@@ -603,11 +637,18 @@ export default function ActivityHub({
       if (replyTo) {
         body.reply_to = replyTo;
       }
-      await fetch("/api/admin/messages", {
+      const response = await fetch("/api/admin/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify(body),
       });
+      if (response.ok) {
+        fetchBroadcast();
+        fetchConversations();
+        if (activeDmPartner) {
+          fetchDmThread(activeDmPartner.id, true);
+        }
+      }
       if (overrideText === undefined) {
         setDraft("");
       }
@@ -619,7 +660,7 @@ export default function ActivityHub({
       setSending(false);
       inputRef.current?.focus();
     }
-  }, [draft, sending, activeDmPartner, replyTo]);
+  }, [activeDmPartner, draft, fetchBroadcast, fetchConversations, fetchDmThread, replyTo, sending]);
 
   // Mentions logic
   const filteredMentionMembers = useMemo(() => {
@@ -642,26 +683,40 @@ export default function ActivityHub({
     if (!content.trim() || sending) return;
     setSending(true);
     try {
-      await fetch(`/api/admin/messages/${id}`, {
+      const response = await fetch(`/api/admin/messages/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ content }),
       });
+      if (response.ok) {
+        fetchBroadcast();
+        fetchConversations();
+        if (activeDmPartner) {
+          fetchDmThread(activeDmPartner.id, true);
+        }
+      }
       setEditingId(null);
     } finally {
       setSending(false);
     }
-  }, [sending]);
+  }, [activeDmPartner, fetchBroadcast, fetchConversations, fetchDmThread, sending]);
 
   const deleteMessage = useCallback(async (id: string) => {
     try {
-      await fetch(`/api/admin/messages/${id}`, {
+      const response = await fetch(`/api/admin/messages/${id}`, {
         method: "DELETE",
         headers: authHeaders(),
       });
+      if (response.ok) {
+        fetchBroadcast();
+        fetchConversations();
+        if (activeDmPartner) {
+          fetchDmThread(activeDmPartner.id, true);
+        }
+      }
       setMsgToDelete(null);
     } catch { /* silent */ }
-  }, []);
+  }, [activeDmPartner, fetchBroadcast, fetchConversations, fetchDmThread]);
 
   const onlineCount = useMemo(() => teamMembers.filter((m) => m.is_online).length, [teamMembers]);
   const onlineMembers = useMemo(() => teamMembers.filter((m) => m.is_online), [teamMembers]);

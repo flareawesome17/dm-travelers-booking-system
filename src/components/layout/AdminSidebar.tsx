@@ -231,7 +231,10 @@ export default function AdminSidebar({
     try {
       if (document.visibilityState === "hidden") return;
       const since = localStorage.getItem(LAST_SEEN_KEY) || new Date(0).toISOString();
-      const res = await fetch(`/api/bookings/new-count?since=${encodeURIComponent(since)}`);
+      const tokenStr = localStorage.getItem("admin_token");
+      const res = await fetch(`/api/bookings/new-count?since=${encodeURIComponent(since)}`, {
+        headers: tokenStr ? { Authorization: `Bearer ${tokenStr}` } : {},
+      });
       if (res.ok) {
         const data = await res.json();
         setNewBookingCount(typeof data.count === "number" ? data.count : 0);

@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { requirePermission } from "@/lib/rbac";
 
 /**
  * Returns the count of new public bookings (those with a public_booking_payment_session)
@@ -8,7 +9,10 @@ import { getSupabaseAdmin } from "@/lib/supabase";
  * Query params:
  *   since — ISO timestamp; only bookings created after this are counted.
  */
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
+  const auth = await requirePermission(req, "bookings.read");
+  if ("error" in auth) return auth.error;
+
   const url = new URL(req.url);
   const since = url.searchParams.get("since");
 

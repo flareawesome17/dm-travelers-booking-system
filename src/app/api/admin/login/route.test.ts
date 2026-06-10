@@ -80,13 +80,7 @@ function createSupabaseMock(options?: {
             eq: vi.fn((column: string, value: unknown) => {
               if (column === "email") {
                 return {
-                  eq: vi.fn((secondColumn: string, secondValue: unknown) => {
-                    expect(secondColumn).toBe("is_active");
-                    expect(secondValue).toBe(true);
-                    return {
-                      single: selectSingleMock,
-                    };
-                  }),
+                  single: selectSingleMock,
                 };
               }
 
@@ -184,6 +178,7 @@ describe("POST /api/admin/login", () => {
         id: "admin-1",
         email: "admin@example.com",
         password_hash: "hashed-password",
+        is_active: true,
       },
     });
     getSupabaseAdminMock.mockReturnValue(supabaseState.supabase);

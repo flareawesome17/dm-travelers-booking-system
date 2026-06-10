@@ -15,20 +15,39 @@ vi.mock("@/lib/auth", () => ({
 
 import { getCurrentAdminPermissions, requirePermission } from "./rbac";
 
+function createActiveAdminQuery() {
+  return {
+    select: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        single: vi.fn(async () => ({
+          data: { is_active: true },
+          error: null,
+        })),
+      })),
+    })),
+  };
+}
+
 describe("rbac helpers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("allows super admins without loading permission tables", async () => {
+  it("allows active super admins without loading permission tables", async () => {
     verifyAdminTokenMock.mockReturnValue({
       payload: { sub: "admin-1", role_id: 1 },
+    });
+    getSupabaseAdminMock.mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === "admin_users") return createActiveAdminQuery();
+        throw new Error(`Unexpected table ${table}`);
+      }),
     });
 
     const result = await requirePermission({} as any, "roles.manage");
 
     expect("payload" in result).toBe(true);
-    expect(getSupabaseAdminMock).not.toHaveBeenCalled();
+    expect(getSupabaseAdminMock).toHaveBeenCalledOnce();
   });
 
   it("returns forbidden when the required permission is absent", async () => {
@@ -37,6 +56,7 @@ describe("rbac helpers", () => {
     });
     getSupabaseAdminMock.mockReturnValue({
       from: vi.fn((table: string) => {
+        if (table === "admin_users") return createActiveAdminQuery();
         if (table === "role_permissions") {
           return {
             select: vi.fn(() => ({
@@ -71,6 +91,7 @@ describe("rbac helpers", () => {
     });
     getSupabaseAdminMock.mockReturnValue({
       from: vi.fn((table: string) => {
+        if (table === "admin_users") return createActiveAdminQuery();
         if (table === "role_permissions") {
           return {
             select: vi.fn(() => ({
@@ -108,6 +129,7 @@ describe("rbac helpers", () => {
     });
     getSupabaseAdminMock.mockReturnValue({
       from: vi.fn((table: string) => {
+        if (table === "admin_users") return createActiveAdminQuery();
         if (table === "permissions") {
           return {
             select: vi.fn(() => ({

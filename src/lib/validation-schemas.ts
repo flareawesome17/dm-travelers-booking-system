@@ -3,6 +3,7 @@
  * Ensures strict input validation and prevents mass assignment attacks.
  */
 import { z } from "zod";
+import { EXPENSE_CATEGORIES } from "@/lib/expenseCategories";
 import { BOOKING_EXTRA_TYPES } from "@/lib/bookingExtras";
 
 // ─── Common Validators ────────────────────────────────────────────────────────
@@ -150,7 +151,9 @@ export const createPaymentSchema = z.object({
 export const createExpenseSchema = z.object({
   description: safeString.max(500),
   amount: positiveNumber,
-  category: z.string().trim().min(1).max(100),
+  category: z.enum(EXPENSE_CATEGORIES, {
+    errorMap: () => ({ message: "Invalid expense category" }),
+  }),
   payment_method: z.enum(["Cash", "GCash", "Card", "Bank Transfer"]).optional(),
   date: ymdDate.optional(),
   notes: z.string().max(1000).optional().nullable(),

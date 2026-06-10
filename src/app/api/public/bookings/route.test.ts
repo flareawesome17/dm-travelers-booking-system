@@ -45,11 +45,15 @@ function createSupabaseMock(options?: {
   existingGuestId?: string | null;
   createdBookingId?: string;
 }) {
-  const cleanupLtMock = vi.fn(async () => ({ error: null }));
-  const cleanupEqMock = vi.fn(() => ({ lt: cleanupLtMock }));
-  const cleanupUpdateMock = vi.fn(() => ({ eq: cleanupEqMock }));
+  const cleanupVerificationLtMock = vi.fn(async () => ({ error: null }));
+  const cleanupVerificationEqMock = vi.fn(() => ({ lt: cleanupVerificationLtMock }));
+  const cleanupVerificationDeleteMock = vi.fn(() => ({ eq: cleanupVerificationEqMock }));
+  const cleanupPaymentLtMock = vi.fn(async () => ({ error: null }));
+  const cleanupPaymentNotMock = vi.fn(() => ({ lt: cleanupPaymentLtMock }));
+  const cleanupPaymentEqMock = vi.fn(() => ({ not: cleanupPaymentNotMock }));
+  const cleanupPaymentDeleteMock = vi.fn(() => ({ eq: cleanupPaymentEqMock }));
   const cancelBookingEqMock = vi.fn(async () => ({ error: null }));
-  const cancelBookingUpdateMock = vi.fn(() => ({ eq: cancelBookingEqMock }));
+  const cancelBookingDeleteMock = vi.fn(() => ({ eq: cancelBookingEqMock }));
   const bookingInsertSingleMock = vi.fn(async () => ({
     data: {
       id: options?.createdBookingId ?? "booking-1",
@@ -70,10 +74,11 @@ function createSupabaseMock(options?: {
   const bookingInsertMock = vi.fn(() => ({
     select: bookingInsertSelectMock,
   }));
-  const bookingUpdateMock = vi
+  const bookingDeleteMock = vi
     .fn()
-    .mockImplementationOnce(cleanupUpdateMock)
-    .mockImplementationOnce(cancelBookingUpdateMock);
+    .mockImplementationOnce(cleanupVerificationDeleteMock)
+    .mockImplementationOnce(cleanupPaymentDeleteMock)
+    .mockImplementation(cancelBookingDeleteMock);
   const existingGuestMaybeSingleMock = vi.fn(async () => ({
     data: options?.existingGuestId ? { id: options.existingGuestId } : null,
     error: null,
@@ -88,6 +93,8 @@ function createSupabaseMock(options?: {
   const guestInsertMock = vi.fn(() => ({
     select: guestInsertSelectMock,
   }));
+  const guestUpdateEqMock = vi.fn(async () => ({ error: null }));
+  const guestUpdateMock = vi.fn(() => ({ eq: guestUpdateEqMock }));
   const roomsEqActiveMock = vi.fn(async () => ({
     data: options?.rooms ?? [],
     error: null,
@@ -121,7 +128,7 @@ function createSupabaseMock(options?: {
 
       if (table === "bookings") {
         return {
-          update: bookingUpdateMock,
+          delete: bookingDeleteMock,
           select: vi.fn(() => ({
             in: bookingsInMock,
           })),
@@ -139,6 +146,31 @@ function createSupabaseMock(options?: {
             })),
           })),
           insert: guestInsertMock,
+          update: guestUpdateMock,
+        };
+      }
+
+      if (table === "discounts") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                lte: vi.fn(() => ({
+                  gte: vi.fn(() => ({
+                    order: vi.fn(async () => ({ data: [], error: null })),
+                  })),
+                })),
+              })),
+            })),
+          })),
+        };
+      }
+
+      if (table === "settings") {
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn(async () => ({ data: [], error: null })),
+          })),
         };
       }
 
@@ -148,10 +180,9 @@ function createSupabaseMock(options?: {
 
   return {
     supabase,
-    cleanupUpdateMock,
-    cleanupEqMock,
-    cleanupLtMock,
-    cancelBookingUpdateMock,
+    cleanupVerificationDeleteMock,
+    cleanupVerificationEqMock,
+    cleanupVerificationLtMock,
     cancelBookingEqMock,
   };
 }
@@ -210,7 +241,7 @@ describe("POST /api/public/bookings", () => {
         full_name: "Guest One",
         email: "guest@example.com",
         phone_number: "09171234567",
-        room_type_requested: "Deluxe",
+        room_id_requested: "room-1",
         check_in_date: "2026-04-10",
         check_out_date: "2026-04-12",
         human_check: true,
@@ -221,11 +252,9 @@ describe("POST /api/public/bookings", () => {
 
     expect(response.status).toBe(409);
     expect(body).toEqual({ error: "This room type is not available right now." });
-    expect(supabaseState.cleanupUpdateMock).toHaveBeenCalledWith(
-      expect.objectContaining({ status: "Cancelled" })
-    );
-    expect(supabaseState.cleanupEqMock).toHaveBeenCalledWith("status", "Pending Verification");
-    expect(supabaseState.cleanupLtMock).toHaveBeenCalled();
+    expect(supabaseState.cleanupVerificationDeleteMock).toHaveBeenCalled();
+    expect(supabaseState.cleanupVerificationEqMock).toHaveBeenCalledWith("status", "Pending Verification");
+    expect(supabaseState.cleanupVerificationLtMock).toHaveBeenCalled();
   });
 
   it("rejects overlapping reservations when all candidate rooms are already occupied", async () => {
@@ -258,7 +287,7 @@ describe("POST /api/public/bookings", () => {
         full_name: "Guest One",
         email: "guest@example.com",
         phone_number: "09171234567",
-        room_type_requested: "Deluxe",
+        room_id_requested: "room-1",
         check_in_date: "2026-04-10",
         check_out_date: "2026-04-12",
         human_check: true,
@@ -296,7 +325,7 @@ describe("POST /api/public/bookings", () => {
         full_name: "Guest One",
         email: "guest@example.com",
         phone_number: "09171234567",
-        room_type_requested: "Deluxe",
+        room_id_requested: "room-1",
         check_in_date: "2026-04-10",
         check_out_date: "2026-04-12",
         human_check: true,
@@ -307,9 +336,6 @@ describe("POST /api/public/bookings", () => {
 
     expect(response.status).toBe(500);
     expect(body).toEqual({ error: "smtp unavailable" });
-    expect(supabaseState.cancelBookingUpdateMock).toHaveBeenCalledWith(
-      expect.objectContaining({ status: "Cancelled" })
-    );
     expect(supabaseState.cancelBookingEqMock).toHaveBeenCalledWith("id", "booking-mail-fail");
   });
 });

@@ -111,8 +111,9 @@ export default function AdminRestaurantPage() {
   };
 
   const loadCategories = () => {
+    const token = localStorage.getItem("admin_token");
     setCategoriesLoading(true);
-    fetch("/api/restaurant-categories").then((r) => r.json())
+    fetch("/api/restaurant-categories", { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json())
       .then((data) => { const list = Array.isArray(data) ? data as RestaurantCategory[] : []; setCategories(list); if (!editingItem && !category && list.length > 0) setCategory(list[0].name); })
       .catch(() => setCategories([])).finally(() => setCategoriesLoading(false));
   };

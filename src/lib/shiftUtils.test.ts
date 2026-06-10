@@ -31,6 +31,7 @@ describe("shiftUtils", () => {
 
   it("retries without performed_by when the schema cache does not know that column", async () => {
     const insertCalls: Array<Record<string, unknown>> = [];
+    const today = new Date().toISOString().slice(0, 10);
 
     const supabase = {
       from: vi.fn((table: string) => {
@@ -68,7 +69,7 @@ describe("shiftUtils", () => {
                           {
                             id: "shift-log-1",
                             shift_id: "shift-1",
-                            date: "2026-04-10",
+                            date: today,
                             status: "OPEN",
                           },
                         ],

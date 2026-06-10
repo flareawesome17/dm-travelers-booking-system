@@ -26,6 +26,10 @@ function createSupabaseMock(options: {
   const bookingUpdateMock = vi.fn(() => ({
     eq: bookingUpdateEqMock,
   }));
+  const bookingDeleteEqMock = vi.fn(async () => ({ error: null }));
+  const bookingDeleteMock = vi.fn(() => ({
+    eq: bookingDeleteEqMock,
+  }));
   const bookingSingleMock = vi.fn(async () => ({
     data: options.booking,
     error: null,
@@ -44,6 +48,7 @@ function createSupabaseMock(options: {
           })),
         })),
         update: bookingUpdateMock,
+        delete: bookingDeleteMock,
       };
     }),
   };
@@ -51,6 +56,7 @@ function createSupabaseMock(options: {
   return {
     supabase,
     bookingUpdateEqMock,
+    bookingDeleteEqMock,
   };
 }
 
@@ -109,7 +115,7 @@ describe("POST /api/public/bookings/verify", () => {
 
     expect(response.status).toBe(400);
     expect(body).toEqual({ error: "Code expired. Please create a new booking." });
-    expect(supabaseState.bookingUpdateEqMock).toHaveBeenCalledWith(
+    expect(supabaseState.bookingDeleteEqMock).toHaveBeenCalledWith(
       "id",
       "550e8400-e29b-41d4-a716-446655440001"
     );

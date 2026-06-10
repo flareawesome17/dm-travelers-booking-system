@@ -240,7 +240,7 @@ export default function HeroCanvas({
   );
 
   useEffect(() => {
-    if (typeof window === "undefined" || window.innerWidth <= 1024) {
+    if (reduceMotion || typeof window === "undefined" || window.innerWidth <= 1024) {
       return undefined;
     }
 
@@ -302,6 +302,7 @@ export default function HeroCanvas({
     config.fallbackImagePath,
     config.frameCount,
     config.startIndex,
+    reduceMotion,
     framesReady,
     preloadFrame,
     preloadNearbyFrames,
@@ -309,7 +310,7 @@ export default function HeroCanvas({
   ]);
 
   useEffect(() => {
-    if (typeof window === "undefined" || window.innerWidth <= 1024) {
+    if (reduceMotion || typeof window === "undefined" || window.innerWidth <= 1024) {
       return undefined;
     }
 
@@ -345,11 +346,12 @@ export default function HeroCanvas({
     config.startIndex,
     drawFrame,
     preloadNearbyFrames,
+    reduceMotion,
     scrollYProgress,
   ]);
 
   useEffect(() => {
-    if (typeof window === "undefined" || window.innerWidth <= 1024) {
+    if (reduceMotion || typeof window === "undefined" || window.innerWidth <= 1024) {
       return undefined;
     }
 
@@ -376,7 +378,7 @@ export default function HeroCanvas({
       resizeObserver.disconnect();
       window.removeEventListener("orientationchange", redrawActiveImage);
     };
-  }, [drawImageToCanvas, syncCanvasSize]);
+  }, [drawImageToCanvas, reduceMotion, syncCanvasSize]);
 
   return (
     <div ref={containerRef} className={cn("absolute inset-0 bg-secondary overflow-hidden", className)}>

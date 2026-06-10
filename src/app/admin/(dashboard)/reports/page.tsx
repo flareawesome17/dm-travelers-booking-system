@@ -27,8 +27,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePermissions } from "@/context/PermissionsContext";
 import { adminFetch, adminFetchOrRedirect, requireAdminSession } from "@/lib/admin-client";
+import { EXPENSE_CATEGORIES } from "@/lib/expenseCategories";
 
 type ShiftSummary = {
   total_cash: number;
@@ -1118,12 +1120,21 @@ export default function AdminReportsPage() {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="expense-category">Category</Label>
-                        <Input
-                          id="expense-category"
+                        <Select
                           value={expenseForm.category}
-                          onChange={(event) => setExpenseForm((current) => ({ ...current, category: event.target.value }))}
-                          required
-                        />
+                          onValueChange={(category) => setExpenseForm((current) => ({ ...current, category }))}
+                        >
+                          <SelectTrigger id="expense-category">
+                            <SelectValue placeholder="Select a category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {EXPENSE_CATEGORIES.map((category) => (
+                              <SelectItem key={category} value={category}>
+                                {category}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                     <div className="space-y-2">

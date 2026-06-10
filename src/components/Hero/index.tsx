@@ -38,7 +38,6 @@ export default function Hero() {
   const ambientOpacity = useTransform(smoothProgress, [0, 0.55, 1], [0.85, 0.45, 0.2]);
   const topTintOpacity = useTransform(smoothProgress, [0, 0.28, 0.72, 1], [0.9, 0.7, 0.5, 0.36]);
   const lineOpacity = useTransform(smoothProgress, [0, 0.2, 0.8, 1], [0.2, 0.42, 0.36, 0.1]);
-  const ambientScale = useTransform(smoothProgress, [0, 1], [1, 1.08]);
 
   return (
     <section
@@ -60,16 +59,15 @@ export default function Hero() {
                 ? undefined
                 : {
                     opacity: ambientOpacity,
-                    scale: ambientScale,
                   }
             }
           >
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_14%,rgba(255,212,97,0.22),transparent_26%),radial-gradient(circle_at_82%_22%,rgba(42,101,172,0.22),transparent_26%),radial-gradient(circle_at_78%_78%,rgba(255,198,66,0.14),transparent_22%)]" />
+            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,13,24,0.96)_0%,rgba(5,15,27,0.88)_24%,rgba(5,15,27,0.48)_48%,rgba(5,15,27,0.14)_72%,rgba(5,15,27,0.36)_100%)]" />
           </motion.div>
 
           <motion.div
             aria-hidden="true"
-            className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,18,37,0.9)_0%,rgba(6,18,37,0.35)_24%,rgba(6,18,37,0.22)_52%,rgba(6,18,37,0.82)_100%)]"
+            className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,13,24,0.92)_0%,rgba(4,13,24,0.38)_20%,rgba(4,13,24,0.18)_52%,rgba(4,13,24,0.88)_100%)]"
             style={reduceMotion ? undefined : { opacity: topTintOpacity }}
           />
 
