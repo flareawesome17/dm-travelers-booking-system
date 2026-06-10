@@ -160,6 +160,15 @@ describe("generateShiftCashReportWorkbook", () => {
     expect(worksheet.getCell("O11").value).toBe("GCASH");
     expect(worksheet.getCell("P10").value).toBe("123");
     expect(worksheet.getCell("P11").value).toBe("4326");
+    expect(worksheet.getCell("F24").value).toBe(2930);
+    expect(worksheet.getCell("G24").value).toBe(0);
+    expect(worksheet.getCell("H24").value).toBe(0);
+    expect(worksheet.getCell("I24").value).toBe(0);
+    expect(worksheet.getCell("J24").value).toBe(125);
+    expect(worksheet.getCell("K24").value).toBe(0);
+    expect(worksheet.getCell("L24").value).toBe(0);
+    expect(worksheet.getCell("M24").value).toBe(500);
+    expect(worksheet.getCell("N24").value).toBe(1175);
     expect(worksheet.getColumn(17).hidden).toBe(true);
     expect(worksheet.pageSetup.printArea).toBe("A1:P35");
     expect(worksheet.pageSetup.fitToWidth).toBe(1);

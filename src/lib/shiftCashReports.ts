@@ -2058,12 +2058,51 @@ export async function generateShiftCashReportWorkbook(
     worksheet.getCell(totalRowIndex, column).style = cloneStyle(dataRowStyle[column - 1] ?? totalCellStyle);
   }
 
-  const maxDataRow = ACTIVITY_START_ROW + visibleRows - 1;
-  ["F", "G", "H", "I", "J", "K", "L", "M", "N"].forEach((columnLetter) => {
-    worksheet.getCell(`${columnLetter}${totalRowIndex}`).value = {
-      formula: `SUM(${columnLetter}${ACTIVITY_START_ROW}:${columnLetter}${maxDataRow})`,
-    };
-    setCurrencyStyle(worksheet.getCell(`${columnLetter}${totalRowIndex}`));
+  const columnTotals = report.activity_rows.reduce(
+    (totals, item) => ({
+      roomRate:
+        totals.roomRate +
+        (item.payment_count > 0 || item.total_amount > 0 ? item.room_rate : 0),
+      extraBed: totals.extraBed + item.extra_bed_amount,
+      extraPerson: totals.extraPerson + item.extra_person_amount,
+      linens: totals.linens + item.linens_amount,
+      charge:
+        totals.charge +
+        item.charge_amount +
+        item.early_checkin_amount +
+        item.late_checkout_amount,
+      minimart: totals.minimart + item.minimart_amount,
+      food: totals.food + item.food_amount,
+      cash: totals.cash + item.cash_amount,
+      nonCash: totals.nonCash + getNonCashAmount(item),
+    }),
+    {
+      roomRate: 0,
+      extraBed: 0,
+      extraPerson: 0,
+      linens: 0,
+      charge: 0,
+      minimart: 0,
+      food: 0,
+      cash: 0,
+      nonCash: 0,
+    },
+  );
+
+  [
+    columnTotals.roomRate,
+    columnTotals.extraBed,
+    columnTotals.extraPerson,
+    columnTotals.linens,
+    columnTotals.charge,
+    columnTotals.minimart,
+    columnTotals.food,
+    columnTotals.cash,
+    columnTotals.nonCash,
+  ].forEach((total, index) => {
+    const cell = worksheet.getCell(totalRowIndex, 6 + index);
+    cell.value = roundMoney(total);
+    setCurrencyStyle(cell);
   });
 
   for (let column = 1; column <= WORKBOOK_TOTAL_COLUMNS; column += 1) {
