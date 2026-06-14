@@ -1742,6 +1742,15 @@ export function getReservationScheduleDisplay(
 
 function setCurrencyStyle(cell: ExcelJS.Cell) {
   cell.numFmt = "#,##0.00";
+  cell.font = {
+    ...(cell.font || {}),
+    size: Math.min(cell.font?.size ?? 11, 8),
+  };
+  cell.alignment = {
+    ...(cell.alignment || {}),
+    shrinkToFit: true,
+    vertical: cell.alignment?.vertical ?? "middle",
+  };
 }
 
 function setCompactDateTimeStyle(cell: ExcelJS.Cell, maxSize = 9) {

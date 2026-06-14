@@ -53,7 +53,7 @@ describe("generateShiftCashReportWorkbook", () => {
           check_in_at: "2026-04-11T06:10:00.000Z",
           check_out_at: null,
           room_rate: 1000,
-          extra_bed_amount: 0,
+          extra_bed_amount: 5940.06,
           extra_person_amount: 0,
           linens_amount: 0,
           charge_amount: 25,
@@ -148,6 +148,9 @@ describe("generateShiftCashReportWorkbook", () => {
     expect(worksheet.getCell("D10").alignment?.shrinkToFit).toBe(true);
     expect(worksheet.getCell("E10").font?.size).toBe(9);
     expect(worksheet.getCell("E10").alignment?.shrinkToFit).toBe(true);
+    expect(worksheet.getCell("G10").font?.size).toBe(8);
+    expect(worksheet.getCell("G10").alignment?.shrinkToFit).toBe(true);
+    expect(worksheet.getCell("G10").value).toBe(5940.06);
     expect(worksheet.getCell("C11").value).toBe("Reservation Guest");
     expect(worksheet.getCell("F11").value).toBe(1930);
     expect(worksheet.getCell("J10").value).toBe(125);
@@ -161,7 +164,9 @@ describe("generateShiftCashReportWorkbook", () => {
     expect(worksheet.getCell("P10").value).toBe("123");
     expect(worksheet.getCell("P11").value).toBe("4326");
     expect(worksheet.getCell("F24").value).toBe(2930);
-    expect(worksheet.getCell("G24").value).toBe(0);
+    expect(worksheet.getCell("G24").value).toBe(5940.06);
+    expect(worksheet.getCell("G24").font?.size).toBe(8);
+    expect(worksheet.getCell("G24").alignment?.shrinkToFit).toBe(true);
     expect(worksheet.getCell("H24").value).toBe(0);
     expect(worksheet.getCell("I24").value).toBe(0);
     expect(worksheet.getCell("J24").value).toBe(125);
