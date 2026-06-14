@@ -37,11 +37,11 @@ function Get-DeployConfig {
     AppDir = $defaultAppDir
     RepoUrl = "GITHUB_REPO_URL_HERE"
     Branch = "main"
-    LocalUrl = "http://localhost:3000"
+    LocalUrl = "http://127.0.0.1:3000"
     ProductionUrl = "https://admin-dm.erniecodev.win"
     PublicProductionUrl = "https://public-dm.erniecodev.win"
     CheckPublicProductionUrl = $false
-    CloudflaredMode = "windows-service"
+    CloudflaredMode = "compose"
     CloudflaredServiceName = "cloudflared"
     AppContainerName = "dm-admin"
     CloudflaredContainerName = "dm-cloudflared"
@@ -166,6 +166,15 @@ function Assert-ProjectFiles {
   }
   if (-not (Test-Path (Join-Path $Config.AppDir ".env.production") -PathType Leaf)) {
     throw ".env.production was not found in $($Config.AppDir). Create it from .env.example, add the production values, and run this script again."
+  }
+  if ($Config.CloudflaredMode -eq "compose") {
+    $envPath = Join-Path $Config.AppDir ".env.production"
+    $tokenConfigured = Get-Content $envPath |
+      Where-Object { $_ -match "^\s*CLOUDFLARE_TUNNEL_TOKEN\s*=\s*\S+" } |
+      Select-Object -First 1
+    if (-not $tokenConfigured) {
+      throw "CLOUDFLARE_TUNNEL_TOKEN is missing from .env.production. Add a fresh tunnel token before starting Compose tunnel mode."
+    }
   }
 }
 
@@ -500,7 +509,7 @@ function Save-FailureLogs {
 function Show-DeploymentSummary {
   param([pscustomobject]$Config)
 
-  $tunnelTarget = "http://localhost:3000"
+  $tunnelTarget = "http://127.0.0.1:3000"
   if ($Config.CloudflaredMode -eq "compose") {
     $tunnelTarget = "http://dm-admin:3000"
   }

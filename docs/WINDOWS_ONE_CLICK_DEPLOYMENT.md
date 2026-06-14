@@ -8,14 +8,14 @@ application UI, business logic, authentication, Supabase schema, RLS, or data.
 ```text
 Admin browser
   -> https://admin-dm.erniecodev.win
-  -> Cloudflare Tunnel Windows service
-  -> http://localhost:3000
+  -> Cloudflare Tunnel Docker container
+  -> http://dm-admin:3000
   -> Docker container dm-admin
 
 Public browser
   -> https://public-dm.erniecodev.win
-  -> Cloudflare Tunnel Windows service
-  -> http://localhost:3000
+  -> Cloudflare Tunnel Docker container
+  -> http://dm-admin:3000
   -> Docker container dm-admin
 ```
 
@@ -29,21 +29,14 @@ Install these on the final Windows server:
 1. Docker Desktop with Docker Compose v2.
 2. Git for Windows.
 3. Windows PowerShell 5.1 or newer.
-4. Cloudflared installed as the existing Windows service.
+4. A Cloudflare Tunnel token for the `dm-hotel` tunnel.
 
 Before deployment:
 
 - Start Docker Desktop and wait until the engine reports ready.
 - Confirm the Cloudflare tunnel is Healthy.
-- Confirm both published application routes point to `http://localhost:3000`.
+- Confirm enabled published application routes point to `http://dm-admin:3000`.
 - Configure Docker Desktop to start when the server starts.
-- Configure the `cloudflared` Windows service for Automatic startup.
-
-Check Cloudflared:
-
-```powershell
-Get-Service cloudflared
-```
 
 ## Recommended Project Location
 
@@ -72,11 +65,11 @@ $DeployConfig = @{
   AppDir = "C:\dm-admin"
   RepoUrl = "https://github.com/OWNER/REPOSITORY.git"
   Branch = "main"
-  LocalUrl = "http://localhost:3000"
+  LocalUrl = "http://127.0.0.1:3000"
   ProductionUrl = "https://admin-dm.erniecodev.win"
   PublicProductionUrl = "https://public-dm.erniecodev.win"
   CheckPublicProductionUrl = $false
-  CloudflaredMode = "windows-service"
+  CloudflaredMode = "compose"
   CloudflaredServiceName = "cloudflared"
   AppContainerName = "dm-admin"
   CloudflaredContainerName = "dm-cloudflared"
@@ -110,9 +103,17 @@ ADMIN_SUBDOMAIN=admin-dm.erniecodev.win
 NEXT_PUBLIC_APP_DOMAIN=public-dm.erniecodev.win
 ```
 
-Do not add the Cloudflare tunnel token when Cloudflared is already installed as
-a Windows service. `.env.production` is ignored by Git and is never replaced by
-the update script.
+Add a fresh token from **Cloudflare Zero Trust -> Networks -> Connectors ->
+Cloudflare Tunnels -> dm-hotel -> Add a connector**:
+
+```env
+CLOUDFLARE_TUNNEL_TOKEN=your-new-token
+```
+
+Do not post or commit the token. `.env.production` is ignored by Git and is
+never replaced by the update script. Starting the Compose tunnel profile
+registers the connector automatically; no Windows service installation is
+required.
 
 ## Initial Installation
 
@@ -210,7 +211,7 @@ PowerShell:
 .\scripts\healthcheck-windows.ps1 -LocalOnly
 ```
 
-Stopping Docker does not stop the host-installed Cloudflared service. The stop
+Stopping the Compose deployment also stops its Cloudflared container. The stop
 script does not remove images or volumes.
 
 ## Verify the Application
@@ -229,7 +230,7 @@ Expected port:
 
 Open:
 
-- `http://localhost:3000`
+- `http://127.0.0.1:3000`
 - `https://admin-dm.erniecodev.win`
 - `https://public-dm.erniecodev.win`
 
@@ -293,14 +294,13 @@ Do not discard changes until their owner confirms they are unnecessary.
 The server branch has diverged from GitHub. Do not force reset it. Inspect the
 branch and commit history before continuing.
 
-### Cloudflared service is not running
+### Cloudflared container is not running
 
-Open Administrator PowerShell:
+Confirm the token exists in `.env.production`, then run:
 
 ```powershell
-Get-Service cloudflared
-Start-Service cloudflared
-Set-Service cloudflared -StartupType Automatic
+docker compose --env-file .env.production --profile tunnel up -d
+docker compose --env-file .env.production --profile tunnel logs --tail 100 cloudflared
 ```
 
 ### Local app works but production domains fail
@@ -308,9 +308,9 @@ Set-Service cloudflared -StartupType Automatic
 Check:
 
 1. Cloudflare tunnel status is Healthy.
-2. Both published application routes use `http://localhost:3000`.
+2. Enabled published application routes use `http://dm-admin:3000`.
 3. HTTP Host Header is empty.
-4. The Windows `cloudflared` service is running.
+4. The `dm-cloudflared` container is running.
 5. Docker shows `dm-admin` as healthy.
 
 ### Review failure logs
