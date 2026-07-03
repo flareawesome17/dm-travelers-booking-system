@@ -276,4 +276,162 @@ describe("shiftUtils", () => {
     expect(result.is_overtime).toBe(true);
     expect(updateMock).not.toHaveBeenCalled();
   });
+
+  it("auto-closes a stale prior-date open shift before creating today's detected shift", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-03T08:00:00.000Z"));
+
+    const staleOpenShiftLog = {
+      id: "shift-log-stale-morning",
+      shift_id: "shift-morning",
+      date: "2026-07-02",
+      status: "OPEN",
+      created_at: "2026-07-02T06:00:00.000Z",
+    };
+
+    const updatePayloads: Array<Record<string, unknown>> = [];
+    const insertPayloads: Array<Record<string, unknown>> = [];
+
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === "shifts") {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                order: vi.fn(async () => ({
+                  data: [
+                    {
+                      id: "shift-morning",
+                      name: "Morning",
+                      start_time: "06:00:00",
+                      end_time: "14:00:00",
+                      sort_order: 1,
+                      is_active: true,
+                    },
+                    {
+                      id: "shift-afternoon",
+                      name: "Afternoon",
+                      start_time: "14:00:00",
+                      end_time: "22:00:00",
+                      sort_order: 2,
+                      is_active: true,
+                    },
+                  ],
+                  error: null,
+                })),
+              })),
+            })),
+          };
+        }
+
+        if (table === "shift_logs") {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn((column: string, value: string) => {
+                if (column === "status" && value === "OPEN") {
+                  return {
+                    order: vi.fn(() => ({
+                      limit: vi.fn(async () => ({
+                        data: [staleOpenShiftLog],
+                        error: null,
+                      })),
+                    })),
+                  };
+                }
+
+                if (column === "shift_id" && value === "shift-morning") {
+                  return {
+                    eq: vi.fn((dateColumn: string, dateValue: string) => {
+                      expect(dateColumn).toBe("date");
+                      expect(dateValue).toBe("2026-07-03");
+                      return {
+                        maybeSingle: vi.fn(async () => ({
+                          data: null,
+                          error: null,
+                        })),
+                      };
+                    }),
+                  };
+                }
+
+                throw new Error(`Unexpected shift_logs filter: ${column}=${value}`);
+              }),
+            })),
+            update: vi.fn((payload: Record<string, unknown>) => {
+              updatePayloads.push(payload);
+              return {
+                eq: vi.fn(async () => ({ data: null, error: null })),
+              };
+            }),
+            insert: vi.fn((payload: Record<string, unknown>) => {
+              insertPayloads.push(payload);
+              return {
+                select: vi.fn(() => ({
+                  single: vi.fn(async () => ({
+                    data: {
+                      id: "shift-log-today-morning",
+                      ...payload,
+                    },
+                    error: null,
+                  })),
+                })),
+              };
+            }),
+          };
+        }
+
+        if (table === "settings") {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: { value: "false" },
+                  error: null,
+                })),
+              })),
+            })),
+          };
+        }
+
+        if (table === "shift_transactions") {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(async () => ({
+                data: [],
+                error: null,
+              })),
+            })),
+          };
+        }
+
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    };
+
+    getSupabaseAdminMock.mockReturnValue(supabase);
+
+    const result = await getOrCreateActiveShiftLog("admin-1");
+
+    expect(updatePayloads).toHaveLength(1);
+    expect(updatePayloads[0]).toMatchObject({
+      status: "CLOSED",
+      closing_type: "AUTO_STALE",
+      close_notes: "Auto-closed because a stale prior-date shift was still open",
+    });
+    expect(insertPayloads).toEqual([
+      {
+        shift_id: "shift-morning",
+        date: "2026-07-03",
+        opened_by: "admin-1",
+        status: "OPEN",
+      },
+    ]);
+    expect(result.shiftLog).toMatchObject({
+      id: "shift-log-today-morning",
+      shift_id: "shift-morning",
+      date: "2026-07-03",
+      status: "OPEN",
+    });
+    expect(result.is_overtime).toBe(false);
+  });
 });

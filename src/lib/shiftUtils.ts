@@ -45,6 +45,20 @@ export type ShiftDefinition = {
   is_active: boolean;
 };
 
+function isStaleOpenShiftLog(
+  openLog: { shift_id?: string | null; date?: string | null },
+  detectedShift: ShiftDefinition,
+  currentDate: string,
+  targetShiftDate: string,
+) {
+  if (!openLog.date) return true;
+  if (openLog.date !== targetShiftDate) return true;
+
+  // Overnight shifts use the previous date after midnight. That is valid only
+  // when the open log belongs to the currently detected overnight shift.
+  return openLog.date !== currentDate && openLog.shift_id !== detectedShift.id;
+}
+
 /**
  * Determine which shift a given Manila time falls into.
  * Handles overnight shifts (e.g., Night 22:00–06:00).
@@ -183,6 +197,7 @@ export async function getOrCreateActiveShiftLog(adminId?: string) {
 
   if (existingOpenLog) {
     const isOvertime = existingOpenLog.shift_id !== detectedShift.id || existingOpenLog.date !== targetShiftDate;
+    const isStale = isStaleOpenShiftLog(existingOpenLog, detectedShift, currentDate, targetShiftDate);
     
     if (isOvertime) {
       // 4. Fetch auto-close setting
@@ -194,7 +209,7 @@ export async function getOrCreateActiveShiftLog(adminId?: string) {
       
       const autoCloseShifts = settingsData?.value === "true";
 
-      if (autoCloseShifts) {
+      if (autoCloseShifts || isStale) {
         // Auto-close the old orphaned shift
         // Fetch calculations before auto-closing
         const { data: transactions, error: txErr } = await supabase
@@ -220,8 +235,8 @@ export async function getOrCreateActiveShiftLog(adminId?: string) {
         await supabase.from("shift_logs").update({
           status: "CLOSED",
           closed_at: new Date().toISOString(),
-          close_notes: "Auto-closed due to shift timeout",
-          closing_type: "AUTO",
+          close_notes: isStale ? "Auto-closed because a stale prior-date shift was still open" : "Auto-closed due to shift timeout",
+          closing_type: isStale ? "AUTO_STALE" : "AUTO",
           total_income: totalIncome,
           total_expense: totalExpense,
           net_total: netTotal,
