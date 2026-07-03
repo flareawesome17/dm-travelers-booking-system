@@ -132,7 +132,7 @@ describe("POST /api/bookings/[id]/check-out", () => {
     expect(supabaseState.roomUpdateMock).not.toHaveBeenCalled();
   });
 
-  it("rolls the booking back when dirtying the room fails", async () => {
+  it("keeps the guest checked out when dirtying the room fails", async () => {
     const supabaseState = createSupabaseMock({
       roomUpdateError: { message: "room update failed" },
     });
@@ -146,11 +146,14 @@ describe("POST /api/bookings/[id]/check-out", () => {
     );
     const body = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(body).toEqual({ error: "Failed to update room status. Check-out has been reverted." });
+    expect(response.status).toBe(200);
+    expect(body.status).toBe("Checked-Out");
+    expect(body.room_status_warning).toBe(
+      "Guest was checked out, but the room status could not be changed to Dirty. Update housekeeping status manually."
+    );
     expect(supabaseState.roomUpdateMock).toHaveBeenCalledOnce();
-    expect(supabaseState.bookingUpdateMock).toHaveBeenCalledTimes(2);
-    expect(supabaseState.bookingRollbackEqMock).toHaveBeenCalledWith("id", "booking-1");
+    expect(supabaseState.bookingUpdateMock).toHaveBeenCalledOnce();
+    expect(supabaseState.bookingRollbackEqMock).not.toHaveBeenCalled();
   });
 
   it("returns the permission error when the caller cannot update bookings", async () => {

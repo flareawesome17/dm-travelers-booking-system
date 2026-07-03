@@ -82,23 +82,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
-    // Mark the associated room as Dirty AFTER successful booking update
+    let roomStatusWarning: string | null = null;
+
+    // Mark the associated room as Dirty AFTER successful booking update.
+    // Do not roll back the guest checkout if housekeeping status cannot be updated:
+    // the guest has already left, and reverting to Checked-In makes overtime continue.
     if (booking.room_id) {
       const { error: roomError } = await supabase
         .from("rooms")
         .update({ status: "Dirty", updated_at: new Date().toISOString() })
         .eq("id", booking.room_id);
 
-      // Rollback booking status if room update fails
       if (roomError) {
-        await supabase
-          .from("bookings")
-          .update({ status: "Checked-In", updated_at: new Date().toISOString() })
-          .eq("id", id);
-        return NextResponse.json(
-          { error: "Failed to update room status. Check-out has been reverted." },
-          { status: 500 }
-        );
+        console.error("[CHECK_OUT_ROOM_STATUS_ERROR]", roomError);
+        roomStatusWarning = "Guest was checked out, but the room status could not be changed to Dirty. Update housekeeping status manually.";
       }
     }
 
@@ -106,12 +103,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const gName = data?.guests?.full_name || "Guest";
     const rNum = data?.rooms?.room_number || "?";
     broadcastSystemMessage({
-      content: `${gName} has checked out of Room ${rNum}. Room is now marked as Dirty.`,
+      content: roomStatusWarning
+        ? `${gName} has checked out of Room ${rNum}. Room status still needs manual housekeeping update.`
+        : `${gName} has checked out of Room ${rNum}. Room is now marked as Dirty.`,
       category: "booking",
-      metadata: { booking_id: id, action: "check_out" },
+      metadata: { booking_id: id, action: "check_out", room_status_warning: roomStatusWarning },
     }, supabase).catch(() => {});
 
-    return NextResponse.json({ ...data, late_checkout_fee_applied: lateFee });
+    return NextResponse.json({ ...data, late_checkout_fee_applied: lateFee, room_status_warning: roomStatusWarning });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
