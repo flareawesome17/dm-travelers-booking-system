@@ -16,16 +16,9 @@ function sumAmount(rows: AmountRow[] | RestaurantAmountRow[] | null | undefined,
   return (rows ?? []).reduce((total, row) => total + Number((row as any)[key] || 0), 0);
 }
 
-/* ── Server-side response cache ──────────────────────────────────────
- *
- * The dashboard fires 10 parallel DB queries. With 3 admin users polling
- * every 2 minutes, that's 30 queries/min * 10 = 300 query executions/min.
- * Since all users see the same dashboard data, we cache the assembled
- * response for 60 seconds. This means at most 10 queries per minute total
- * regardless of how many admins are logged in.
- * ───────────────────────────────────────────────────────────────────── */
-const DASHBOARD_CACHE_TTL_MS = 60_000; // 60 seconds
-let dashboardCache: { data: any; expiresAt: number } | null = null;
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate",
+};
 
 export async function GET(req: NextRequest) {
   const auth = await requireAnyPermission(req, [
@@ -36,12 +29,6 @@ export async function GET(req: NextRequest) {
     "reports.analytics.read",
   ]);
   if ("error" in auth) return auth.error;
-
-  // Return cached response if fresh
-  const now = Date.now();
-  if (dashboardCache && dashboardCache.expiresAt > now) {
-    return NextResponse.json(dashboardCache.data);
-  }
 
   try {
     const supabase = getSupabaseAdmin();
@@ -171,13 +158,9 @@ export async function GET(req: NextRequest) {
       revenueToday,
     };
 
-    // Cache for 60 seconds
-    dashboardCache = { data: payload, expiresAt: Date.now() + DASHBOARD_CACHE_TTL_MS };
-
-    return NextResponse.json(payload);
+    return NextResponse.json(payload, { headers: NO_STORE_HEADERS });
   } catch (error) {
     console.error("[ADMIN_DASHBOARD_ERROR]", error);
     return internalError();
   }
 }
-
